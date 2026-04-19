@@ -1,0 +1,126 @@
+import { useState, useCallback } from 'react'
+import ProblemsPage from './components/ProblemsPage'
+import CalendarView from './components/CalendarView'
+import DailyRevisions from './components/DailyRevisions'
+import ProblemModal from './components/ProblemModal'
+import SyncSettings from './components/SyncSettings'
+import { syncToday } from './services/leetcode'
+import * as store from './store'
+
+const TABS = ['Calendar', "Today's Revision", 'Problems', 'Settings']
+
+export default function App() {
+  const [tab, setTab] = useState('Calendar')
+  const [problems, setProblems] = useState(store.getProblems())
+  const [revisions, setRevisions] = useState(store.getRevisions())
+  const [selectedProblem, setSelectedProblem] = useState(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState('')
+
+  const reload = useCallback(() => {
+    setProblems(store.getProblems())
+    setRevisions(store.getRevisions())
+  }, [])
+
+  const handleRevise = useCallback(slug => {
+    store.addRevision(slug)
+    setRevisions(store.getRevisions())
+  }, [])
+
+  const handleRemoveRevision = useCallback((slug, date) => {
+    store.removeRevision(slug, date)
+    setRevisions(store.getRevisions())
+  }, [])
+
+  const handleQuickSync = useCallback(async () => {
+    const session = store.getSession()
+    if (!session) {
+      setSyncMsg('Set your session cookie in Settings first.')
+      setTimeout(() => setSyncMsg(''), 3000)
+      return
+    }
+    setSyncing(true)
+    setSyncMsg('Syncing today...')
+    try {
+      const { results, resubmissions } = await syncToday(session, msg => setSyncMsg(msg))
+      if (results.length > 0) {
+        const merged = store.mergeProblems(results)
+        setProblems(merged)
+      }
+      for (const r of resubmissions) {
+        store.addRevision(r.slug, r.date)
+      }
+      if (resubmissions.length > 0) setRevisions(store.getRevisions())
+      setSyncMsg(`Synced ${results.length} problem${results.length !== 1 ? 's' : ''}, ${resubmissions.length} revision${resubmissions.length !== 1 ? 's' : ''}`)
+    } catch (err) {
+      setSyncMsg('Sync failed: ' + err.message)
+    }
+    setSyncing(false)
+    setTimeout(() => setSyncMsg(''), 4000)
+  }, [])
+
+  const count = Object.keys(problems).length
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <nav className="tabs">
+          {TABS.map(t => (
+            <button
+              key={t}
+              className={`tab ${tab === t ? 'active' : ''}`}
+              onClick={() => setTab(t)}
+            >
+              {t}
+              {t === 'Problems' && count > 0 && <span className="tab-badge">{count}</span>}
+            </button>
+          ))}
+          <div className="quick-sync">
+            <button
+              className="quick-sync-btn"
+              onClick={handleQuickSync}
+              disabled={syncing}
+            >
+              {syncing ? '⟳ Syncing...' : '⟳ Sync Today'}
+            </button>
+            {syncMsg && <span className="quick-sync-msg">{syncMsg}</span>}
+          </div>
+        </nav>
+      </header>
+
+      <main className="app-main">
+        {tab === 'Problems' && (
+          <ProblemsPage
+            problems={problems}
+            revisions={revisions}
+            onRevise={handleRevise}
+          />
+        )}
+        {tab === 'Calendar' && (
+          <CalendarView
+            problems={problems}
+            revisions={revisions}
+            onRevise={handleRevise}
+            onRemoveRevision={handleRemoveRevision}
+          />
+        )}
+        {tab === "Today's Revision" && (
+          <DailyRevisions
+            problems={problems}
+            revisions={revisions}
+            onSelectProblem={setSelectedProblem}
+            onRevise={handleRevise}
+          />
+        )}
+        {tab === 'Settings' && <SyncSettings onSyncComplete={reload} />}
+      </main>
+
+      <ProblemModal
+        problem={selectedProblem}
+        revisions={revisions}
+        onClose={() => setSelectedProblem(null)}
+        onRevise={handleRevise}
+      />
+    </div>
+  )
+}
