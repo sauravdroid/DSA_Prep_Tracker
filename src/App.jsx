@@ -4,10 +4,11 @@ import CalendarView from './components/CalendarView'
 import DailyRevisions from './components/DailyRevisions'
 import ProblemModal from './components/ProblemModal'
 import SyncSettings from './components/SyncSettings'
+import StudyPlanCalendar from './components/StudyPlanCalendar'
 import { syncToday } from './services/leetcode'
 import * as store from './store'
 
-const TABS = ['Calendar', "Today's Revision", 'Problems', 'Settings']
+const TABS = ['Calendar', "Today's Revision", 'Study Plan', 'Problems', 'Settings']
 
 export default function App() {
   const [tab, setTab] = useState('Calendar')
@@ -42,7 +43,7 @@ export default function App() {
     setSyncing(true)
     setSyncMsg('Syncing today...')
     try {
-      const { results, resubmissions } = await syncToday(session, msg => setSyncMsg(msg))
+      const { results, resubmissions } = await syncToday(session, msg => setSyncMsg(msg), store.getProblems())
       if (results.length > 0) {
         const merged = store.mergeProblems(results)
         setProblems(merged)
@@ -110,6 +111,12 @@ export default function App() {
             revisions={revisions}
             onSelectProblem={setSelectedProblem}
             onRevise={handleRevise}
+          />
+        )}
+        {tab === 'Study Plan' && (
+          <StudyPlanCalendar
+            problems={problems}
+            revisions={revisions}
           />
         )}
         {tab === 'Settings' && <SyncSettings onSyncComplete={reload} />}

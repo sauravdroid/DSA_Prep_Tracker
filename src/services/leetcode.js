@@ -16,7 +16,7 @@ async function gql(query, variables, session) {
   return json.data
 }
 
-export async function fetchSubmissions(session, startDate, onProgress) {
+export async function fetchSubmissions(session, startDate, onProgress, existingProblems = {}) {
   const startTs = Math.floor(new Date(startDate).getTime() / 1000)
   const endTs = Math.floor(Date.now() / 1000) + 86400
   const problemMap = {} // slug -> problem data (keeps getting overwritten to oldest date)
@@ -61,11 +61,22 @@ export async function fetchSubmissions(session, startDate, onProgress) {
       const solvedDate = toLocalDateStr(new Date(ts * 1000))
       const key = `${s.titleSlug}|${solvedDate}`
 
-      // Track re-submissions on different dates as revisions
-      if (problemMap[s.titleSlug] && !seenSlugDates.has(key)) {
-        resubmissions.push({ slug: s.titleSlug, date: solvedDate })
-      }
+      if (seenSlugDates.has(key)) continue
       seenSlugDates.add(key)
+
+      // Detect revision: problem already seen in this fetch OR exists in store with a different date
+      const existingDate = problemMap[s.titleSlug]?.dateSolved
+        || existingProblems[s.titleSlug]?.dateSolved
+      if (existingDate && existingDate !== solvedDate) {
+        // Newest-first: the first occurrence is the latest solve, which is the revision
+        // Only record the newer date as a revision (skip if this date is older)
+        if (solvedDate > existingDate) {
+          resubmissions.push({ slug: s.titleSlug, date: solvedDate })
+        } else if (problemMap[s.titleSlug]) {
+          // We already recorded the newer date in problemMap; that's the revision
+          resubmissions.push({ slug: s.titleSlug, date: problemMap[s.titleSlug].dateSolved })
+        }
+      }
 
       // Always overwrite — since we iterate newest-first, the last write wins (oldest date)
       problemMap[s.titleSlug] = {
@@ -101,9 +112,9 @@ export async function fetchProblemDetails(slug, session) {
   return data.question
 }
 
-export async function syncProblems(session, startDate, onProgress) {
+export async function syncProblems(session, startDate, onProgress, existingProblems = {}) {
   onProgress?.('Fetching submissions...')
-  const { problems: submissions, failCounts, resubmissions } = await fetchSubmissions(session, startDate, onProgress)
+  const { problems: submissions, failCounts, resubmissions } = await fetchSubmissions(session, startDate, onProgress, existingProblems)
 
   const results = []
   for (let i = 0; i < submissions.length; i++) {
@@ -140,9 +151,9 @@ export async function syncProblems(session, startDate, onProgress) {
   return { results, resubmissions }
 }
 
-export async function syncToday(session, onProgress) {
+export async function syncToday(session, onProgress, existingProblems = {}) {
   const today = todayStr()
-  return syncProblems(session, today, onProgress)
+  return syncProblems(session, today, onProgress, existingProblems)
 }
 
 function delay(ms) {

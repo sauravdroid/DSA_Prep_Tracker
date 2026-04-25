@@ -20,7 +20,7 @@ export default function SyncSettings({ onSyncComplete }) {
     setSyncing(true)
     setStatus('Starting sync...')
     try {
-      const { results: problems, resubmissions } = await syncProblems(session.trim(), startDate, setStatus)
+      const { results: problems, resubmissions } = await syncProblems(session.trim(), startDate, setStatus, store.getProblems())
       const merged = store.mergeProblems(problems)
       // Store re-submissions as revisions
       for (const r of resubmissions) {

@@ -1,0 +1,102 @@
+{
+  "id": "dp-foundations-apr26",
+  "title": "2-Week DP Study Plan",
+  "description": "Cover core DP patterns: 1D DP, Grid DP, Coin/Knapsack, and String DP while revising old patterns",
+  "startDate": "2026-04-26",
+  "phases": [
+    { "label": "1D DP", "days": [1, 2, 3, 4, 5], "color": "var(--blue)" },
+    { "label": "Grid DP", "days": [6, 7], "color": "var(--green)" },
+    { "label": "Coin / Knapsack", "days": [8, 9, 10, 11, 12], "color": "var(--accent)" },
+    { "label": "String DP", "days": [13, 14], "color": "#8b5cf6" }
+  ],
+  "weeks": [
+    { "label": "Week 1 — Foundation DP" },
+    { "label": "Week 2 — Intermediate DP + Mixed Practice" }
+  ],
+  "days": [
+    {
+      "day": 1, "date": "2026-04-26",
+      "newProblems": [{ "title": "Climbing Stairs", "url": "https://leetcode.com/problems/climbing-stairs/", "difficulty": "Easy", "pattern": "Dynamic Programming" }],
+      "revisionProblems": [{ "slug": "number-of-islands", "reason": "Apr 17, 0 revisions" }],
+      "timed": false
+    },
+    {
+      "day": 2, "date": "2026-04-27",
+      "newProblems": [{ "title": "Min Cost Climbing Stairs", "url": "https://leetcode.com/problems/min-cost-climbing-stairs/", "difficulty": "Easy", "pattern": "Dynamic Programming" }],
+      "revisionProblems": [{ "slug": "search-in-rotated-sorted-array", "reason": "Mar 12, 1 revision" }],
+      "timed": false
+    },
+    {
+      "day": 3, "date": "2026-04-28",
+      "newProblems": [{ "title": "House Robber", "url": "https://leetcode.com/problems/house-robber/", "difficulty": "Medium", "pattern": "Dynamic Programming" }],
+      "revisionProblems": [{ "slug": "diameter-of-binary-tree", "reason": "Apr 4, 2 revisions" }],
+      "timed": true
+    },
+    {
+      "day": 4, "date": "2026-04-29",
+      "newProblems": [{ "title": "House Robber II", "url": "https://leetcode.com/problems/house-robber-ii/", "difficulty": "Medium", "pattern": "Dynamic Programming" }],
+      "revisionProblems": [{ "slug": "subsets", "reason": "Mar 25, 4 revisions" }],
+      "timed": false
+    },
+    {
+      "day": 5, "date": "2026-04-30",
+      "newProblems": [{ "title": "Decode Ways", "url": "https://leetcode.com/problems/decode-ways/", "difficulty": "Medium", "pattern": "Dynamic Programming" }],
+      "revisionProblems": [{ "slug": "gas-station", "reason": "Mar 17, 4 revisions" }],
+      "timed": false
+    },
+    {
+      "day": 6, "date": "2026-05-01",
+      "newProblems": [{ "title": "Unique Paths", "url": "https://leetcode.com/problems/unique-paths/", "difficulty": "Medium", "pattern": "Dynamic Programming" }],
+      "revisionProblems": [{ "slug": "longest-repeating-character-replacement", "reason": "Mar 21, 4 revisions" }],
+      "timed": true
+    },
+    {
+      "day": 7, "date": "2026-05-02",
+      "newProblems": [{ "title": "Unique Paths II", "url": "https://leetcode.com/problems/unique-paths-ii/", "difficulty": "Medium", "pattern": "Dynamic Programming" }],
+      "revisionProblems": [{ "slug": "daily-temperatures", "reason": "Mar 31, 1 revision" }],
+      "timed": false
+    },
+    {
+      "day": 8, "date": "2026-05-03",
+      "newProblems": [{ "title": "Minimum Path Sum", "url": "https://leetcode.com/problems/minimum-path-sum/", "difficulty": "Medium", "pattern": "Dynamic Programming" }],
+      "revisionProblems": [{ "slug": "course-schedule", "reason": "Apr 20, 1 revision" }],
+      "timed": false
+    },
+    {
+      "day": 9, "date": "2026-05-04",
+      "newProblems": [{ "title": "Coin Change", "url": "https://leetcode.com/problems/coin-change/", "difficulty": "Medium", "pattern": "Dynamic Programming" }],
+      "revisionProblems": [{ "slug": "binary-tree-maximum-path-sum", "reason": "Apr 5, 0 revisions" }],
+      "timed": true
+    },
+    {
+      "day": 10, "date": "2026-05-05",
+      "newProblems": [{ "title": "Coin Change II", "url": "https://leetcode.com/problems/coin-change-ii/", "difficulty": "Medium", "pattern": "Dynamic Programming" }],
+      "revisionProblems": [{ "slug": "permutations", "reason": "Mar 28, 4 revisions" }],
+      "timed": false
+    },
+    {
+      "day": 11, "date": "2026-05-06",
+      "newProblems": [{ "title": "Partition Equal Subset Sum", "url": "https://leetcode.com/problems/partition-equal-subset-sum/", "difficulty": "Medium", "pattern": "Dynamic Programming" }],
+      "revisionProblems": [{ "slug": "partition-labels", "reason": "Apr 9, 2 revisions" }],
+      "timed": false
+    },
+    {
+      "day": 12, "date": "2026-05-07",
+      "newProblems": [{ "title": "Target Sum", "url": "https://leetcode.com/problems/target-sum/", "difficulty": "Medium", "pattern": "Dynamic Programming" }],
+      "revisionProblems": [{ "slug": "koko-eating-bananas", "reason": "Mar 14, 2 revisions" }],
+      "timed": true
+    },
+    {
+      "day": 13, "date": "2026-05-08",
+      "newProblems": [{ "title": "Longest Common Subsequence", "url": "https://leetcode.com/problems/longest-common-subsequence/", "difficulty": "Medium", "pattern": "Dynamic Programming" }],
+      "revisionProblems": [{ "slug": "pacific-atlantic-water-flow", "reason": "Apr 21, 0 revisions" }],
+      "timed": false
+    },
+    {
+      "day": 14, "date": "2026-05-09",
+      "newProblems": [{ "title": "Word Break", "url": "https://leetcode.com/problems/word-break/", "difficulty": "Medium", "pattern": "Dynamic Programming" }],
+      "revisionProblems": [{ "slug": "palindrome-partitioning", "reason": "Mar 30, 2 revisions" }],
+      "timed": false
+    }
+  ]
+}

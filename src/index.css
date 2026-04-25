@@ -183,6 +183,21 @@ button {
   font-size: 14px;
 }
 
+.export-btn {
+  padding: 6px 14px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.export-btn:hover {
+  background: var(--accent2);
+}
+
 .filter-input {
   width: 100%;
   padding: 10px 14px;
@@ -1681,6 +1696,34 @@ button {
   opacity: 0.55;
 }
 
+.rev-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: transparent;
+  background: var(--surface2);
+  transition: all 0.2s;
+}
+
+.rev-check.done {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: white;
+  animation: checkPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes checkPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); transform: scale(1); }
+  50% { box-shadow: 0 0 16px 6px rgba(34, 197, 94, 0.6); transform: scale(1.1); }
+}
+
 .rev-problem-info {
   flex: 1;
   min-width: 0;
@@ -2022,4 +2065,667 @@ button {
 .last-sync {
   font-size: 12px;
   color: var(--text2);
+}
+
+/* Add to revision list - icon in problem rows */
+.add-rev-list-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text2);
+  background: var(--surface2);
+  transition: all 0.2s;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.add-rev-list-icon:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(255, 161, 22, 0.1);
+}
+
+.add-rev-list-icon.added {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: white;
+}
+
+/* Add to revision list - large button in detail view */
+.add-rev-list-btn {
+  width: 100%;
+  padding: 10px 16px;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  background: rgba(255, 161, 22, 0.08);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 16px;
+}
+
+.add-rev-list-btn:hover {
+  background: rgba(255, 161, 22, 0.15);
+}
+
+.add-rev-list-btn.added {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: #22c55e;
+  color: #16a34a;
+}
+.yesterday-page {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.yesterday-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.yesterday-header h2 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.yesterday-date {
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.yesterday-stats {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.yesterday-stat {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 4px;
+}
+
+.yesterday-stat.new {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+}
+
+.yesterday-stat.rev {
+  background: rgba(139, 92, 246, 0.12);
+  color: #7c3aed;
+}
+
+.yesterday-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.yesterday-section-title {
+  font-size: 15px;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--border);
+}
+
+.yesterday-section-title.new-color {
+  color: #16a34a;
+  border-bottom-color: #22c55e;
+}
+
+.yesterday-section-title.rev-color {
+  color: #7c3aed;
+  border-bottom-color: #8b5cf6;
+}
+
+/* ===== Study Plan Calendar ===== */
+.study-plan-page {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+  height: calc(100vh - 120px);
+}
+
+.study-plan-page > .cal-middle {
+  order: 2;
+}
+
+.sp-calendar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.sp-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sp-plan-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.sp-plan-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--surface2);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.sp-plan-tab:hover {
+  border-color: var(--border);
+}
+
+.sp-plan-tab.active {
+  border-color: var(--accent);
+  background: rgba(255, 193, 30, 0.08);
+}
+
+.sp-plan-tab.complete .sp-plan-tab-check {
+  color: var(--green);
+}
+
+.sp-plan-tab-check {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text2);
+  flex-shrink: 0;
+}
+
+.sp-plan-tab-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sp-plan-tab-dates {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sp-plan-tab-title {
+  font-size: 11px;
+  color: var(--text2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sp-plan-tab-pct {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.sp-header h2 {
+  font-size: 18px;
+}
+
+.sp-plan-select {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sp-date-range {
+  font-size: 13px;
+  color: var(--text2);
+  font-weight: 600;
+}
+
+.sp-description {
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.sp-calendar-grid {
+  flex: 0;
+}
+
+.calendar-cell.sp-done {
+  background: rgba(0, 184, 163, 0.12);
+}
+
+.calendar-cell.sp-done .cell-pat {
+  opacity: 0.6;
+}
+
+.calendar-cell.sp-done .cell-progress-new,
+.calendar-cell.sp-done .cell-progress-rev {
+  opacity: 0.7;
+}
+
+.sp-done-check {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--green);
+  color: white;
+  font-size: 30px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+  line-height: 1;
+  box-shadow: 0 2px 12px rgba(0, 184, 163, 0.4);
+  opacity: 1;
+  transition: opacity 0.2s;
+}
+
+.calendar-cell.sp-done:hover .sp-done-check {
+  opacity: 0.15;
+}
+
+.calendar-cell.sp-done .cell-patterns,
+.calendar-cell.sp-done .cell-top-row {
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+
+.calendar-cell.sp-done:hover .cell-patterns,
+.calendar-cell.sp-done:hover .cell-top-row {
+  opacity: 1;
+}
+
+.sp-stats {
+  display: flex;
+  gap: 10px;
+}
+
+.sp-stat {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.sp-stat.new-color {
+  background: rgba(0, 184, 163, 0.1);
+  color: var(--green);
+}
+
+.sp-stat.rev-color {
+  background: rgba(139, 92, 246, 0.1);
+  color: #8b5cf6;
+}
+
+.sp-stat.timed-color {
+  background: rgba(255, 161, 22, 0.1);
+  color: var(--accent);
+}
+
+.sp-phases {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.sp-phase-chip {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border: 1.5px solid;
+  border-radius: 20px;
+}
+
+.sp-week-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text2);
+  margin: 16px 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sp-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.sp-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--surface2);
+  border: 1px solid transparent;
+  border-top: 3px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  text-align: left;
+  min-height: 100px;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+
+.sp-cell:hover {
+  border-color: var(--accent);
+  border-top-color: var(--accent);
+}
+
+.sp-cell.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.sp-cell.today {
+  border-color: var(--accent);
+  background: rgba(255, 193, 30, 0.1);
+}
+
+.sp-cell.done {
+  background: rgba(0, 184, 163, 0.08);
+}
+
+.sp-cell.missed {
+  background: rgba(255, 55, 95, 0.05);
+}
+
+.sp-cell.future {
+  opacity: 0.6;
+}
+
+.sp-cell-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sp-cell-day {
+  font-size: 11px;
+  color: var(--text2);
+  font-weight: 600;
+}
+
+.sp-cell-date {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sp-cell-check {
+  margin-left: auto;
+  color: var(--green);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.sp-cell-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sp-cell-new {
+  font-size: 11px;
+  color: var(--text);
+  font-weight: 500;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sp-cell-timed {
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sp-cell-tags {
+  display: flex;
+  gap: 4px;
+}
+
+.sp-tag {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.sp-tag.new {
+  background: rgba(0, 184, 163, 0.12);
+  color: var(--green);
+}
+
+.sp-tag.rev {
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
+}
+
+/* Detail panel */
+.sp-detail {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.sp-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.sp-detail-header h3 {
+  font-size: 16px;
+}
+
+.sp-phase-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.sp-timed-banner {
+  background: rgba(255, 161, 22, 0.1);
+  border: 1px solid rgba(255, 161, 22, 0.25);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--accent2);
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.sp-section {
+  margin-bottom: 20px;
+}
+
+.sp-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.sp-section-title.new-color {
+  color: var(--green);
+}
+
+.sp-section-title.rev-color {
+  color: #8b5cf6;
+}
+
+.sp-problem-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  transition: opacity 0.2s;
+}
+
+.sp-problem-card.done {
+  opacity: 0.55;
+}
+
+.sp-check-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: none;
+  color: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  margin-top: 2px;
+}
+
+.sp-check-btn.checked {
+  background: var(--green);
+  border-color: var(--green);
+  color: white;
+}
+
+.sp-check-btn:hover:not(.checked) {
+  border-color: var(--green);
+}
+
+.sp-problem-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sp-problem-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sp-problem-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sp-problem-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sp-reason {
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.sp-rev-history {
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 4px;
+}
+
+.sp-protocol {
+  background: var(--surface2);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-top: 16px;
+}
+
+.sp-protocol h4 {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text2);
+}
+
+.sp-protocol ol {
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.7;
+}
+
+.sp-sync-indicator {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 2px;
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--text2);
+}
+
+.sp-sync-indicator.synced {
+  background: rgba(0, 184, 163, 0.12);
+  color: var(--green);
+}
+
+.sp-solved-date {
+  font-size: 12px;
+  color: var(--green);
+  font-weight: 600;
+}
+
+.sp-tag.completed {
+  background: rgba(0, 184, 163, 0.15);
+  color: var(--green);
 }

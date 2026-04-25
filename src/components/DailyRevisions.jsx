@@ -178,6 +178,7 @@ export default function DailyRevisions({ problems, revisions, onSelectProblem, o
                   const done = todayRevisedSlugs.has(p.slug)
                   return (
                     <div key={p.slug} className={`rev-problem-card ${done ? 'revised' : ''}`}>
+                      <span className={`rev-check ${done ? 'done' : ''}`}>{done ? '✓' : ''}</span>
                       <div className="rev-problem-info">
                         <button className="rev-problem-title" onClick={() => onSelectProblem(p)}>
                           {p.title}

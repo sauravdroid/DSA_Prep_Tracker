@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { getPattern } from '../utils/patterns'
 import { toLocalDateStr, todayStr } from '../utils/dateUtils'
-import { getStartDate } from '../store'
+import { getStartDate, getTodayRevisionList, saveTodayRevisionList } from '../store'
 
 function getWeekDates(refDate) {
   const d = new Date(refDate)
@@ -25,6 +25,20 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
   const [calView, setCalView] = useState('week')
   const [weekDrillDate, setWeekDrillDate] = useState(null) // date string for drill-down
   const [weekDrillDir, setWeekDrillDir] = useState(null) // 'open' | 'close'
+  const [revListSlugs, setRevListSlugs] = useState(() => getTodayRevisionList().slugs)
+
+  const revListSet = useMemo(() => new Set(revListSlugs), [revListSlugs])
+
+  const toggleRevList = (slug) => {
+    let next
+    if (revListSet.has(slug)) {
+      next = revListSlugs.filter(s => s !== slug)
+    } else {
+      next = [...revListSlugs, slug]
+    }
+    setRevListSlugs(next)
+    saveTodayRevisionList(next)
+  }
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -249,6 +263,13 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
                 </div>
               </div>
             )}
+
+            <button
+              className={`add-rev-list-btn large ${revListSet.has(sp.slug) ? 'added' : ''}`}
+              onClick={() => toggleRevList(sp.slug)}
+            >
+              {revListSet.has(sp.slug) ? '✓ In Revision List' : '+ Add to Revision List'}
+            </button>
           </div>
         ) : (
           /* Problem list */
@@ -274,6 +295,13 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
                           {(p.failedCount || 0) > 0 && <span className="fail-count">✗{p.failedCount}</span>}
                           <span className={`difficulty-badge ${p.difficulty.toLowerCase()}`}>
                             {p.difficulty}
+                          </span>
+                          <span
+                            className={`add-rev-list-icon ${revListSet.has(p.slug) ? 'added' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); toggleRevList(p.slug) }}
+                            title={revListSet.has(p.slug) ? 'Remove from revision list' : 'Add to revision list'}
+                          >
+                            {revListSet.has(p.slug) ? '✓' : '+'}
                           </span>
                         </span>
                       </button>
@@ -306,6 +334,13 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
                           {(p.failedCount || 0) > 0 && <span className="fail-count">✗{p.failedCount}</span>}
                           <span className={`difficulty-badge ${p.difficulty.toLowerCase()}`}>
                             {p.difficulty}
+                          </span>
+                          <span
+                            className={`add-rev-list-icon ${revListSet.has(p.slug) ? 'added' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); toggleRevList(p.slug) }}
+                            title={revListSet.has(p.slug) ? 'Remove from revision list' : 'Add to revision list'}
+                          >
+                            {revListSet.has(p.slug) ? '✓' : '+'}
                           </span>
                         </span>
                       </button>

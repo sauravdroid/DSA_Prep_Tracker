@@ -2,6 +2,36 @@ import { useState } from 'react'
 import { getPattern } from '../utils/patterns'
 import { todayStr } from '../utils/dateUtils'
 
+function exportCSV(problemList, revisions) {
+  const revisionMap = {}
+  for (const r of revisions) {
+    if (!revisionMap[r.slug]) revisionMap[r.slug] = []
+    revisionMap[r.slug].push(r.date)
+  }
+
+  const headers = ['Title', 'Difficulty', 'Pattern', 'Tags', 'Date Solved', 'Times Revised', 'URL']
+  const rows = problemList.map(p => [
+    p.title,
+    p.difficulty,
+    getPattern(p.tags),
+    (p.tags || []).join('; '),
+    p.dateSolved,
+    (revisionMap[p.slug] || []).length,
+    p.url
+  ])
+
+  const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const csv = [headers.join(','), ...rows.map(r => r.map(escape).join(','))].join('\n')
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `leetcode_problems_${todayStr()}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function ProblemsPage({ problems, revisions, onRevise }) {
   const [expandedTopics, setExpandedTopics] = useState({})
   const [filter, setFilter] = useState('')
@@ -51,6 +81,9 @@ export default function ProblemsPage({ problems, revisions, onRevise }) {
         <div className="problems-header">
           <h2>Problems by Topic</h2>
           <span className="problem-count">{problemList.length} problems</span>
+          <button className="export-btn" onClick={() => exportCSV(problemList, revisions)}>
+            Export CSV
+          </button>
         </div>
 
         <input
