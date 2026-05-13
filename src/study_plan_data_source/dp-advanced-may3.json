@@ -1,0 +1,100 @@
+{
+  "id": "dp-advanced-may4",
+  "title": "1-Week Advanced DP",
+  "description": "Advanced DP patterns — 1 new problem/day + 2 revisions (depth over volume)",
+  "startDate": "2026-05-04",
+  "phases": [
+    { "label": "Subsequence DP", "days": [1, 2], "color": "var(--blue)" },
+    { "label": "Palindrome DP", "days": [3, 4], "color": "var(--green)" },
+    { "label": "String + Grid DP", "days": [5, 6], "color": "var(--accent)" },
+    { "label": "Mixed Advanced DP", "days": [7], "color": "#8b5cf6" }
+  ],
+  "weeks": [
+    { "label": "Week 1 — Advanced DP + Full Revision" }
+  ],
+  "days": [
+    {
+      "day": 1, "date": "2026-05-04",
+      "newProblems": [
+        { "title": "Longest Increasing Subsequence", "url": "https://leetcode.com/problems/longest-increasing-subsequence/", "difficulty": "Medium", "pattern": "Dynamic Programming" },
+        { "title": "Number of Longest Increasing Subsequence", "url": "https://leetcode.com/problems/number-of-longest-increasing-subsequence/", "difficulty": "Medium", "pattern": "Dynamic Programming" }
+      ],
+      "revisionProblems": [
+        { "slug": "decode-ways", "reason": "DP — Apr 27, 0 revisions" },
+        { "slug": "meeting-rooms-ii", "reason": "Greedy — Mar 4, 0 revisions" },
+        { "slug": "insert-interval", "reason": "Array — Mar 7, 0 revisions" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 2, "date": "2026-05-05",
+      "newProblems": [
+        { "title": "Maximum Product Subarray", "url": "https://leetcode.com/problems/maximum-product-subarray/", "difficulty": "Medium", "pattern": "Dynamic Programming" },
+        { "title": "Best Time to Buy and Sell Stock with Cooldown", "url": "https://leetcode.com/problems/best-time-to-buy-and-sell-stock-with-cooldown/", "difficulty": "Medium", "pattern": "Dynamic Programming" }
+      ],
+      "revisionProblems": [
+        { "slug": "unique-paths", "reason": "DP — Apr 27, 0 revisions" },
+        { "slug": "find-minimum-in-rotated-sorted-array", "reason": "Binary Search — Mar 11, 0 revisions" },
+        { "slug": "minimum-window-substring", "reason": "Sliding Window — Mar 22, 0 revisions" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 3, "date": "2026-05-06",
+      "newProblems": [
+        { "title": "Palindromic Substrings", "url": "https://leetcode.com/problems/palindromic-substrings/", "difficulty": "Medium", "pattern": "Dynamic Programming" },
+        { "title": "Longest Palindromic Subsequence", "url": "https://leetcode.com/problems/longest-palindromic-subsequence/", "difficulty": "Medium", "pattern": "Dynamic Programming" }
+      ],
+      "revisionProblems": [
+        { "slug": "minimum-path-sum", "reason": "DP — Apr 28, 0 revisions" },
+        { "slug": "sort-colors", "reason": "Two Pointers — Mar 24, 0 revisions" },
+        { "slug": "path-sum-ii", "reason": "Trees (DFS) — Apr 3, 1 revision" }
+      ],
+      "timed": true
+    },
+    {
+      "day": 4, "date": "2026-05-07",
+      "newProblems": [
+        { "title": "Maximal Square", "url": "https://leetcode.com/problems/maximal-square/", "difficulty": "Medium", "pattern": "Dynamic Programming" }
+      ],
+      "revisionProblems": [
+        { "slug": "coin-change", "reason": "DP — Apr 29, 0 revisions" },
+        { "slug": "balanced-binary-tree", "reason": "Trees (DFS) — Apr 5, 0 revisions" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 5, "date": "2026-05-08",
+      "newProblems": [
+        { "title": "Edit Distance", "url": "https://leetcode.com/problems/edit-distance/", "difficulty": "Medium", "pattern": "Dynamic Programming" }
+      ],
+      "revisionProblems": [
+        { "slug": "longest-common-subsequence", "reason": "DP — May 1, 0 revisions" },
+        { "slug": "rotting-oranges", "reason": "BFS — Apr 18, 0 revisions" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 6, "date": "2026-05-09",
+      "newProblems": [
+        { "title": "Minimum Cost For Tickets", "url": "https://leetcode.com/problems/minimum-cost-for-tickets/", "difficulty": "Medium", "pattern": "Dynamic Programming" }
+      ],
+      "revisionProblems": [
+        { "slug": "partition-equal-subset-sum", "reason": "DP — Apr 30, 0 revisions" },
+        { "slug": "clone-graph", "reason": "DFS — Apr 20, 0 revisions" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 7, "date": "2026-05-10",
+      "newProblems": [
+        { "title": "Perfect Squares", "url": "https://leetcode.com/problems/perfect-squares/", "difficulty": "Medium", "pattern": "Dynamic Programming" }
+      ],
+      "revisionProblems": [
+        { "slug": "word-break", "reason": "DP — May 1, 0 revisions" },
+        { "slug": "largest-rectangle-in-histogram", "reason": "Stack — Apr 1, 1 revision" }
+      ],
+      "timed": false
+    }
+  ]
+}

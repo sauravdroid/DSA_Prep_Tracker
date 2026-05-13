@@ -1,0 +1,71 @@
+{
+  "id": "dp-deferred-may12",
+  "title": "Deferred DP + Consolidation",
+  "description": "Finish 4 deferred DP problems (Tue–Fri) + revision (Sat). Sunday full off. No guilt.",
+  "startDate": "2026-05-12",
+  "phases": [
+    { "label": "Grid DP", "days": [1], "color": "var(--green)" },
+    { "label": "Two-String DP", "days": [2, 3], "color": "var(--blue)" },
+    { "label": "Multi-dim Knapsack", "days": [4], "color": "var(--accent)" },
+    { "label": "Consolidation", "days": [5], "color": "#8b5cf6" }
+  ],
+  "weeks": [
+    { "label": "Week 1 — Deferred DP + Revision" }
+  ],
+  "days": [
+    {
+      "day": 1, "date": "2026-05-12",
+      "newProblems": [
+        { "title": "Triangle", "url": "https://leetcode.com/problems/triangle/", "difficulty": "Medium", "pattern": "Dynamic Programming" }
+      ],
+      "revisionProblems": [
+        { "slug": "maximal-square", "reason": "Grid DP — May 7, 0 revisions" },
+        { "slug": "koko-eating-bananas", "reason": "Binary Search — Mar 14, 3 revisions" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 2, "date": "2026-05-13",
+      "newProblems": [
+        { "title": "Interleaving String", "url": "https://leetcode.com/problems/interleaving-string/", "difficulty": "Medium", "pattern": "Dynamic Programming" }
+      ],
+      "revisionProblems": [
+        { "slug": "edit-distance", "reason": "Two-String DP — May 8, 0 revisions" },
+        { "slug": "rotting-oranges", "reason": "BFS — Apr 18, 1 revision" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 3, "date": "2026-05-14",
+      "newProblems": [
+        { "title": "Distinct Subsequences", "url": "https://leetcode.com/problems/distinct-subsequences/", "difficulty": "Hard", "pattern": "Dynamic Programming" }
+      ],
+      "revisionProblems": [
+        { "slug": "longest-increasing-subsequence", "reason": "Subsequence DP — May 3, 0 revisions" },
+        { "slug": "insert-interval", "reason": "Array — Mar 7, 1 revision" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 4, "date": "2026-05-15",
+      "newProblems": [
+        { "title": "Ones and Zeroes", "url": "https://leetcode.com/problems/ones-and-zeroes/", "difficulty": "Medium", "pattern": "Dynamic Programming" }
+      ],
+      "revisionProblems": [
+        { "slug": "partition-equal-subset-sum", "reason": "0/1 Knapsack — Apr 29, 2 revisions" },
+        { "slug": "number-of-islands", "reason": "DFS — Apr 17, 1 revision" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 5, "date": "2026-05-16",
+      "newProblems": [],
+      "revisionProblems": [
+        { "slug": "coin-change", "reason": "Unbounded Knapsack — Apr 29, 1 revision" },
+        { "slug": "largest-rectangle-in-histogram", "reason": "Stack — Apr 1, 2 revisions" },
+        { "slug": "balanced-binary-tree", "reason": "Trees DFS — Apr 5, 1 revision" }
+      ],
+      "timed": false
+    }
+  ]
+}

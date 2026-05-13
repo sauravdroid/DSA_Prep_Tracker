@@ -10,9 +10,16 @@ async function gql(query, variables, session) {
     },
     body: JSON.stringify({ query, variables }),
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const json = await res.json()
+  const text = await res.text()
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
+  let json
+  try {
+    json = JSON.parse(text)
+  } catch {
+    throw new Error(`Invalid JSON response: ${text.slice(0, 200)}`)
+  }
   if (json.errors) throw new Error(json.errors[0].message)
+  if (!json.data) throw new Error(`No data in response: ${JSON.stringify(json).slice(0, 200)}`)
   return json.data
 }
 
@@ -29,8 +36,8 @@ export async function fetchSubmissions(session, startDate, onProgress, existingP
 
   while (hasMore) {
     const data = await gql(
-      `query submissionList($offset: Int!, $limit: Int!) {
-        submissionList(offset: $offset, limit: $limit) {
+      `query ($offset: Int!, $limit: Int!, $slug: String) {
+        submissionList(offset: $offset, limit: $limit, questionSlug: $slug) {
           hasNext
           submissions {
             title

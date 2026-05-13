@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { getPattern } from '../utils/patterns'
 import { todayStr } from '../utils/dateUtils'
 import { getAllPlans, getPlanById, getActivePlanId, setActivePlanId } from '../study_plan_data_source'
+import { getTodayRevisionList, saveTodayRevisionList } from '../store'
 
 function getPhase(phases, day) {
   return phases.find(p => p.days.includes(day))
@@ -18,12 +19,26 @@ export default function StudyPlanCalendar({ problems, revisions }) {
   const [activePlanId, _setActivePlanId] = useState(() => getActivePlanId())
   const [detailTab, setDetailTab] = useState('new')
   const [selectedProblem, setSelectedProblem] = useState(null)
+  const [revListSlugs, setRevListSlugs] = useState(() => getTodayRevisionList().slugs)
 
   const plan = useMemo(() => getPlanById(activePlanId), [activePlanId])
   const PLAN = plan?.days || []
   const PHASES = plan?.phases || []
   const WEEKS = plan?.weeks || []
   const PLAN_START = plan?.startDate || today
+
+  const isInRevList = useCallback((slug) => revListSlugs.includes(slug), [revListSlugs])
+
+  const toggleRevList = useCallback((slug) => {
+    let next
+    if (revListSlugs.includes(slug)) {
+      next = revListSlugs.filter(s => s !== slug)
+    } else {
+      next = [...revListSlugs, slug]
+    }
+    setRevListSlugs(next)
+    saveTodayRevisionList(next)
+  }, [revListSlugs])
 
   const switchPlan = (id) => {
     _setActivePlanId(id)
@@ -56,9 +71,13 @@ export default function StudyPlanCalendar({ problems, revisions }) {
     return !!solvedMap[slug]
   }
 
-  const isRevDone = (rp, planDate) => {
+  const isRevDone = (rp) => {
     const dates = revisionsBySlug[rp.slug] || []
-    return dates.some(d => d >= planDate)
+    // Count any revision from the day before the plan starts onwards
+    const d = new Date(PLAN_START + 'T12:00:00')
+    d.setDate(d.getDate() - 1)
+    const fromDate = d.toISOString().slice(0, 10)
+    return dates.some(dt => dt >= fromDate)
   }
 
   const selectedDay = PLAN.find(d => d.date === selectedDate)
@@ -70,18 +89,24 @@ export default function StudyPlanCalendar({ problems, revisions }) {
   const completedNew = PLAN.reduce((s, d) =>
     s + d.newProblems.filter(p => isNewDone(p)).length, 0)
   const completedRev = PLAN.reduce((s, d) =>
-    s + d.revisionProblems.filter(rp => isRevDone(rp, d.date)).length, 0)
+    s + d.revisionProblems.filter(rp => isRevDone(rp)).length, 0)
 
   // Compute progress for each plan (for tab display)
   const planTabs = useMemo(() => {
     return allPlans.map(p => {
       const days = p.days || []
+      const planStart = p.startDate
+      const cutoff = (() => {
+        const dt = new Date(planStart + 'T12:00:00')
+        dt.setDate(dt.getDate() - 1)
+        return dt.toISOString().slice(0, 10)
+      })()
       let doneNew = 0, doneRev = 0
       for (const d of days) {
         doneNew += d.newProblems.filter(np => !!solvedMap[slugFromUrl(np.url)]).length
         doneRev += d.revisionProblems.filter(rp => {
           const dates = revisionsBySlug[rp.slug] || []
-          return dates.some(dt => dt >= d.date)
+          return dates.some(dt => dt >= cutoff)
         }).length
       }
       const total = p.totalNew + p.totalRev
@@ -167,7 +192,7 @@ export default function StudyPlanCalendar({ problems, revisions }) {
                 const isToday = day.date === today
                 const isFuture = day.date > today
                 const newDone = day.newProblems.every(p => isNewDone(p))
-                const revDone = day.revisionProblems.every(rp => isRevDone(rp, day.date))
+                const revDone = day.revisionProblems.every(rp => isRevDone(rp))
                 const allDone = newDone && revDone
                 const dateObj = new Date(day.date + 'T12:00:00')
                 const dayNum = dateObj.getDate()
@@ -200,8 +225,8 @@ export default function StudyPlanCalendar({ problems, revisions }) {
                     <span className="day-number">{dayNum}</span>
                     <div className="cell-top-row">
                       <div className="cell-progress">
-                        <div className="cell-progress-new" style={{ flex: newCount }}>{newCount} new</div>
-                        <div className="cell-progress-rev" style={{ flex: revCount }}>{revCount} rev</div>
+                        {newCount > 0 && <div className="cell-progress-new" style={{ flex: newCount }}>{newCount} new</div>}
+                        {revCount > 0 && <div className="cell-progress-rev" style={{ flex: revCount }}>{revCount} rev</div>}
                       </div>
                     </div>
                     <div className="cell-patterns">
@@ -252,7 +277,7 @@ export default function StudyPlanCalendar({ problems, revisions }) {
                                           url: prob?.url || `https://leetcode.com/problems/${rp.slug}/`,
                                           difficulty: prob?.difficulty || 'Unknown',
                                           _pattern: prob ? getPattern(prob.tags) : 'Unknown',
-                                          _done: isRevDone(rp, day.date),
+                                          _done: isRevDone(rp),
                                           _type: 'revision',
                                           _reason: rp.reason,
                                         })
@@ -334,6 +359,13 @@ export default function StudyPlanCalendar({ problems, revisions }) {
                     {selectedProblem._done ? '✓ Synced' : selectedProblem._type === 'new' ? '○ Not solved' : '○ Not revised'}
                   </span>
                 </div>
+
+                <button
+                  className={`sp-rev-list-btn ${isInRevList(selectedProblem.slug) ? 'added' : ''}`}
+                  onClick={() => toggleRevList(selectedProblem.slug)}
+                >
+                  {isInRevList(selectedProblem.slug) ? '− Remove from Revision List' : '+ Add to Revision List'}
+                </button>
 
                 <div className="inline-detail-rows">
                   <div className="detail-row">
@@ -449,7 +481,7 @@ export default function StudyPlanCalendar({ problems, revisions }) {
                         <span className="cal-pattern-count">{selectedDay.revisionProblems.length}</span>
                       </div>
                       {selectedDay.revisionProblems.map((rp, idx) => {
-                        const done = isRevDone(rp, selectedDay.date)
+                        const done = isRevDone(rp)
                         const prob = solvedMap[rp.slug]
                         return (
                           <button

@@ -8,7 +8,7 @@ import StudyPlanCalendar from './components/StudyPlanCalendar'
 import { syncToday } from './services/leetcode'
 import * as store from './store'
 
-const TABS = ['Calendar', "Today's Revision", 'Study Plan', 'Problems', 'Settings']
+const TABS = ['Calendar', 'Study Plan', "Today's Revision", 'Problems', 'Settings']
 
 export default function App() {
   const [tab, setTab] = useState('Calendar')

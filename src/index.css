@@ -2322,6 +2322,10 @@ button {
   flex: 0;
 }
 
+.sp-calendar-grid .calendar-cell:not(.empty) {
+  min-height: 140px;
+}
+
 .calendar-cell.sp-done {
   background: rgba(0, 184, 163, 0.12);
 }
@@ -2717,6 +2721,35 @@ button {
 .sp-sync-indicator.synced {
   background: rgba(0, 184, 163, 0.12);
   color: var(--green);
+}
+
+.sp-rev-list-btn {
+  width: 100%;
+  padding: 10px 16px;
+  margin: 12px 0 4px;
+  border-radius: var(--radius);
+  border: 1.5px dashed var(--accent);
+  background: rgba(255, 161, 22, 0.06);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sp-rev-list-btn:hover {
+  background: rgba(255, 161, 22, 0.13);
+}
+
+.sp-rev-list-btn.added {
+  border-style: solid;
+  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.5);
+  color: #7c3aed;
+}
+
+.sp-rev-list-btn.added:hover {
+  background: rgba(139, 92, 246, 0.15);
 }
 
 .sp-solved-date {

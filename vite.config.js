@@ -28,6 +28,7 @@ function leetcodeProxy() {
             let data = ''
             proxyRes.on('data', chunk => (data += chunk))
             proxyRes.on('end', () => {
+              res.statusCode = proxyRes.statusCode
               res.setHeader('Content-Type', 'application/json')
               res.end(data)
             })
