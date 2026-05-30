@@ -31,7 +31,7 @@
       ],
       "revisionProblems": [
         { "slug": "edit-distance", "reason": "Two-String DP — May 8, 0 revisions" },
-        { "slug": "rotting-oranges", "reason": "BFS — Apr 18, 1 revision" }
+        { "slug": "permutation-in-string", "reason": "Sliding Window — Mar 24, 0 revisions" }
       ],
       "timed": false
     },

@@ -20,3 +20,4 @@ And able to add notes.
 4. When navigating to the next day in the detailed view of right pane in the Calendar tab, future tabs shouldn't be navigable
 5. Fix the pop-up UX it's opacity should be the highest and we shouldn't see the next cell details of a neighbour's cell, when we hover on another neighbour cell
 6. In the StudyPlan tab, the next day should automatically include the problems that were solved the day before in the revision list of the next day
+7. Create a export button for this week study plan, it should contain the porblem, leetcode link, date completed, failure submission, difficulty

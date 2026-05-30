@@ -1,0 +1,88 @@
+{
+  "id": "linked-list-may25",
+  "title": "Phase 1 Week 1 — Linked List",
+  "description": "Close the Linked List gap: 6 must-do problems (1/day) + mixed-pattern revision. Sunday = re-solve + optionals.",
+  "startDate": "2026-05-25",
+  "phases": [
+    { "label": "LL Foundation", "days": [1, 2], "color": "var(--green)" },
+    { "label": "LL Cycle Detection", "days": [3], "color": "var(--blue)" },
+    { "label": "LL In-place", "days": [4, 5, 6], "color": "var(--accent)" },
+    { "label": "Re-solve + Optional", "days": [7], "color": "#8b5cf6" }
+  ],
+  "weeks": [
+    { "label": "Week 1 — Linked List + Mixed Revision" }
+  ],
+  "days": [
+    {
+      "day": 1, "date": "2026-05-25",
+      "newProblems": [
+        { "title": "Reverse Linked List", "url": "https://leetcode.com/problems/reverse-linked-list/", "difficulty": "Easy", "pattern": "Linked List" }
+      ],
+      "revisionProblems": [
+        { "slug": "target-sum", "reason": "DP/Backtracking — Apr 30, 0 revisions" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 2, "date": "2026-05-26",
+      "newProblems": [
+        { "title": "Merge Two Sorted Lists", "url": "https://leetcode.com/problems/merge-two-sorted-lists/", "difficulty": "Easy", "pattern": "Linked List" }
+      ],
+      "revisionProblems": [
+        { "slug": "maximum-product-subarray", "reason": "DP — May 5, 0 revisions" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 3, "date": "2026-05-27",
+      "newProblems": [
+        { "title": "Linked List Cycle", "url": "https://leetcode.com/problems/linked-list-cycle/", "difficulty": "Easy", "pattern": "Linked List" }
+      ],
+      "revisionProblems": [
+        { "slug": "search-in-rotated-sorted-array", "reason": "Binary Search — Mar 12, 2 revisions" }
+      ],
+      "timed": true
+    },
+    {
+      "day": 4, "date": "2026-05-28",
+      "newProblems": [
+        { "title": "Remove Nth Node From End of List", "url": "https://leetcode.com/problems/remove-nth-node-from-end-of-list/", "difficulty": "Medium", "pattern": "Linked List" }
+      ],
+      "revisionProblems": [
+        { "slug": "binary-tree-maximum-path-sum", "reason": "Tree DFS — Apr 5, 1 revision" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 5, "date": "2026-05-29",
+      "newProblems": [
+        { "title": "Reorder List", "url": "https://leetcode.com/problems/reorder-list/", "difficulty": "Medium", "pattern": "Linked List" }
+      ],
+      "revisionProblems": [
+        { "slug": "partition-equal-subset-sum", "reason": "DP/Knapsack — Apr 29, 3 revisions" }
+      ],
+      "timed": true
+    },
+    {
+      "day": 6, "date": "2026-05-30",
+      "newProblems": [
+        { "title": "Reverse Linked List II", "url": "https://leetcode.com/problems/reverse-linked-list-ii/", "difficulty": "Medium", "pattern": "Linked List" }
+      ],
+      "revisionProblems": [
+        { "slug": "minimum-window-substring", "reason": "Sliding Window — Mar 22, 1 revision" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 7, "date": "2026-05-31",
+      "newProblems": [],
+      "revisionProblems": [
+        { "slug": "reverse-linked-list", "reason": "Re-solve — must be <5 min (muscle memory)", "difficulty": "Easy" },
+        { "slug": "reorder-list", "reason": "Re-solve — target 15 min (Week 1 checkpoint)", "difficulty": "Medium" },
+        { "slug": "linked-list-cycle", "reason": "Re-solve — target 10 min", "difficulty": "Easy" },
+        { "slug": "longest-increasing-subsequence", "reason": "DP — May 3, 1 revision" }
+      ],
+      "timed": true
+    }
+  ]
+}

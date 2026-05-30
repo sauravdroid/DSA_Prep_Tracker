@@ -1,12 +1,16 @@
 import dpFoundations from './dp-foundations-apr26.json'
 import dpAdvanced from './dp-advanced-may3.json'
 import dpDeferred from './dp-deferred-may12.json'
+import mixedPatterns from './mixed-patterns-may18.json'
+import linkedList from './linked-list-may25.json'
 
 // Add new plans here as they are created
 const ALL_PLANS = [
   dpFoundations,
   dpAdvanced,
   dpDeferred,
+  mixedPatterns,
+  linkedList,
 ]
 
 export function getAllPlans() {

@@ -1,0 +1,85 @@
+{
+  "id": "mixed-patterns-may18",
+  "title": "1-Week Mixed Patterns",
+  "description": "6 diverse patterns — Sliding Window, Binary Search, Graph, Tree, Stack, Greedy/Two Pointers — 1 new + 2 revisions/day. Sunday off.",
+  "startDate": "2026-05-18",
+  "phases": [
+    { "label": "Sliding Window", "days": [1], "color": "var(--blue)" },
+    { "label": "Binary Search", "days": [2], "color": "var(--green)" },
+    { "label": "Graph BFS/DFS", "days": [3], "color": "var(--accent)" },
+    { "label": "Tree DFS", "days": [4], "color": "#8b5cf6" },
+    { "label": "Monotonic Stack", "days": [5], "color": "var(--red)" },
+    { "label": "Greedy / Two Pointers", "days": [6], "color": "var(--blue)" }
+  ],
+  "weeks": [
+    { "label": "Week 1 — Mixed Pattern Practice" }
+  ],
+  "days": [
+    {
+      "day": 1, "date": "2026-05-18",
+      "newProblems": [
+        { "title": "Max Consecutive Ones III", "url": "https://leetcode.com/problems/max-consecutive-ones-iii/", "difficulty": "Medium", "pattern": "Sliding Window" }
+      ],
+      "revisionProblems": [
+        { "slug": "permutation-in-string", "reason": "Sliding Window — Mar 24, 1 revision" },
+        { "slug": "insert-interval", "reason": "Array — Mar 7, 2 revisions" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 2, "date": "2026-05-19",
+      "newProblems": [
+        { "title": "Minimum Number of Days to Make m Bouquets", "url": "https://leetcode.com/problems/minimum-number-of-days-to-make-m-bouquets/", "difficulty": "Medium", "pattern": "Binary Search" }
+      ],
+      "revisionProblems": [
+        { "slug": "interleaving-string", "reason": "Two-String DP — May 13, 0 revisions" },
+        { "slug": "search-in-rotated-sorted-array-ii", "reason": "Binary Search — Mar 12, 0 revisions" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 3, "date": "2026-05-20",
+      "newProblems": [
+        { "title": "Shortest Bridge", "url": "https://leetcode.com/problems/shortest-bridge/", "difficulty": "Medium", "pattern": "Graph BFS/DFS" }
+      ],
+      "revisionProblems": [
+        { "slug": "distinct-subsequences", "reason": "Two-String DP — May 14, 0 revisions" },
+        { "slug": "binary-tree-zigzag-level-order-traversal", "reason": "Trees BFS — Apr 8, 0 revisions" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 4, "date": "2026-05-21",
+      "newProblems": [
+        { "title": "Validate Binary Search Tree", "url": "https://leetcode.com/problems/validate-binary-search-tree/", "difficulty": "Medium", "pattern": "Tree DFS" }
+      ],
+      "revisionProblems": [
+        { "slug": "ones-and-zeroes", "reason": "Multi-dim Knapsack — May 15, 0 revisions" },
+        { "slug": "word-search", "reason": "Backtracking — Apr 15, 0 revisions" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 5, "date": "2026-05-22",
+      "newProblems": [
+        { "title": "Next Greater Element II", "url": "https://leetcode.com/problems/next-greater-element-ii/", "difficulty": "Medium", "pattern": "Monotonic Stack" }
+      ],
+      "revisionProblems": [
+        { "slug": "coin-change", "reason": "Unbounded Knapsack — Apr 29, 2 revisions" },
+        { "slug": "reverse-words-in-a-string", "reason": "String — Mar 5, 0 revisions" }
+      ],
+      "timed": false
+    },
+    {
+      "day": 6, "date": "2026-05-23",
+      "newProblems": [
+        { "title": "Increasing Triplet Subsequence", "url": "https://leetcode.com/problems/increasing-triplet-subsequence/", "difficulty": "Medium", "pattern": "Greedy / Two Pointers" }
+      ],
+      "revisionProblems": [
+        { "slug": "maximal-square", "reason": "Grid DP — May 7, 0 revisions" },
+        { "slug": "is-graph-bipartite", "reason": "Graph BFS — Apr 20, 0 revisions" }
+      ],
+      "timed": false
+    }
+  ]
+}

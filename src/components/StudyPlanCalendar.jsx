@@ -4,6 +4,55 @@ import { todayStr } from '../utils/dateUtils'
 import { getAllPlans, getPlanById, getActivePlanId, setActivePlanId } from '../study_plan_data_source'
 import { getTodayRevisionList, saveTodayRevisionList } from '../store'
 
+function exportWeekAsJSON(weekDays, solvedMap, revisionsBySlug, planStart) {
+  const cutoff = (() => {
+    const dt = new Date(planStart + 'T12:00:00')
+    dt.setDate(dt.getDate() - 1)
+    return dt.toISOString().slice(0, 10)
+  })()
+
+  const problems = []
+  for (const day of weekDays) {
+    for (const p of day.newProblems) {
+      const slug = slugFromUrl(p.url)
+      const synced = solvedMap[slug]
+      problems.push({
+        type: 'new',
+        day: day.day,
+        date: day.date,
+        title: p.title,
+        leetcodeLink: p.url,
+        difficulty: synced?.difficulty || p.difficulty,
+        dateCompleted: synced?.dateSolved || null,
+        failedSubmissions: synced?.failedCount || 0,
+      })
+    }
+    for (const rp of day.revisionProblems) {
+      const prob = solvedMap[rp.slug]
+      const dates = revisionsBySlug[rp.slug] || []
+      const revDate = dates.filter(dt => dt >= cutoff).sort().reverse()[0] || null
+      problems.push({
+        type: 'revision',
+        day: day.day,
+        date: day.date,
+        title: prob?.title || rp.slug,
+        leetcodeLink: prob?.url || `https://leetcode.com/problems/${rp.slug}/`,
+        difficulty: prob?.difficulty || rp.difficulty || 'Unknown',
+        dateCompleted: revDate,
+        failedSubmissions: prob?.failedCount || 0,
+      })
+    }
+  }
+
+  const blob = new Blob([JSON.stringify(problems, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `week-plan-${weekDays[0]?.date || 'export'}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 function getPhase(phases, day) {
   return phases.find(p => p.days.includes(day))
 }
@@ -168,7 +217,19 @@ export default function StudyPlanCalendar({ problems, revisions }) {
           const weekDays = PLAN.slice(wi * 7, wi * 7 + 7)
           return (
           <div key={wi}>
-            <div className="sp-week-label">{week.label}</div>
+            <div className="sp-week-label">
+              {week.label}
+              <button
+                className="sp-export-btn"
+                title="Export week as JSON"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  exportWeekAsJSON(weekDays, solvedMap, revisionsBySlug, PLAN_START)
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+            </div>
             <div className="calendar-grid sp-calendar-grid">
               {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
                 <div key={d} className="calendar-day-header">{d}</div>

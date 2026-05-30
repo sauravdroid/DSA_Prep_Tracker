@@ -2426,6 +2426,30 @@ button {
   margin: 16px 0 8px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sp-export-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sp-export-btn:hover {
+  background: var(--accent2);
+  border-color: var(--accent2);
+  color: #fff;
 }
 
 .sp-grid {
