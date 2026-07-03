@@ -3,6 +3,10 @@ import dpAdvanced from './dp-advanced-may3.json'
 import dpDeferred from './dp-deferred-may12.json'
 import mixedPatterns from './mixed-patterns-may18.json'
 import linkedList from './linked-list-may25.json'
+import blindRevisionJun5 from './blind-revision-jun5.json'
+import blindRevisionJun15 from './blind-revision-jun15.json'
+import blindRevisionJun22 from './blind-revision-jun22.json'
+import revisionOnlyJun29 from './revision-only-jun29.json'
 
 // Add new plans here as they are created
 const ALL_PLANS = [
@@ -11,6 +15,10 @@ const ALL_PLANS = [
   dpDeferred,
   mixedPatterns,
   linkedList,
+  blindRevisionJun5,
+  blindRevisionJun15,
+  blindRevisionJun22,
+  revisionOnlyJun29,
 ]
 
 export function getAllPlans() {

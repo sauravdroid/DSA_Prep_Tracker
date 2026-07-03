@@ -5,11 +5,7 @@ import { getAllPlans, getPlanById, getActivePlanId, setActivePlanId } from '../s
 import { getTodayRevisionList, saveTodayRevisionList } from '../store'
 
 function exportWeekAsJSON(weekDays, solvedMap, revisionsBySlug, planStart) {
-  const cutoff = (() => {
-    const dt = new Date(planStart + 'T12:00:00')
-    dt.setDate(dt.getDate() - 1)
-    return dt.toISOString().slice(0, 10)
-  })()
+  const cutoff = planStart
 
   const problems = []
   for (const day of weekDays) {
@@ -120,13 +116,12 @@ export default function StudyPlanCalendar({ problems, revisions }) {
     return !!solvedMap[slug]
   }
 
+  const PLAN_END = PLAN.length > 0 ? PLAN[PLAN.length - 1].date : PLAN_START
+
   const isRevDone = (rp) => {
     const dates = revisionsBySlug[rp.slug] || []
-    // Count any revision from the day before the plan starts onwards
-    const d = new Date(PLAN_START + 'T12:00:00')
-    d.setDate(d.getDate() - 1)
-    const fromDate = d.toISOString().slice(0, 10)
-    return dates.some(dt => dt >= fromDate)
+    // Count any revision within the plan's date range
+    return dates.some(dt => dt >= PLAN_START && dt <= PLAN_END)
   }
 
   const selectedDay = PLAN.find(d => d.date === selectedDate)
@@ -145,23 +140,19 @@ export default function StudyPlanCalendar({ problems, revisions }) {
     return allPlans.map(p => {
       const days = p.days || []
       const planStart = p.startDate
-      const cutoff = (() => {
-        const dt = new Date(planStart + 'T12:00:00')
-        dt.setDate(dt.getDate() - 1)
-        return dt.toISOString().slice(0, 10)
-      })()
+      const planEnd = days.length > 0 ? days[days.length - 1].date : planStart
       let doneNew = 0, doneRev = 0
       for (const d of days) {
         doneNew += d.newProblems.filter(np => !!solvedMap[slugFromUrl(np.url)]).length
         doneRev += d.revisionProblems.filter(rp => {
           const dates = revisionsBySlug[rp.slug] || []
-          return dates.some(dt => dt >= cutoff)
+          return dates.some(dt => dt >= planStart && dt <= planEnd)
         }).length
       }
       const total = p.totalNew + p.totalRev
       const done = doneNew + doneRev
       return { ...p, doneNew, doneRev, total, done, complete: total > 0 && done >= total }
-    })
+    }).sort((a, b) => (a.startDate < b.startDate ? 1 : a.startDate > b.startDate ? -1 : 0))
   }, [allPlans, solvedMap, revisionsBySlug])
 
   return (
@@ -246,7 +237,19 @@ export default function StudyPlanCalendar({ problems, revisions }) {
                 return emptyCells
               })()}
 
-              {weekDays.map(day => {
+              {weekDays.flatMap((day, dayIdx) => {
+                // Insert empty cells for skipped dates (e.g. Sunday off)
+                const gapCells = []
+                if (dayIdx > 0) {
+                  const prevDow = new Date(weekDays[dayIdx - 1].date + 'T12:00:00').getDay()
+                  const currDow = new Date(day.date + 'T12:00:00').getDay()
+                  let gap = currDow - prevDow - 1
+                  if (gap < 0) gap += 7
+                  for (let g = 0; g < gap; g++) {
+                    gapCells.push(<div key={`gap-${wi}-${day.date}-${g}`} className="calendar-cell empty" />)
+                  }
+                }
+
                 const phase = getPhase(PHASES, day.day)
                 const isSelected = day.date === selectedDate
                 const isPast = day.date < today
@@ -276,7 +279,8 @@ export default function StudyPlanCalendar({ problems, revisions }) {
                 }
                 const patEntries = Object.entries(patGroups).sort((a, b) => b[1].length - a[1].length)
 
-                return (
+                return [
+                  ...gapCells,
                   <button
                     key={day.date}
                     className={`calendar-cell ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''} active ${allDone ? 'past-solved sp-done' : ''} ${isPast && !allDone ? 'past-missed' : ''}`}
@@ -360,7 +364,7 @@ export default function StudyPlanCalendar({ problems, revisions }) {
                       {day.timed && <span className="cell-pat" style={{ background: 'rgba(255,161,22,0.15)' }}>⏱ Timed</span>}
                     </div>
                   </button>
-                )
+                ]
               })}
             </div>
           </div>

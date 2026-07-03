@@ -3,6 +3,40 @@ import { getPattern } from '../utils/patterns'
 import { toLocalDateStr, todayStr } from '../utils/dateUtils'
 import { getStartDate, getTodayRevisionList, saveTodayRevisionList } from '../store'
 
+function exportDayAsJSON(date, newProblems, revisionProblems) {
+  const items = []
+  for (const p of newProblems) {
+    items.push({
+      type: 'new',
+      date,
+      title: p.title,
+      leetcodeLink: p.url,
+      difficulty: p.difficulty,
+      dateCompleted: p.dateSolved || null,
+      failedSubmissions: p.failedCount || 0,
+    })
+  }
+  for (const p of revisionProblems) {
+    items.push({
+      type: 'revision',
+      date,
+      title: p.title,
+      leetcodeLink: p.url,
+      difficulty: p.difficulty,
+      dateCompleted: date,
+      failedSubmissions: p.failedCount || 0,
+    })
+  }
+
+  const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `day-report-${date}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 function getWeekDates(refDate) {
   const d = new Date(refDate)
   const day = d.getDay()
@@ -15,6 +49,61 @@ function getWeekDates(refDate) {
     dates.push(toLocalDateStr(dt))
   }
   return dates
+}
+
+// Returns the six date strings (Monday through Saturday) for the week that
+// contains the given date. Sunday is intentionally excluded.
+function getMondayToSaturday(refDateStr) {
+  const d = new Date(refDateStr + 'T12:00:00')
+  const day = d.getDay() // 0=Sun, 1=Mon, ... 6=Sat
+  const mondayOffset = day === 0 ? -6 : 1 - day
+  const monday = new Date(d)
+  monday.setDate(d.getDate() + mondayOffset)
+  const dates = []
+  for (let i = 0; i < 6; i++) {
+    const dt = new Date(monday)
+    dt.setDate(monday.getDate() + i)
+    dates.push(toLocalDateStr(dt))
+  }
+  return dates
+}
+
+function exportWeekAsJSON(dates, problemsByDate, revisionsByDate, problems) {
+  const items = []
+  for (const date of dates) {
+    const newProblems = problemsByDate[date] || []
+    const revisionProblems = (revisionsByDate[date] || []).map(r => problems[r.slug]).filter(Boolean)
+    for (const p of newProblems) {
+      items.push({
+        type: 'new',
+        date,
+        title: p.title,
+        leetcodeLink: p.url,
+        difficulty: p.difficulty,
+        dateCompleted: p.dateSolved || null,
+        failedSubmissions: p.failedCount || 0,
+      })
+    }
+    for (const p of revisionProblems) {
+      items.push({
+        type: 'revision',
+        date,
+        title: p.title,
+        leetcodeLink: p.url,
+        difficulty: p.difficulty,
+        dateCompleted: date,
+        failedSubmissions: p.failedCount || 0,
+      })
+    }
+  }
+
+  const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `week-report-${dates[0]}-to-${dates[dates.length - 1]}.json`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 export default function CalendarView({ problems, revisions, onRevise, onRemoveRevision }) {
@@ -94,6 +183,12 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
   const selectedNewProblems = selectedDate ? (problemsByDate[selectedDate] || []) : []
   const selectedRevisions = selectedDate ? (revisionsByDate[selectedDate] || []) : []
   const selectedRevisionProblems = selectedRevisions.map(r => problems[r.slug]).filter(Boolean)
+
+  // Mon–Sat week containing the selected date (used for the weekly JSON export)
+  const weekMonSat = useMemo(() => (selectedDate ? getMondayToSaturday(selectedDate) : []), [selectedDate])
+  const weekHasProblems = weekMonSat.some(
+    d => (problemsByDate[d] || []).length > 0 || (revisionsByDate[d] || []).length > 0
+  )
 
   // Group a list of problems by pattern
   function groupByPattern(list) {
@@ -195,6 +290,30 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
               <span className="detail-tab-count">{selectedRevisionProblems.length}</span>
             )}
           </button>
+          {selectedDate && (weekHasProblems || selectedNewProblems.length > 0 || selectedRevisionProblems.length > 0) && (
+            <div className="export-btn-group" style={{ marginLeft: 'auto' }}>
+              {(selectedNewProblems.length > 0 || selectedRevisionProblems.length > 0) && (
+                <button
+                  className="sp-export-btn has-label"
+                  title="Export this day as JSON"
+                  onClick={() => exportDayAsJSON(selectedDate, selectedNewProblems, selectedRevisionProblems)}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Day
+                </button>
+              )}
+              {weekHasProblems && (
+                <button
+                  className="sp-export-btn has-label"
+                  title="Export this week (Mon–Sat) as JSON"
+                  onClick={() => exportWeekAsJSON(weekMonSat, problemsByDate, revisionsByDate, problems)}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Week
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {sp ? (

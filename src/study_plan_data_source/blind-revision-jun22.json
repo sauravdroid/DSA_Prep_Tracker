@@ -1,0 +1,145 @@
+{
+  "id": "blind-revision-jun22",
+  "title": "Blind + Revision — UF, SW, Backtracking, DP, Trees (Jun 22–27)",
+  "description": "No Trie/LRU this week. Base stays 1 blind + 1 revision daily, with optional micro-revision on Mon/Wed/Fri if energy is high. Reintroduces DP and Trees while keeping RED focus on Union-Find, fixed-size Sliding Window, and Backtracking rollback.",
+  "startDate": "2026-06-22",
+  "phases": [
+    { "label": "Blind + Revision", "days": [1, 2, 3, 4, 5], "color": "var(--accent)" },
+    { "label": "Checkpoint Day", "days": [6], "color": "#8b5cf6" }
+  ],
+  "weeks": [
+    { "label": "Week 4 — Balanced Reinforcement (No New Major Pattern)" }
+  ],
+  "days": [
+    {
+      "day": 1,
+      "date": "2026-06-22",
+      "label": "Mon — Union-Find + DP",
+      "newProblems": [
+        {
+          "title": "Most Stones Removed with Same Row or Column",
+          "url": "https://leetcode.com/problems/most-stones-removed-with-same-row-or-column/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "35 min timed. UF recognition trigger: rows/columns induce connected components; answer depends on component count. Optional micro-revision (5 min): UF trigger flashcards."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "coin-change",
+          "reason": "DP 1D stale refresh. Trigger: minimum coins over amount, DP transition over previous amounts. 20 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 2,
+      "date": "2026-06-23",
+      "label": "Tue — Fixed Sliding Window + Tree BFS",
+      "newProblems": [
+        {
+          "title": "Maximum Number of Vowels in a Substring of Given Length",
+          "url": "https://leetcode.com/problems/maximum-number-of-vowels-in-a-substring-of-given-length/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "35 min timed. Fixed-size window discipline: add right, remove left when size > k, maintain incremental state. Optional micro-revision only if very fresh: explain LC 438 template without coding."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "binary-tree-zigzag-level-order-traversal",
+          "reason": "Tree BFS stale maintenance canary. Level-order traversal with alternating direction per level. 20 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 3,
+      "date": "2026-06-24",
+      "label": "Wed — Backtracking + DP String",
+      "newProblems": [
+        {
+          "title": "Beautiful Arrangement",
+          "url": "https://leetcode.com/problems/beautiful-arrangement/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "35 min timed. Backtracking with position constraints. Focus on rollback discipline: choose -> explore -> unchoose. Optional micro-revision (5 min): rollback checklist."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "interleaving-string",
+          "reason": "DP string canary. State tracks positions in s1/s2, transition consumes from either source. 20 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 4,
+      "date": "2026-06-25",
+      "label": "Thu — Tree DFS + Sliding Window Canary",
+      "newProblems": [
+        {
+          "title": "Maximum Difference Between Node and Ancestor",
+          "url": "https://leetcode.com/problems/maximum-difference-between-node-and-ancestor/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "35 min timed. Tree DFS with path-state propagation (carry min/max ancestor values)."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "find-all-anagrams-in-a-string",
+          "reason": "Fixed-size Sliding Window canary repeat to stabilize LC 438 template. Frequency state must update correctly as chars enter/leave. 20 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 5,
+      "date": "2026-06-26",
+      "label": "Fri — Graph BFS/DFS + Linked List",
+      "newProblems": [
+        {
+          "title": "Number of Enclaves",
+          "url": "https://leetcode.com/problems/number-of-enclaves/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "35 min timed. Graph/grid BFS-DFS trigger: boundary-connected land is removable; count enclosed remainder. Optional micro-revision (10 min) only if fresh: DP flashcards."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "reverse-linked-list-ii",
+          "reason": "Linked List stronger canary. Use dummy node, isolate sublist [left..right], reverse, and reconnect correctly. 20 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 6,
+      "date": "2026-06-27",
+      "label": "Sat — Checkpoint Day (UF, Backtracking, Binary Search on Answer)",
+      "newProblems": [],
+      "revisionProblems": [
+        {
+          "slug": "number-of-operations-to-make-network-connected",
+          "reason": "Checkpoint: Union-Find components + edge sufficiency. 15-20 min timed, no notes, no hints."
+        },
+        {
+          "slug": "generate-parentheses",
+          "reason": "Checkpoint: Backtracking constraints and clean state transitions. 15 min timed, no notes."
+        },
+        {
+          "slug": "minimum-number-of-days-to-make-m-bouquets",
+          "reason": "Checkpoint: Binary Search on Answer canary (replaces over-memorized Koko). 20 min timed, no notes."
+        },
+        {
+          "slug": "binary-tree-maximum-path-sum",
+          "reason": "Optional 4th only if fresh: Tree DFS hard canary."
+        }
+      ],
+      "timed": true
+    }
+  ]
+}

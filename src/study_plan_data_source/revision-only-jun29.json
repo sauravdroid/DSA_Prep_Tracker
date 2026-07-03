@@ -1,0 +1,117 @@
+{
+  "id": "revision-only-jun29",
+  "title": "Revision Only — DP, Binary Search, Trees, UF, Sliding Window (Jun 29–Jul 4)",
+  "description": "Revision-only week: exactly 2 revision coding problems/day, no blind/new problems. Backtracking runs on a separate track and is intentionally excluded here. No Linked List this week. Sunday fully off. Prioritizes Red/Yellow canaries and older weak topics — 2D DP transition coupling, Binary Search feasibility predicate, Tree DFS return contract, Union-Find recognition/components, Sliding Window retention, core 1D DP. Rule: if Revision 1 exposes a major gap, Revision 2 may become approach-only + 10-min dry run; otherwise do both as coding.",
+  "startDate": "2026-06-29",
+  "phases": [
+    { "label": "Revision Only", "days": [1, 2, 3, 4, 5], "color": "var(--accent)" },
+    { "label": "Checkpoint Day", "days": [6], "color": "#8b5cf6" }
+  ],
+  "weeks": [
+    { "label": "Week 5 — Revision-Only Reinforcement (Backtracking on Separate Track)" }
+  ],
+  "days": [
+    {
+      "day": 1,
+      "date": "2026-06-29",
+      "label": "Mon — DP transition + Fixed-window Sliding Window",
+      "newProblems": [],
+      "revisionProblems": [
+        {
+          "slug": "interleaving-string",
+          "reason": "2D DP / String DP. Active weak canary — transition coupling still shaky. dp[i][j] = can s3[0..i+j-1] be built from s1[0..i-1] + s2[0..j-1]? Taking from s1 → dp[i-1][j]; taking from s2 → dp[i][j-1]. 25 min timed."
+        },
+        {
+          "slug": "permutation-in-string",
+          "reason": "Fixed-size Sliding Window. Tests the frequency-window template without overusing Find All Anagrams. Fixed window size = s1.length; right enters, left leaves; frequency delta must balance. 20 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 2,
+      "date": "2026-06-30",
+      "label": "Tue — Binary Search on Answer + Union-Find recognition",
+      "newProblems": [],
+      "revisionProblems": [
+        {
+          "slug": "minimum-number-of-days-to-make-m-bouquets",
+          "reason": "Binary Search on Answer. Recent independent-solve failure — weak part is canMake(day). What am I minimizing? candidate = day. Can I make m bouquets? Is the predicate monotonic? 25 min timed."
+        },
+        {
+          "slug": "satisfiability-of-equality-equations",
+          "reason": "Union-Find — disguised recognition, good Red-bucket canary. Union all '=='; then check all '!='; if same parent during '!=', it's a contradiction. 20 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 3,
+      "date": "2026-07-01",
+      "label": "Wed — Tree DFS contract + Older DP base",
+      "newProblems": [],
+      "revisionProblems": [
+        {
+          "slug": "binary-tree-maximum-path-sum",
+          "reason": "Tree DFS. Strong canary for return-contract discipline. dfs(node) returns max one-sided gain upward; the global answer may use left + node + right. 25 min timed."
+        },
+        {
+          "slug": "coin-change",
+          "reason": "1D DP. Older core DP canary — keeps the DP base fresh. dp[amount] = minimum coins needed for amount. 20 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 4,
+      "date": "2026-07-02",
+      "label": "Thu — Union-Find components + Tree DFS return-node",
+      "newProblems": [],
+      "revisionProblems": [
+        {
+          "slug": "number-of-operations-to-make-network-connected",
+          "reason": "Union-Find / Components. Components + edge sufficiency; recently improved but still worth reinforcing. If edges < n-1 return -1; answer = components - 1. 25 min timed."
+        },
+        {
+          "slug": "lowest-common-ancestor-of-a-binary-tree",
+          "reason": "Tree DFS. Return-node contract — important DFS base skill. dfs(node) returns p / q / LCA / null. 20 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 5,
+      "date": "2026-07-03",
+      "label": "Fri — Harder DP recall + Variable Sliding Window",
+      "newProblems": [],
+      "revisionProblems": [
+        {
+          "slug": "distinct-subsequences",
+          "reason": "2D DP / String DP. Older complex DP canary — good retention test. dp[i][j] = ways to form t[0..j-1] from s[0..i-1]. 25 min timed."
+        },
+        {
+          "slug": "minimum-window-substring",
+          "reason": "Variable-size Sliding Window — stronger than easy window problems. Expand until valid; shrink while valid; track the minimum window. 25 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 6,
+      "date": "2026-07-04",
+      "label": "Sat — Serious Checkpoint Day (no notes, no hints first)",
+      "newProblems": [],
+      "revisionProblems": [
+        {
+          "slug": "minimum-number-of-days-to-make-m-bouquets",
+          "reason": "Checkpoint: retest the exact recent Binary Search on Answer failure. No notes, no hints first. Can I solve the feasibility predicate canMake(day) cleanly? 20 min timed."
+        },
+        {
+          "slug": "binary-tree-maximum-path-sum",
+          "reason": "Checkpoint: retest Tree DFS return-contract discipline. No notes, no hints first. Can I state dfs(node)'s return value before coding? 20 min timed."
+        }
+      ],
+      "timed": true
+    }
+  ]
+}

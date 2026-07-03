@@ -1,0 +1,184 @@
+{
+  "id": "blind-revision-jun5",
+  "title": "Blind + Revision — Backtracking, Union-Find, Bipartite (Jun 5–14)",
+  "description": "70% blind problems (pattern hidden), 30% revision targeting weakest areas: Backtracking, Union-Find, Bipartite. Saturdays are re-solve days. Sundays off.",
+  "startDate": "2026-06-05",
+  "phases": [
+    { "label": "Blind + Revision", "days": [1, 2, 3, 4, 5, 6, 7, 8], "color": "var(--accent)" },
+    { "label": "Re-solve Day", "days": [2, 8], "color": "#8b5cf6" }
+  ],
+  "weeks": [
+    { "label": "Week 1 — Blind Practice + Weak Pattern Revision" },
+    { "label": "Week 2 — Blind Practice + Union-Find & Backtracking" }
+  ],
+  "days": [
+    {
+      "day": 1,
+      "date": "2026-06-05",
+      "label": "Fri",
+      "newProblems": [
+        {
+          "title": "Valid Parentheses",
+          "url": "https://leetcode.com/problems/valid-parentheses/",
+          "difficulty": "Easy",
+          "pattern": "BLIND",
+          "notes": "Stack — matching/pairing sub-pattern. 35 min timed."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "subsets",
+          "reason": "5 revisions — Backtracking include/skip template. 20 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 2,
+      "date": "2026-06-06",
+      "label": "Sat — Re-solve Day (Backtracking focus)",
+      "newProblems": [],
+      "revisionProblems": [
+        {
+          "slug": "permutations",
+          "reason": "Re-solve: 15 min timed, no notes. Backtracking swap/choose."
+        },
+        {
+          "slug": "combination-sum",
+          "reason": "Re-solve: 15 min timed, no notes. Backtracking unbounded choices."
+        },
+        {
+          "slug": "palindrome-partitioning",
+          "reason": "Re-solve: 15 min timed, no notes. Backtracking partition style."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 3,
+      "date": "2026-06-08",
+      "label": "Mon",
+      "newProblems": [
+        {
+          "title": "Product of Array Except Self",
+          "url": "https://leetcode.com/problems/product-of-array-except-self/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "Array — prefix/suffix trick. 35 min timed."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "redundant-connection",
+          "reason": "Redo with Union-Find (not DFS). Cycle detection via UF. 25 min."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 4,
+      "date": "2026-06-09",
+      "label": "Tue",
+      "newProblems": [
+        {
+          "title": "Container With Most Water",
+          "url": "https://leetcode.com/problems/container-with-most-water/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "Two Pointers. 35 min timed."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "number-of-provinces",
+          "reason": "Redo with Union-Find. Textbook connected components — count distinct roots. 20 min."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 5,
+      "date": "2026-06-10",
+      "label": "Wed",
+      "newProblems": [
+        {
+          "title": "Lowest Common Ancestor of a Binary Tree",
+          "url": "https://leetcode.com/problems/lowest-common-ancestor-of-a-binary-tree/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "Tree DFS. 35 min timed."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "is-graph-bipartite",
+          "reason": "Redo — two-color DFS/BFS. 'Can we split into 2 groups with no conflicts?' 25 min."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 6,
+      "date": "2026-06-11",
+      "label": "Thu",
+      "newProblems": [
+        {
+          "title": "Group Anagrams",
+          "url": "https://leetcode.com/problems/group-anagrams/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "HashMap. 35 min timed."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "accounts-merge",
+          "reason": "Redo with Union-Find. Union emails by shared account, group by root. 25 min."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 7,
+      "date": "2026-06-12",
+      "label": "Fri",
+      "newProblems": [
+        {
+          "title": "Subarray Sum Equals K",
+          "url": "https://leetcode.com/problems/subarray-sum-equals-k/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "Prefix Sum + HashMap. 35 min timed."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "subsets-ii",
+          "reason": "2 revisions — Backtracking with duplicate handling. 20 min."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 8,
+      "date": "2026-06-13",
+      "label": "Sat — Re-solve Day (Graph + Backtracking)",
+      "newProblems": [],
+      "revisionProblems": [
+        {
+          "slug": "redundant-connection",
+          "reason": "Re-solve: 12 min timed. Did you retain Mon's UF approach?"
+        },
+        {
+          "slug": "is-graph-bipartite",
+          "reason": "Re-solve: 15 min timed. Two-color check without notes."
+        },
+        {
+          "slug": "generate-parentheses",
+          "reason": "Re-solve: 15 min timed. Backtracking constraint-based generation."
+        }
+      ],
+      "timed": true
+    }
+  ]
+}

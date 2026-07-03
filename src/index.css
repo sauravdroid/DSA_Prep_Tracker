@@ -2240,7 +2240,7 @@ button {
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
-  min-width: 0;
+  flex-shrink: 0;
 }
 
 .sp-plan-tab:hover {
@@ -2281,6 +2281,7 @@ button {
   color: var(--text2);
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 220px;
 }
 
 .sp-plan-tab-pct {
@@ -2450,6 +2451,21 @@ button {
   background: var(--accent2);
   border-color: var(--accent2);
   color: #fff;
+}
+
+.export-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sp-export-btn.has-label {
+  width: auto;
+  gap: 5px;
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .sp-grid {

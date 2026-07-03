@@ -2,32 +2,35 @@ import { useState } from 'react'
 import { getPattern } from '../utils/patterns'
 import { todayStr } from '../utils/dateUtils'
 
-function exportCSV(problemList, revisions) {
+function exportJSON(problemList, revisions) {
   const revisionMap = {}
   for (const r of revisions) {
     if (!revisionMap[r.slug]) revisionMap[r.slug] = []
     revisionMap[r.slug].push(r.date)
   }
 
-  const headers = ['Title', 'Difficulty', 'Pattern', 'Tags', 'Date Solved', 'Times Revised', 'URL']
-  const rows = problemList.map(p => [
-    p.title,
-    p.difficulty,
-    getPattern(p.tags),
-    (p.tags || []).join('; '),
-    p.dateSolved,
-    (revisionMap[p.slug] || []).length,
-    p.url
-  ])
+  const data = problemList.map(p => {
+    const revisionDates = (revisionMap[p.slug] || []).slice().sort()
+    return {
+      title: p.title,
+      slug: p.slug,
+      difficulty: p.difficulty,
+      pattern: getPattern(p.tags),
+      tags: p.tags || [],
+      acRate: p.acRate ?? null,
+      dateSolved: p.dateSolved ?? null,
+      failedCount: p.failedCount ?? 0,
+      timesRevised: revisionDates.length,
+      revisionDates,
+      url: p.url,
+    }
+  })
 
-  const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`
-  const csv = [headers.join(','), ...rows.map(r => r.map(escape).join(','))].join('\n')
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `leetcode_problems_${todayStr()}.csv`
+  a.download = `leetcode_problems_${todayStr()}.json`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -81,8 +84,8 @@ export default function ProblemsPage({ problems, revisions, onRevise }) {
         <div className="problems-header">
           <h2>Problems by Topic</h2>
           <span className="problem-count">{problemList.length} problems</span>
-          <button className="export-btn" onClick={() => exportCSV(problemList, revisions)}>
-            Export CSV
+          <button className="export-btn" onClick={() => exportJSON(problemList, revisions)}>
+            Export JSON
           </button>
         </div>
 

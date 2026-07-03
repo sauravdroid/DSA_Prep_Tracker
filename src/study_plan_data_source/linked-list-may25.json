@@ -72,17 +72,6 @@
         { "slug": "minimum-window-substring", "reason": "Sliding Window — Mar 22, 1 revision" }
       ],
       "timed": false
-    },
-    {
-      "day": 7, "date": "2026-05-31",
-      "newProblems": [],
-      "revisionProblems": [
-        { "slug": "reverse-linked-list", "reason": "Re-solve — must be <5 min (muscle memory)", "difficulty": "Easy" },
-        { "slug": "reorder-list", "reason": "Re-solve — target 15 min (Week 1 checkpoint)", "difficulty": "Medium" },
-        { "slug": "linked-list-cycle", "reason": "Re-solve — target 10 min", "difficulty": "Easy" },
-        { "slug": "longest-increasing-subsequence", "reason": "DP — May 3, 1 revision" }
-      ],
-      "timed": true
     }
   ]
 }

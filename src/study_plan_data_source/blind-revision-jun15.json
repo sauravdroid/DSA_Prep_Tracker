@@ -1,0 +1,145 @@
+{
+  "id": "blind-revision-jun15",
+  "title": "Blind + Revision — Backtracking, UF, Sliding Window (Jun 15–20)",
+  "description": "70% weak-pattern strengthening (Backtracking, Union-Find, Bipartite, Sliding Window), 30% stale-pattern maintenance (Intervals). Blind problems secretly test weak patterns without labels.",
+  "startDate": "2026-06-15",
+  "phases": [
+    { "label": "Blind + Revision", "days": [1, 2, 3, 4, 5], "color": "var(--accent)" },
+    { "label": "Checkpoint Day", "days": [6], "color": "#8b5cf6" }
+  ],
+  "weeks": [
+    { "label": "Week 3 — Weak Pattern Strengthening + Stale Maintenance" }
+  ],
+  "days": [
+    {
+      "day": 1,
+      "date": "2026-06-15",
+      "label": "Mon — Backtracking focus",
+      "newProblems": [
+        {
+          "title": "Maximum Length of a Concatenated String with Unique Characters",
+          "url": "https://leetcode.com/problems/maximum-length-of-a-concatenated-string-with-unique-characters/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "35 min timed. Log: pattern guess, trigger, state, core rule, failure condition."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "subsets-ii",
+          "reason": "RED — Backtracking duplicate handling. Had 1 fail last week. 20 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 2,
+      "date": "2026-06-16",
+      "label": "Tue — Union-Find focus",
+      "newProblems": [
+        {
+          "title": "Satisfiability of Equality Equations",
+          "url": "https://leetcode.com/problems/satisfiability-of-equality-equations/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "35 min timed. Log: pattern guess, trigger, state, core rule, failure condition."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "redundant-connection",
+          "reason": "RED — Union-Find cycle detection. Learned last week. Is it sticking? 20 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 3,
+      "date": "2026-06-17",
+      "label": "Wed — Sliding Window focus",
+      "newProblems": [
+        {
+          "title": "Find All Anagrams in a String",
+          "url": "https://leetcode.com/problems/find-all-anagrams-in-a-string/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "35 min timed. Close to Permutation in String — same template, different output. Log triggers."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "longest-repeating-character-replacement",
+          "reason": "RED — Sliding Window. 5 revisions, 82 days stale. Can you explain the window invariant? 20 min."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 4,
+      "date": "2026-06-18",
+      "label": "Thu — Backtracking + Intervals",
+      "newProblems": [
+        {
+          "title": "Split a String Into the Max Number of Unique Substrings",
+          "url": "https://leetcode.com/problems/split-a-string-into-the-max-number-of-unique-substrings/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "35 min timed. Log: pattern guess, trigger, state, core rule, failure condition."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "insert-interval",
+          "reason": "YELLOW — Intervals. 4 revisions, 96 days stale. Decay check. 20 min."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 5,
+      "date": "2026-06-19",
+      "label": "Fri — Union-Find + Bipartite",
+      "newProblems": [
+        {
+          "title": "Number of Operations to Make Network Connected",
+          "url": "https://leetcode.com/problems/number-of-operations-to-make-network-connected/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "35 min timed. Log: pattern guess, trigger, state, core rule, failure condition."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "is-graph-bipartite",
+          "reason": "RED — Bipartite coloring. Learned last week. Two-color DFS check. 20 min."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 6,
+      "date": "2026-06-20",
+      "label": "Sat — Checkpoint Day (mixed weak + stale)",
+      "newProblems": [],
+      "revisionProblems": [
+        {
+          "slug": "generate-parentheses",
+          "reason": "Checkpoint: Backtracking constraint generation. 15 min timed, no notes."
+        },
+        {
+          "slug": "redundant-connection",
+          "reason": "Checkpoint: Union-Find. 2nd test this week — must be <12 min."
+        },
+        {
+          "slug": "is-graph-bipartite",
+          "reason": "Checkpoint: Bipartite coloring. 2nd test this week — must be <12 min."
+        },
+        {
+          "slug": "koko-eating-bananas",
+          "reason": "YELLOW — Binary Search on Answer. 6 revisions, 91 days stale. Optional decay check. 15 min."
+        }
+      ],
+      "timed": true
+    }
+  ]
+}
