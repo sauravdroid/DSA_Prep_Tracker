@@ -28,6 +28,7 @@ export async function fetchSubmissions(session, startDate, onProgress, existingP
   const endTs = Math.floor(Date.now() / 1000) + 86400
   const problemMap = {} // slug -> problem data (keeps getting overwritten to oldest date)
   const failCounts = {} // slug -> number of non-Accepted submissions
+  const failures = [] // { slug, date, ts } for each non-Accepted submission
   const resubmissions = [] // { slug, date } for accepted re-submissions (revisions)
   const seenSlugDates = new Set() // "slug|date" to dedupe same-day re-submissions
   let offset = 0
@@ -63,6 +64,7 @@ export async function fetchSubmissions(session, startDate, onProgress, existingP
       if (ts >= endTs) continue
       if (s.statusDisplay !== 'Accepted') {
         failCounts[s.titleSlug] = (failCounts[s.titleSlug] || 0) + 1
+        failures.push({ slug: s.titleSlug, date: toLocalDateStr(new Date(ts * 1000)), ts })
         continue
       }
       const solvedDate = toLocalDateStr(new Date(ts * 1000))
@@ -99,7 +101,7 @@ export async function fetchSubmissions(session, startDate, onProgress, existingP
     if (hasMore) await delay(350)
   }
 
-  return { problems: Object.values(problemMap), failCounts, resubmissions }
+  return { problems: Object.values(problemMap), failCounts, failures, resubmissions }
 }
 
 export async function fetchProblemDetails(slug, session) {
@@ -121,7 +123,7 @@ export async function fetchProblemDetails(slug, session) {
 
 export async function syncProblems(session, startDate, onProgress, existingProblems = {}) {
   onProgress?.('Fetching submissions...')
-  const { problems: submissions, failCounts, resubmissions } = await fetchSubmissions(session, startDate, onProgress, existingProblems)
+  const { problems: submissions, failCounts, failures, resubmissions } = await fetchSubmissions(session, startDate, onProgress, existingProblems)
 
   const results = []
   for (let i = 0; i < submissions.length; i++) {
@@ -155,12 +157,13 @@ export async function syncProblems(session, startDate, onProgress, existingProbl
   }
 
   onProgress?.(`Done! Synced ${results.length} problems, ${resubmissions.length} re-submissions.`)
-  return { results, resubmissions }
+  return { results, resubmissions, failures }
 }
 
-export async function syncToday(session, onProgress, existingProblems = {}) {
-  const today = todayStr()
-  return syncProblems(session, today, onProgress, existingProblems)
+// Quick sync: catch up from last sync through today (falls back to today when never synced).
+export async function syncToday(session, onProgress, existingProblems = {}, since = null) {
+  const startDate = since || todayStr()
+  return syncProblems(session, startDate, onProgress, existingProblems)
 }
 
 function delay(ms) {

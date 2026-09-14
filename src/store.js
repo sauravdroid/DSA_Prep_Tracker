@@ -4,6 +4,7 @@ const KEYS = {
   SESSION: 'dsa_session',
   PROBLEMS: 'dsa_problems',
   REVISIONS: 'dsa_revisions',
+  FAILURES: 'dsa_failures',
   START_DATE: 'dsa_start_date',
   LAST_SYNC: 'dsa_last_sync',
   TODAY_REV_LIST: 'dsa_today_rev_list',
@@ -99,7 +100,6 @@ export function removeRevision(slug, date) {
 export function getRevisionsForProblem(slug) {
   return getRevisions().filter(r => r.slug === slug)
 }
-
 export function getRevisionsForDate(date) {
   return getRevisions().filter(r => r.date === date)
 }
@@ -107,6 +107,26 @@ export function getRevisionsForDate(date) {
 export function getProblemsForDate(date) {
   const problems = getProblems()
   return Object.values(problems).filter(p => p.dateSolved === date)
+}
+
+// Failure events: { slug, date, ts } — one per non-Accepted submission.
+export function getFailures() {
+  return read(KEYS.FAILURES, [])
+}
+
+export function addFailures(events) {
+  if (!events || events.length === 0) return getFailures()
+  const existing = getFailures()
+  const seen = new Set(existing.map(f => `${f.slug}|${f.ts}`))
+  for (const e of events) {
+    const key = `${e.slug}|${e.ts}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    existing.push(e)
+  }
+  existing.sort((a, b) => a.ts - b.ts)
+  write(KEYS.FAILURES, existing)
+  return existing
 }
 
 // Today's revision list: { date, slugs: [slug, ...] }

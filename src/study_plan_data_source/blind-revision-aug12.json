@@ -1,0 +1,120 @@
+{
+  "id": "blind-revision-aug12",
+  "title": "Blind + Revision — Binary Search, Graphs, DP, Greedy, Trees (Aug 12–17)",
+  "description": "One-day-shifted week starting Wed Aug 12. Base stays 1 blind + 1 revision daily. Saturday is the timed checkpoint. Sunday fully off, so the Greedy + Linked List day moves to Mon Aug 17. Focus: binary search feasibility/peak reasoning, BFS shortest-path vs topological sort, DP order-matters transitions, greedy heap placement, and the Tree DFS return contract.",
+  "startDate": "2026-08-12",
+  "phases": [
+    { "label": "Blind + Revision", "days": [1, 2, 3, 5], "color": "var(--accent)" },
+    { "label": "Checkpoint Day", "days": [4], "color": "#8b5cf6" }
+  ],
+  "weeks": [
+    { "label": "Week 11 — Blind + Revision (Shifted Start, Sunday Off)" }
+  ],
+  "days": [
+    {
+      "day": 1,
+      "date": "2026-08-12",
+      "label": "Wed — Binary Search on Shape + Binary Search on Answer",
+      "newProblems": [
+        {
+          "title": "Find Peak Element",
+          "url": "https://leetcode.com/problems/find-peak-element/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "35 min timed. Binary search without a sorted array: compare nums[mid] with nums[mid+1] and move toward the higher side. State the invariant before coding — a peak always exists inside [lo, hi]."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "koko-eating-bananas",
+          "reason": "Binary Search on Answer — light confidence check only (likely memorized). Do not code it blind-fast; instead say out loud what you minimize, what canEat(speed) is, and why it is monotonic. 15 min."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 2,
+      "date": "2026-08-13",
+      "label": "Thu — Graph BFS shortest path + Topological sort canary",
+      "newProblems": [
+        {
+          "title": "Word Ladder",
+          "url": "https://leetcode.com/problems/word-ladder/",
+          "difficulty": "Hard",
+          "pattern": "BLIND",
+          "notes": "40 min timed. Implicit graph + BFS for shortest transformation length. Build neighbors via wildcard patterns, mark visited on enqueue (not dequeue), and count levels rather than tracking paths."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "course-schedule",
+          "reason": "Graph cycle detection / topological sort canary. Trigger: prerequisites imply a directed graph; answer is 'no cycle'. Kahn's indegree queue or DFS with 3-state coloring. 20 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 3,
+      "date": "2026-08-14",
+      "label": "Fri — DP order-matters transition + 1D DP base",
+      "newProblems": [
+        {
+          "title": "Combination Sum IV",
+          "url": "https://leetcode.com/problems/combination-sum-iv/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "35 min timed. Traps the combination-vs-permutation distinction: loop target outer, coins inner because order matters. Write dp[t] = ______ before coding, then explain why swapping the loops changes the answer."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "coin-change",
+          "reason": "1D DP base canary, and the direct contrast to Combination Sum IV — same shape, but order does not matter. State both loop orders and why min-coins is order-independent. 20 min timed."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 4,
+      "date": "2026-08-15",
+      "label": "Sat — Timed checkpoint: Hashing + Tree DFS return contract",
+      "newProblems": [
+        {
+          "title": "Longest Consecutive Sequence",
+          "url": "https://leetcode.com/problems/longest-consecutive-sequence/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "30 min strictly timed, no notes. Checkpoint problem. Trigger: O(n) means hashing, not sorting. Only start a run at a value whose predecessor is absent."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "binary-tree-maximum-path-sum",
+          "reason": "Tree DFS return-contract canary, still Yellow. Before coding write: dfs(node) returns the best one-sided gain upward, while the global max may use left + node + right. 25 min timed, no notes."
+        }
+      ],
+      "timed": true
+    },
+    {
+      "day": 5,
+      "date": "2026-08-17",
+      "label": "Mon — Greedy heap placement + Linked List canary",
+      "newProblems": [
+        {
+          "title": "Reorganize String",
+          "url": "https://leetcode.com/problems/reorganize-string/",
+          "difficulty": "Medium",
+          "pattern": "BLIND",
+          "notes": "35 min timed. Greedy + max-heap: always place the most frequent remaining character that is not the previous one. Check feasibility first — impossible when maxFreq > (n + 1) / 2."
+        }
+      ],
+      "revisionProblems": [
+        {
+          "slug": "reorder-list",
+          "reason": "Linked List canary — multi-step pointer discipline that Reverse Linked List II already exposed. Three phases: find middle, reverse second half, merge alternately. 20 min timed."
+        }
+      ],
+      "timed": true
+    }
+  ]
+}

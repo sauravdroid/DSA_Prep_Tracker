@@ -5,10 +5,11 @@ import DailyRevisions from './components/DailyRevisions'
 import ProblemModal from './components/ProblemModal'
 import SyncSettings from './components/SyncSettings'
 import StudyPlanCalendar from './components/StudyPlanCalendar'
-import { syncToday } from './services/leetcode'
+import StatsPage from './components/StatsPage'
+import { syncToday, syncProblems } from './services/leetcode'
 import * as store from './store'
 
-const TABS = ['Calendar', 'Study Plan', "Today's Revision", 'Problems', 'Settings']
+const TABS = ['Calendar', 'Study Plan', "Today's Revision", 'Problems', 'Stats', 'Settings']
 
 export default function App() {
   const [tab, setTab] = useState('Calendar')
@@ -33,7 +34,7 @@ export default function App() {
     setRevisions(store.getRevisions())
   }, [])
 
-  const handleQuickSync = useCallback(async () => {
+  const runSync = useCallback(async fetcher => {
     const session = store.getSession()
     if (!session) {
       setSyncMsg('Set your session cookie in Settings first.')
@@ -41,9 +42,9 @@ export default function App() {
       return
     }
     setSyncing(true)
-    setSyncMsg('Syncing today...')
+    setSyncMsg('Syncing...')
     try {
-      const { results, resubmissions } = await syncToday(session, msg => setSyncMsg(msg), store.getProblems())
+      const { results, resubmissions, failures } = await fetcher(session)
       if (results.length > 0) {
         const merged = store.mergeProblems(results)
         setProblems(merged)
@@ -51,6 +52,7 @@ export default function App() {
       for (const r of resubmissions) {
         store.addRevision(r.slug, r.date)
       }
+      store.addFailures(failures)
       if (resubmissions.length > 0) setRevisions(store.getRevisions())
       setSyncMsg(`Synced ${results.length} problem${results.length !== 1 ? 's' : ''}, ${resubmissions.length} revision${resubmissions.length !== 1 ? 's' : ''}`)
     } catch (err) {
@@ -59,6 +61,16 @@ export default function App() {
     setSyncing(false)
     setTimeout(() => setSyncMsg(''), 4000)
   }, [])
+
+  const handleQuickSync = useCallback(
+    () => runSync(session => syncToday(session, msg => setSyncMsg(msg), store.getProblems(), store.getLastSync())),
+    [runSync]
+  )
+
+  const handleSyncMonth = useCallback(
+    monthStartDate => runSync(session => syncProblems(session, monthStartDate, msg => setSyncMsg(msg), store.getProblems())),
+    [runSync]
+  )
 
   const count = Object.keys(problems).length
 
@@ -103,6 +115,8 @@ export default function App() {
             revisions={revisions}
             onRevise={handleRevise}
             onRemoveRevision={handleRemoveRevision}
+            onSyncMonth={handleSyncMonth}
+            syncing={syncing}
           />
         )}
         {tab === "Today's Revision" && (
@@ -115,6 +129,12 @@ export default function App() {
         )}
         {tab === 'Study Plan' && (
           <StudyPlanCalendar
+            problems={problems}
+            revisions={revisions}
+          />
+        )}
+        {tab === 'Stats' && (
+          <StatsPage
             problems={problems}
             revisions={revisions}
           />

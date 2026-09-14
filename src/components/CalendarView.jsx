@@ -106,7 +106,7 @@ function exportWeekAsJSON(dates, problemsByDate, revisionsByDate, problems) {
   URL.revokeObjectURL(url)
 }
 
-export default function CalendarView({ problems, revisions, onRevise, onRemoveRevision }) {
+export default function CalendarView({ problems, revisions, onRevise, onRemoveRevision, onSyncMonth, syncing }) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(todayStr())
   const [detailTab, setDetailTab] = useState('new')
@@ -512,6 +512,14 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
                   }}
                 >
                   Today
+                </button>
+                <button
+                  className={`month-sync-btn ${syncing ? 'syncing' : ''}`}
+                  onClick={() => onSyncMonth?.(toDateStr(1))}
+                  disabled={syncing}
+                  title={`Sync all of ${monthName}`}
+                >
+                  ⟳
                 </button>
               </div>
               <button onClick={nextMonth} className="nav-btn">▶</button>

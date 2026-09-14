@@ -7,6 +7,7 @@ import blindRevisionJun5 from './blind-revision-jun5.json'
 import blindRevisionJun15 from './blind-revision-jun15.json'
 import blindRevisionJun22 from './blind-revision-jun22.json'
 import revisionOnlyJun29 from './revision-only-jun29.json'
+import blindRevisionAug12 from './blind-revision-aug12.json'
 
 // Add new plans here as they are created
 const ALL_PLANS = [
@@ -19,6 +20,7 @@ const ALL_PLANS = [
   blindRevisionJun15,
   blindRevisionJun22,
   revisionOnlyJun29,
+  blindRevisionAug12,
 ]
 
 export function getAllPlans() {

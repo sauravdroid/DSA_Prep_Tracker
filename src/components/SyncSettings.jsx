@@ -22,12 +22,13 @@ export default function SyncSettings({ onSyncComplete }) {
     try {
       // Use exact last sync timestamp if available so we only fetch new submissions
       const syncFrom = lastSync || startDate
-      const { results: problems, resubmissions } = await syncProblems(session.trim(), syncFrom, setStatus, store.getProblems())
+      const { results: problems, resubmissions, failures } = await syncProblems(session.trim(), syncFrom, setStatus, store.getProblems())
       const merged = store.mergeProblems(problems)
       // Store re-submissions as revisions
       for (const r of resubmissions) {
         store.addRevision(r.slug, r.date)
       }
+      store.addFailures(failures)
       setStatus(`Sync complete! ${Object.keys(merged).length} problems, ${resubmissions.length} re-submissions.`)
       onSyncComplete()
     } catch (e) {
