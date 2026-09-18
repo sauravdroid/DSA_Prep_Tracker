@@ -6,10 +6,11 @@ import ProblemModal from './components/ProblemModal'
 import SyncSettings from './components/SyncSettings'
 import StudyPlanCalendar from './components/StudyPlanCalendar'
 import StatsPage from './components/StatsPage'
+import RecursionVisualizer from './components/RecursionVisualizer'
 import { syncToday, syncProblems } from './services/leetcode'
 import * as store from './store'
 
-const TABS = ['Calendar', 'Study Plan', "Today's Revision", 'Problems', 'Stats', 'Settings']
+const TABS = ['Calendar', 'Study Plan', "Today's Revision", 'Problems', 'Stats', 'Recursion', 'Settings']
 
 export default function App() {
   const [tab, setTab] = useState('Calendar')
@@ -139,6 +140,7 @@ export default function App() {
             revisions={revisions}
           />
         )}
+        {tab === 'Recursion' && <RecursionVisualizer />}
         {tab === 'Settings' && <SyncSettings onSyncComplete={reload} />}
       </main>
 

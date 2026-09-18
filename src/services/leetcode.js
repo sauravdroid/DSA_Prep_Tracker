@@ -121,6 +121,29 @@ export async function fetchProblemDetails(slug, session) {
   return data.question
 }
 
+// Everything needed to seed the recursion visualizer: sample inputs, the expected
+// outputs (only available inside the rendered description) and the starter code.
+export async function fetchQuestion(slug, session) {
+  const data = await gql(
+    `query questionData($titleSlug: String!) {
+      question(titleSlug: $titleSlug) {
+        questionFrontendId
+        title
+        titleSlug
+        difficulty
+        isPaidOnly
+        content
+        exampleTestcaseList
+        metaData
+        codeSnippets { langSlug code }
+      }
+    }`,
+    { titleSlug: slug },
+    session
+  )
+  return data.question
+}
+
 export async function syncProblems(session, startDate, onProgress, existingProblems = {}) {
   onProgress?.('Fetching submissions...')
   const { problems: submissions, failCounts, failures, resubmissions } = await fetchSubmissions(session, startDate, onProgress, existingProblems)
