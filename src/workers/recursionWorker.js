@@ -81,27 +81,48 @@ function deepEqual(a, b) {
 const MAX_CELLS = 48
 const MAX_GRID_ROWS = 40
 const MAX_GRID_COLS = 40
+const MAX_TREE_NODES = 63
+
+// Ids come from a Map shared across the whole trace, so a cursor variable like
+// `curr` resolves to the same id as that node inside `root`'s flattened tree.
+// `seen` is per-call: the id map must not double as the visited guard, or every
+// snapshot after the first would flatten to nothing.
+function flattenTree(root, ids, out, seen) {
+  if (!root || out.length >= MAX_TREE_NODES) return null
+  if (seen.has(root)) return ids.get(root)
+  seen.add(root)
+
+  let id = ids.get(root)
+  if (id == null) {
+    id = ids.size
+    ids.set(root, id)
+  }
+
+  const node = { id, val: preview(root.val, 2), left: null, right: null }
+  out.push(node)
+  node.left = flattenTree(root.left, ids, out, seen)
+  node.right = flattenTree(root.right, ids, out, seen)
+  return id
+}
 
 function isScalar(v) {
   return v === null || ['number', 'string', 'boolean', 'undefined'].includes(typeof v)
 }
 
-// A DP table or matrix has scalar cells. A BFS queue of [node, parent] pairs is
-// also an array of arrays, so cell type is what separates them.
+// A DP table or matrix has scalar cells and uniform row lengths. A BFS queue of
+// [node, parent] pairs fails the cell test; a ragged accumulator like the subsets
+// result fails the width test.
 function isGrid(value) {
   if (!Array.isArray(value) || value.length < 2) return false
-  let width = 0
-  for (const row of value) {
-    if (!Array.isArray(row)) return false
-    width = Math.max(width, row.length)
-    if (!row.every(isScalar)) return false
-  }
-  return width >= 2
+  if (!Array.isArray(value[0])) return false
+  const width = value[0].length
+  if (width < 2) return false
+  return value.every(row => Array.isArray(row) && row.length === width && row.every(isScalar))
 }
 
 // Arrays keep their elements separate so the UI can draw them as cells rather
 // than one long string.
-function snapshotValue(value) {
+function snapshotValue(value, ids) {
   const entry = { text: preview(value) }
 
   if (isGrid(value)) {
@@ -117,6 +138,9 @@ function snapshotValue(value) {
     entry.length = value.length
   } else if (value instanceof TreeNode) {
     entry.kind = 'tree'
+    const nodes = []
+    entry.rootId = flattenTree(value, ids, nodes, new Set())
+    entry.tree = nodes
   } else if (value instanceof ListNode) {
     entry.kind = 'list'
   } else if (Number.isInteger(value)) {
@@ -126,7 +150,9 @@ function snapshotValue(value) {
     entry.kind = 'value'
   }
 
-  entry.sig = entry.kind === 'grid' ? JSON.stringify(entry.rows) : entry.text
+  entry.sig = entry.kind === 'grid' ? JSON.stringify(entry.rows)
+    : entry.kind === 'tree' ? `${entry.rootId}:${JSON.stringify(entry.tree)}`
+    : entry.text
   return entry
 }
 
@@ -137,6 +163,8 @@ function createTracer() {
   // Unchanged values reuse the same object; structured clone keeps shared
   // references, so a large static grid is only serialized once.
   const lastSnapshot = new Map()
+  // Node identity for the whole trace, so tree ids stay comparable across events.
+  const treeIds = new Map()
   let aborted = null
   let armed = true
   let nextId = 0
@@ -196,7 +224,7 @@ function createTracer() {
         const snapshot = {}
         for (const key of Object.keys(vars)) {
           if (typeof vars[key] === 'function') continue
-          const entry = snapshotValue(vars[key])
+          const entry = snapshotValue(vars[key], treeIds)
           const cacheKey = `${current}|${key}`
           const prev = lastSnapshot.get(cacheKey)
           if (prev && prev.sig === entry.sig) {

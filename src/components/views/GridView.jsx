@@ -73,9 +73,9 @@ export default function GridView({ name, value, previous, cursor }) {
         </table>
       </div>
 
-      {(value.rowCount > value.rows.length || value.colCount > (value.rows[0]?.length ?? 0)) && (
+      {(value.rowCount > value.rows.length || value.colCount > value.rows[0].length) && (
         <p className="rec-grid-trunc">
-          showing {value.rows.length}×{value.rows[0]?.length ?? 0} of {value.rowCount}×{value.colCount}
+          showing {value.rows.length}×{value.rows[0].length} of {value.rowCount}×{value.colCount}
         </p>
       )}
     </div>

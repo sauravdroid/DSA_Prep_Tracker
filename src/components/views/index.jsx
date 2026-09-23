@@ -1,11 +1,13 @@
 import ArrayView from './ArrayView'
 import GridView from './GridView'
-import { detectViews, indexPointers, gridCursor, applyViewSpec } from '../../utils/viewDetect'
+import TreeView from './TreeView'
+import { detectViews, indexPointers, gridCursor, treeCursors, applyViewSpec } from '../../utils/viewDetect'
 
 // Adding a structure = one component plus one entry here.
 const REGISTRY = {
   array: ArrayView,
   grid: GridView,
+  tree: TreeView,
 }
 
 export default function DataViews({ snapshot, previous, spec }) {
@@ -30,6 +32,7 @@ export default function DataViews({ snapshot, previous, spec }) {
             previous={previous?.[view.name]}
             pointers={pointers}
             cursor={cursor}
+            cursors={view.kind === 'tree' ? treeCursors(snapshot, view.name) : undefined}
           />
         )
       })}
