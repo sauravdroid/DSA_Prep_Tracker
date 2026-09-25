@@ -1,10 +1,10 @@
-import { getPattern } from '../utils/patterns'
+import { getPatterns } from '../utils/patterns'
 import { todayStr } from '../utils/dateUtils'
 
 export default function ProblemModal({ problem, revisions, onClose, onRevise }) {
   if (!problem) return null
 
-  const pattern = getPattern(problem.tags)
+  const patterns = getPatterns(problem.tags)
   const problemRevisions = revisions
     .filter(r => r.slug === problem.slug)
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -22,7 +22,9 @@ export default function ProblemModal({ problem, revisions, onClose, onRevise }) 
           <span className={`difficulty-badge ${problem.difficulty.toLowerCase()}`}>
             {problem.difficulty}
           </span>
-          <span className="pattern-tag">{pattern}</span>
+          {patterns.map(pat => (
+            <span key={pat} className="pattern-tag">{pat}</span>
+          ))}
         </div>
 
         <div className="modal-details">

@@ -609,6 +609,11 @@ button {
   color: var(--red);
 }
 
+.month-stat.attempted {
+  background: rgba(255, 161, 22, 0.12);
+  color: var(--accent2);
+}
+
 .nav-btn {
   background: var(--surface2);
   border: 1px solid var(--border);
@@ -696,6 +701,12 @@ button {
   font-size: 64px;
   color: rgba(255, 55, 95, 0.12);
   pointer-events: none;
+}
+
+/* Attempted but unsolved: effort happened, so never render it as a missed day. */
+.calendar-cell.attempted,
+.calendar-cell.past-attempted {
+  background: rgba(255, 161, 22, 0.1);
 }
 
 .calendar-cell.selected.past-solved,
@@ -868,6 +879,11 @@ button {
   color: #7c3aed;
 }
 
+.tooltip-tag.try {
+  background: rgba(255, 161, 22, 0.18);
+  color: var(--accent2);
+}
+
 .cell-pat-count {
   display: inline-flex;
   align-items: center;
@@ -929,6 +945,29 @@ button {
   align-items: center;
   justify-content: center;
   white-space: nowrap;
+}
+
+.cell-progress-try {
+  background: var(--accent);
+  min-width: 4px;
+  padding: 0 6px;
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.cell-pat-try {
+  background: rgba(255, 161, 22, 0.15) !important;
+}
+
+.attempt-unsolved {
+  font-size: 10px;
+  color: var(--text2);
+  font-style: italic;
 }
 
 .dot {

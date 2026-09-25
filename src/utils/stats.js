@@ -1,4 +1,4 @@
-import { getPattern } from './patterns'
+import { getPatterns } from './patterns'
 
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard']
 const DIFFICULTY_WEIGHT = { Easy: 1, Medium: 2, Hard: 3 }
@@ -67,23 +67,27 @@ export function computeStats(problems, revisions, failures, from, to) {
     patternMap[pattern][key]++
     patternMap[pattern].total++
   }
+  // A problem tagged with several patterns counts toward each of them, so
+  // these totals intentionally sum to more than newProblems.length.
   for (const p of newProblems) {
-    const pat = getPattern(p.tags)
-    bump(pat, 'new')
-    const g = patternMap[pat]
-    if (p.difficulty === 'Hard') g.hard++
-    else if (p.difficulty === 'Medium') g.medium++
-    else if (p.difficulty === 'Easy') g.easy++
-    if (p.acRate != null) g.acRates.push(p.acRate)
+    for (const pat of getPatterns(p.tags)) {
+      bump(pat, 'new')
+      const g = patternMap[pat]
+      if (p.difficulty === 'Hard') g.hard++
+      else if (p.difficulty === 'Medium') g.medium++
+      else if (p.difficulty === 'Easy') g.easy++
+      if (p.acRate != null) g.acRates.push(p.acRate)
+    }
   }
   for (const p of revisionProblems) {
-    bump(getPattern(p.tags), 'revisions')
+    for (const pat of getPatterns(p.tags)) bump(pat, 'revisions')
   }
   for (const f of rangeFailures) {
     const p = problems[f.slug]
     if (!p) continue
-    const pat = getPattern(p.tags)
-    if (patternMap[pat]) patternMap[pat].fails++
+    for (const pat of getPatterns(p.tags)) {
+      if (patternMap[pat]) patternMap[pat].fails++
+    }
   }
   const patterns = Object.values(patternMap)
     .map(g => ({

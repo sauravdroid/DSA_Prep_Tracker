@@ -205,7 +205,10 @@ export default function StatsPage({ problems, revisions }) {
         </section>
 
         <section className="stat-panel stat-panel-full">
-          <h3 className="stat-panel-title">Problems per pattern</h3>
+          <h3 className="stat-panel-title">
+            Problems per pattern
+            <span className="stat-panel-hint">multi-pattern problems count in each</span>
+          </h3>
           <ResponsiveContainer width="100%" height={Math.max(240, patternChartData.length * 30)}>
             <BarChart data={patternChartData} layout="vertical" margin={{ top: 8, right: 16, left: 24, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e2e2" horizontal={false} />

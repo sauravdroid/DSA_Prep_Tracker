@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { getPattern } from '../utils/patterns'
+import { getPatterns } from '../utils/patterns'
 import { toLocalDateStr } from '../utils/dateUtils'
 
 function getYesterdayStr() {
@@ -21,9 +21,10 @@ export default function YesterdayProblems({ problems, revisions, onSelectProblem
   function groupByPattern(list) {
     const groups = {}
     for (const p of list) {
-      const pat = getPattern(p.tags)
-      if (!groups[pat]) groups[pat] = []
-      groups[pat].push(p)
+      for (const pat of getPatterns(p.tags)) {
+        if (!groups[pat]) groups[pat] = []
+        groups[pat].push(p)
+      }
     }
     return Object.entries(groups).sort((a, b) => b[1].length - a[1].length)
   }

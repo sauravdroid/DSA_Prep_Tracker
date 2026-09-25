@@ -16,6 +16,7 @@ export default function App() {
   const [tab, setTab] = useState('Calendar')
   const [problems, setProblems] = useState(store.getProblems())
   const [revisions, setRevisions] = useState(store.getRevisions())
+  const [failures, setFailures] = useState(store.getFailures())
   const [selectedProblem, setSelectedProblem] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
@@ -23,6 +24,7 @@ export default function App() {
   const reload = useCallback(() => {
     setProblems(store.getProblems())
     setRevisions(store.getRevisions())
+    setFailures(store.getFailures())
   }, [])
 
   const handleRevise = useCallback(slug => {
@@ -54,6 +56,7 @@ export default function App() {
         store.addRevision(r.slug, r.date)
       }
       store.addFailures(failures)
+      setFailures(store.getFailures())
       if (resubmissions.length > 0) setRevisions(store.getRevisions())
       setSyncMsg(`Synced ${results.length} problem${results.length !== 1 ? 's' : ''}, ${resubmissions.length} revision${resubmissions.length !== 1 ? 's' : ''}`)
     } catch (err) {
@@ -114,6 +117,7 @@ export default function App() {
           <CalendarView
             problems={problems}
             revisions={revisions}
+            failures={failures}
             onRevise={handleRevise}
             onRemoveRevision={handleRemoveRevision}
             onSyncMonth={handleSyncMonth}

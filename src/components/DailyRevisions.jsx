@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { getPattern } from '../utils/patterns'
+import { getPattern, getPatterns } from '../utils/patterns'
 import { todayStr } from '../utils/dateUtils'
 import { getTodayRevisionList, saveTodayRevisionList } from '../store'
 
@@ -42,8 +42,12 @@ export default function DailyRevisions({ problems, revisions, onSelectProblem, o
       const pattern = getPattern(p.tags)
       const scored = { ...p, pattern, score, daysSince, revCount }
       sMap[p.slug] = scored
-      if (!bp[pattern]) bp[pattern] = []
-      bp[pattern].push(scored)
+      // Listed under every pattern it belongs to, so picking by a weak pattern
+      // surfaces it even when that is not its primary label.
+      for (const pat of getPatterns(p.tags)) {
+        if (!bp[pat]) bp[pat] = []
+        bp[pat].push(scored)
+      }
     }
 
     for (const key of Object.keys(bp)) {

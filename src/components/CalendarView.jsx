@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { getPattern } from '../utils/patterns'
+import { getPatterns } from '../utils/patterns'
 import { toLocalDateStr, todayStr } from '../utils/dateUtils'
 import { getStartDate, getTodayRevisionList, saveTodayRevisionList } from '../store'
 
@@ -106,7 +106,7 @@ function exportWeekAsJSON(dates, problemsByDate, revisionsByDate, problems) {
   URL.revokeObjectURL(url)
 }
 
-export default function CalendarView({ problems, revisions, onRevise, onRemoveRevision, onSyncMonth, syncing }) {
+export default function CalendarView({ problems, revisions, failures = [], onRevise, onRemoveRevision, onSyncMonth, syncing }) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(todayStr())
   const [detailTab, setDetailTab] = useState('new')
@@ -148,6 +148,24 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
     revisionsByDate[r.date].push(r)
   }
 
+  // Failed submissions grouped by day and slug, so a day spent attempting counts
+  // as study time even when nothing was solved.
+  const attemptsByDate = useMemo(() => {
+    const byDate = {}
+    for (const f of failures) {
+      if (!byDate[f.date]) byDate[f.date] = new Map()
+      byDate[f.date].set(f.slug, (byDate[f.date].get(f.slug) || 0) + 1)
+    }
+    return byDate
+  }, [failures])
+
+  const attemptList = date =>
+    [...(attemptsByDate[date]?.entries() ?? [])].map(([slug, tries]) => ({
+      slug,
+      tries,
+      problem: problems[slug] || null,
+    }))
+
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1))
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1))
 
@@ -183,6 +201,11 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
   const selectedNewProblems = selectedDate ? (problemsByDate[selectedDate] || []) : []
   const selectedRevisions = selectedDate ? (revisionsByDate[selectedDate] || []) : []
   const selectedRevisionProblems = selectedRevisions.map(r => problems[r.slug]).filter(Boolean)
+  const selectedHasSolved = selectedNewProblems.length > 0 || selectedRevisionProblems.length > 0
+  // Attempts are only worth surfacing on days that produced nothing, and they never
+  // count toward the day's problem totals.
+  const selectedAttempts = selectedDate && !selectedHasSolved ? attemptList(selectedDate) : []
+  const activeTab = detailTab === 'attempted' && selectedAttempts.length === 0 ? 'new' : detailTab
 
   // Mon–Sat week containing the selected date (used for the weekly JSON export)
   const weekMonSat = useMemo(() => (selectedDate ? getMondayToSaturday(selectedDate) : []), [selectedDate])
@@ -190,13 +213,14 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
     d => (problemsByDate[d] || []).length > 0 || (revisionsByDate[d] || []).length > 0
   )
 
-  // Group a list of problems by pattern
+  // Group a list of problems by pattern; multi-pattern problems appear in each
   function groupByPattern(list) {
     const groups = {}
     for (const p of list) {
-      const pat = getPattern(p.tags)
-      if (!groups[pat]) groups[pat] = []
-      groups[pat].push(p)
+      for (const pat of getPatterns(p.tags)) {
+        if (!groups[pat]) groups[pat] = []
+        groups[pat].push(p)
+      }
     }
     return Object.entries(groups).sort((a, b) => b[1].length - a[1].length)
   }
@@ -216,13 +240,15 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
     }
     const grouped = {}
     for (const p of allProbs) {
-      const pat = getPattern(p.tags)
-      if (!grouped[pat]) grouped[pat] = []
-      grouped[pat].push({
+      const entry = {
         ...p,
         isNew: newProbs.some(x => x.slug === p.slug),
         isRevised: revSlugs.has(p.slug),
-      })
+      }
+      for (const pat of getPatterns(p.tags)) {
+        if (!grouped[pat]) grouped[pat] = []
+        grouped[pat].push(entry)
+      }
     }
     const groups = Object.entries(grouped).sort((a, b) => b[1].length - a[1].length)
     return {
@@ -236,7 +262,7 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
   }, [weekDrillDate, problemsByDate, revisionsByDate, problems])
 
   const sp = selectedProblem
-  const pattern = sp ? getPattern(sp.tags) : ''
+  const patterns = sp ? getPatterns(sp.tags) : []
   const problemRevisions = sp
     ? revisions.filter(r => r.slug === sp.slug).sort((a, b) => b.date.localeCompare(a.date))
     : []
@@ -263,17 +289,18 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
           <button className="day-nav-btn" onClick={() => shiftDay(-1)}>◀</button>
           <h3 className="cal-panel-title">{selectedDate || 'Select a date'}</h3>
           <button className="day-nav-btn" onClick={() => shiftDay(1)}>▶</button>
-          {selectedDate && (selectedNewProblems.length > 0 || selectedRevisionProblems.length > 0) && (
+          {selectedDate && (selectedHasSolved || selectedAttempts.length > 0) && (
             <div className="cal-panel-progress">
               {selectedNewProblems.length > 0 && <div className="cell-progress-new" style={{ flex: selectedNewProblems.length }}>{selectedNewProblems.length} new</div>}
               {selectedRevisionProblems.length > 0 && <div className="cell-progress-rev" style={{ flex: selectedRevisionProblems.length }}>{selectedRevisionProblems.length} rev</div>}
+              {selectedAttempts.length > 0 && <div className="cell-progress-try" style={{ flex: selectedAttempts.length }}>{selectedAttempts.length} tried</div>}
             </div>
           )}
         </div>
 
         <div className="detail-tabs">
           <button
-            className={`detail-tab ${detailTab === 'new' ? 'active' : ''}`}
+            className={`detail-tab ${activeTab === 'new' ? 'active' : ''}`}
             onClick={() => { setDetailTab('new'); setSelectedProblem(null) }}
           >
             New Solved
@@ -282,7 +309,7 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
             )}
           </button>
           <button
-            className={`detail-tab ${detailTab === 'revised' ? 'active' : ''}`}
+            className={`detail-tab ${activeTab === 'revised' ? 'active' : ''}`}
             onClick={() => { setDetailTab('revised'); setSelectedProblem(null) }}
           >
             Revised
@@ -290,6 +317,15 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
               <span className="detail-tab-count">{selectedRevisionProblems.length}</span>
             )}
           </button>
+          {selectedAttempts.length > 0 && (
+            <button
+              className={`detail-tab ${activeTab === 'attempted' ? 'active' : ''}`}
+              onClick={() => { setDetailTab('attempted'); setSelectedProblem(null) }}
+            >
+              Attempted
+              <span className="detail-tab-count">{selectedAttempts.length}</span>
+            </button>
+          )}
           {selectedDate && (weekHasProblems || selectedNewProblems.length > 0 || selectedRevisionProblems.length > 0) && (
             <div className="export-btn-group" style={{ marginLeft: 'auto' }}>
               {(selectedNewProblems.length > 0 || selectedRevisionProblems.length > 0) && (
@@ -327,7 +363,7 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
               <span className={`difficulty-badge ${sp.difficulty.toLowerCase()}`}>
                 {sp.difficulty}
               </span>
-              <span className="pattern-tag">{pattern}</span>
+              <span className="pattern-tag">{patterns.join(' · ')}</span>
             </div>
 
             <div className="inline-detail-rows">
@@ -392,8 +428,8 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
           </div>
         ) : (
           /* Problem list */
-          <div className="detail-list" key={detailTab}>
-            {detailTab === 'new' && (
+          <div className="detail-list" key={activeTab}>
+            {activeTab === 'new' && (
               groupedNew.length > 0 ? (
                 groupedNew.map(([pat, items]) => (
                   <div key={pat} className="cal-pattern-group">
@@ -432,7 +468,7 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
               )
             )}
 
-            {detailTab === 'revised' && (
+            {activeTab === 'revised' && (
               groupedRevised.length > 0 ? (
                 groupedRevised.map(([pat, items]) => (
                   <div key={pat} className="cal-pattern-group">
@@ -470,6 +506,39 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
                 <p className="empty-message">No revisions on this date.</p>
               )
             )}
+
+            {activeTab === 'attempted' && (
+              selectedAttempts.length > 0 ? (
+                <div className="cal-pattern-group">
+                  <div className="cal-pattern-header">
+                    <span>Failed submissions</span>
+                    <span className="cal-pattern-count">{selectedAttempts.reduce((s, a) => s + a.tries, 0)}</span>
+                  </div>
+                  {selectedAttempts.map((a, idx) => (
+                    <button
+                      key={a.slug}
+                      className="problem-row"
+                      onClick={() => a.problem && setSelectedProblem(a.problem)}
+                    >
+                      <span className="problem-row-num">{idx + 1}</span>
+                      <span className="problem-title">{a.problem?.title || a.slug}</span>
+                      <span className="problem-row-meta">
+                        <span className="fail-count">✗{a.tries}</span>
+                        {a.problem ? (
+                          <span className={`difficulty-badge ${a.problem.difficulty.toLowerCase()}`}>
+                            {a.problem.difficulty}
+                          </span>
+                        ) : (
+                          <span className="attempt-unsolved">not solved yet</span>
+                        )}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="empty-message">No failed submissions on this date.</p>
+              )
+            )}
           </div>
         )}
       </div>
@@ -485,7 +554,7 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
                 <h3>{monthName}
                   {(() => {
                     const startDate = getStartDate()
-                    let activeDays = 0, missedDays = 0
+                    let activeDays = 0, attemptedDays = 0, missedDays = 0
                     for (let d = 1; d <= daysInMonth; d++) {
                       const ds = toDateStr(d)
                       if (ds >= today) continue
@@ -493,11 +562,13 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
                       const hasNew = (problemsByDate[ds] || []).length > 0
                       const hasRev = (revisionsByDate[ds] || []).length > 0
                       if (hasNew || hasRev) activeDays++
+                      else if (attemptsByDate[ds]) attemptedDays++
                       else missedDays++
                     }
                     return (
                       <span className="month-stats">
                         <span className="month-stat active">{activeDays} active</span>
+                        {attemptedDays > 0 && <span className="month-stat attempted">{attemptedDays} tried</span>}
                         <span className="month-stat missed">{missedDays} missed</span>
                       </span>
                     )
@@ -535,29 +606,36 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
                 const dateStr = toDateStr(day)
                 const dayNew = problemsByDate[dateStr] || []
                 const dayRev = (revisionsByDate[dateStr] || []).map(r => problems[r.slug]).filter(Boolean)
+                const dayAttempts = attemptList(dateStr)
                 const newCount = dayNew.length
                 const revCount = dayRev.length
                 const isToday = dateStr === today
                 const isPast = dateStr < today
                 const isSelected = dateStr === selectedDate
-                const hasActivity = newCount > 0 || revCount > 0
+                const hasSolved = newCount > 0 || revCount > 0
+                const attemptCount = dayAttempts.reduce((s, a) => s + a.tries, 0)
+                // An attempt-only day is still study time, so it is never "missed".
+                const attemptedOnly = !hasSolved && dayAttempts.length > 0
+                const hasActivity = hasSolved || attemptedOnly
 
                 // Group by pattern for this day's tile
                 const patGroups = {}
                 const newSlugs = new Set(dayNew.map(p => p.slug))
                 const revSlugs = new Set(dayRev.map(p => p.slug))
                 for (const p of dayNew) {
-                  const pat = getPattern(p.tags)
-                  if (!patGroups[pat]) patGroups[pat] = []
-                  if (!patGroups[pat].some(x => x.slug === p.slug)) {
-                    patGroups[pat].push({ title: p.title, slug: p.slug, isNew: true, isRev: revSlugs.has(p.slug) })
+                  for (const pat of getPatterns(p.tags)) {
+                    if (!patGroups[pat]) patGroups[pat] = []
+                    if (!patGroups[pat].some(x => x.slug === p.slug)) {
+                      patGroups[pat].push({ title: p.title, slug: p.slug, isNew: true, isRev: revSlugs.has(p.slug) })
+                    }
                   }
                 }
                 for (const p of dayRev) {
-                  const pat = getPattern(p.tags)
-                  if (!patGroups[pat]) patGroups[pat] = []
-                  if (!patGroups[pat].some(x => x.slug === p.slug)) {
-                    patGroups[pat].push({ title: p.title, slug: p.slug, isNew: newSlugs.has(p.slug), isRev: true })
+                  for (const pat of getPatterns(p.tags)) {
+                    if (!patGroups[pat]) patGroups[pat] = []
+                    if (!patGroups[pat].some(x => x.slug === p.slug)) {
+                      patGroups[pat].push({ title: p.title, slug: p.slug, isNew: newSlugs.has(p.slug), isRev: true })
+                    }
                   }
                 }
                 const patEntries = Object.entries(patGroups).sort((a, b) => b[1].length - a[1].length)
@@ -568,20 +646,46 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
                 return (
                   <button
                     key={day}
-                    className={`calendar-cell ${isToday ? 'today' : ''} ${isSelected && !isMissed && !isFuture ? 'selected' : ''} ${hasActivity ? 'active' : ''} ${isFuture ? 'future' : ''} ${isPast && !isToday && dateStr >= startDate ? (hasActivity ? 'past-solved' : 'past-missed') : ''}`}
+                    className={`calendar-cell ${isToday ? 'today' : ''} ${isSelected && !isMissed && !isFuture ? 'selected' : ''} ${hasActivity ? 'active' : ''} ${attemptedOnly ? 'attempted' : ''} ${isFuture ? 'future' : ''} ${isPast && !isToday && dateStr >= startDate ? (hasSolved ? 'past-solved' : attemptedOnly ? 'past-attempted' : 'past-missed') : ''}`}
                     onClick={() => { if (!isMissed && !isFuture) { setSelectedDate(dateStr); setSelectedProblem(null) } }}
                     style={isMissed || isFuture ? { cursor: 'default' } : undefined}
                   >
                     <span className="day-number">{day}</span>
                     <div className="cell-top-row">
-                      {hasActivity && (
+                      {hasSolved && (
                         <div className="cell-progress">
                           {newCount > 0 && <div className="cell-progress-new" style={{ flex: newCount }}>{newCount} new</div>}
                           {revCount > 0 && <div className="cell-progress-rev" style={{ flex: revCount }}>{revCount} rev</div>}
                         </div>
                       )}
+                      {attemptedOnly && (
+                        <div className="cell-progress">
+                          <div className="cell-progress-try" style={{ flex: 1 }}>
+                            {dayAttempts.length} tried
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    {hasActivity && (
+                    {attemptedOnly && (
+                      <div className="cell-patterns">
+                        <span className="cell-pat-wrap">
+                          <span className="cell-pat cell-pat-try">
+                            <span className="cell-pat-count">{attemptCount}</span>{attemptCount === 1 ? 'attempt' : 'attempts'}
+                          </span>
+                          <span className="cell-pat-tooltip">
+                            {dayAttempts.map(a => (
+                              <span key={a.slug} className="tooltip-row">
+                                <span className="tooltip-title">{a.problem?.title || a.slug}</span>
+                                <span className="tooltip-tags">
+                                  <span className="tooltip-tag try">✗{a.tries}</span>
+                                </span>
+                              </span>
+                            ))}
+                          </span>
+                        </span>
+                      </div>
+                    )}
+                    {hasSolved && (
                       <div className="cell-patterns">
                         {patEntries.slice(0, 6).map(([pat, items]) => {
                           const patNew = items.filter(p => p.isNew).length
@@ -704,7 +808,7 @@ export default function CalendarView({ problems, revisions, onRevise, onRemoveRe
                   ...(problemsByDate[dateStr] || []),
                   ...(revisionsByDate[dateStr] || []).map(r => problems[r.slug]).filter(Boolean),
                 ]
-                const dayPatterns = new Set(dayProblems.map(p => getPattern(p.tags)))
+                const dayPatterns = new Set(dayProblems.flatMap(p => getPatterns(p.tags)))
                 const patCount = dayPatterns.size
                 const hasActivity = newCount > 0 || revCount > 0
 

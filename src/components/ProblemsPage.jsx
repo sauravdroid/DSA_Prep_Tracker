@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getPattern } from '../utils/patterns'
+import { getPattern, getPatterns } from '../utils/patterns'
 import { todayStr } from '../utils/dateUtils'
 
 function exportJSON(problemList, revisions) {
@@ -16,6 +16,7 @@ function exportJSON(problemList, revisions) {
       slug: p.slug,
       difficulty: p.difficulty,
       pattern: getPattern(p.tags),
+      patterns: getPatterns(p.tags),
       tags: p.tags || [],
       acRate: p.acRate ?? null,
       dateSolved: p.dateSolved ?? null,
@@ -44,9 +45,11 @@ export default function ProblemsPage({ problems, revisions, onRevise }) {
   const problemList = Object.values(problems)
   const grouped = {}
   for (const p of problemList) {
-    const pattern = getPattern(p.tags)
-    if (!grouped[pattern]) grouped[pattern] = []
-    grouped[pattern].push({ ...p, pattern })
+    const patterns = getPatterns(p.tags)
+    for (const pattern of patterns) {
+      if (!grouped[pattern]) grouped[pattern] = []
+      grouped[pattern].push({ ...p, pattern, patterns })
+    }
   }
 
   const sortedTopics = Object.keys(grouped).sort((a, b) =>
@@ -71,7 +74,7 @@ export default function ProblemsPage({ problems, revisions, onRevise }) {
     : sortedTopics
 
   const sp = selectedProblem
-  const pattern = sp ? getPattern(sp.tags) : ''
+  const patterns = sp ? getPatterns(sp.tags) : []
   const problemRevisions = sp
     ? revisions.filter(r => r.slug === sp.slug).sort((a, b) => b.date.localeCompare(a.date))
     : []
@@ -146,7 +149,9 @@ export default function ProblemsPage({ problems, revisions, onRevise }) {
               <span className={`difficulty-badge ${sp.difficulty.toLowerCase()}`}>
                 {sp.difficulty}
               </span>
-              <span className="pattern-tag">{pattern}</span>
+              {patterns.map(pat => (
+                <span key={pat} className="pattern-tag">{pat}</span>
+              ))}
             </div>
 
             <div className="inline-detail-rows">
