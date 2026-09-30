@@ -11,7 +11,7 @@ import DebtPage from './components/DebtPage'
 import SyncNotesPanel from './components/SyncNotesPanel'
 import ColdTestModal from './components/ColdTestModal'
 import SyncDock from './components/SyncDock'
-import { syncToday, syncProblems } from './services/leetcode'
+import { syncProblems } from './services/leetcode'
 import { backupIfConnected } from './utils/github'
 import { startAutoSync } from './utils/autoSync'
 import { computeRetention } from './utils/retention'
@@ -114,11 +114,6 @@ export default function App() {
     setTimeout(() => setSyncMsg(''), 6000)
   }, [])
 
-  const handleQuickSync = useCallback(
-    () => runSync(session => syncToday(session, msg => setSyncMsg(msg), store.getProblems(), store.getLastSync())),
-    [runSync]
-  )
-
   const handleSyncMonth = useCallback(
     monthStartDate => runSync(session => syncProblems(session, monthStartDate, msg => setSyncMsg(msg), store.getProblems())),
     [runSync]
@@ -160,16 +155,9 @@ export default function App() {
               )}
             </button>
           ))}
-          <div className="quick-sync">
-            <button
-              className="quick-sync-btn"
-              onClick={handleQuickSync}
-              disabled={syncing}
-            >
-              {syncing ? '⟳ Syncing...' : '⟳ Sync Today'}
-            </button>
-            {syncMsg && <span className="quick-sync-msg">{syncMsg}</span>}
-          </div>
+          {/* Only the month backfill reports here now; the recurring sync has
+              its own dock. */}
+          {syncMsg && <div className="quick-sync"><span className="quick-sync-msg">{syncMsg}</span></div>}
         </nav>
       </header>
 

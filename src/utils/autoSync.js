@@ -63,9 +63,12 @@ function step(key, next, note) {
   })
 }
 
+let noteSeq = 0
+
 function note(text) {
   // Newest first, and bounded: this is a running commentary, not an audit log.
-  set({ log: [{ at: new Date().toISOString(), text }, ...state.log].slice(0, 40) })
+  noteSeq += 1
+  set({ log: [{ id: noteSeq, at: new Date().toISOString(), text }, ...state.log].slice(0, 40) })
 }
 
 /** One pass. Never throws: a failed step is reported, the rest still run. */
@@ -92,8 +95,13 @@ export async function runCycle({ manual = false } = {}) {
     if (!session) {
       step('leetcode', 'skipped', 'No session cookie set')
     } else {
-      step('leetcode', 'running')
-      const r = await withTimeout(syncToday(session, () => {}, store.getProblems(), store.getLastSync()), 'LeetCode sync')
+      step('leetcode', 'running', 'Contacting LeetCode…')
+      // syncToday reports which page and which problem it is on; without this
+      // the longest step of the cycle is the one that says least.
+      const r = await withTimeout(
+        syncToday(session, msg => step('leetcode', 'running', msg), store.getProblems(), store.getLastSync()),
+        'LeetCode sync'
+      )
       if (r.results.length > 0) store.mergeProblems(r.results)
       for (const x of r.resubmissions) store.addRevision(x.slug, x.date)
       store.addFailures(r.failures)
@@ -101,8 +109,12 @@ export async function runCycle({ manual = false } = {}) {
       if (total > 0) changed.push(`${r.results.length} solved, ${r.resubmissions.length} revised`)
       step('leetcode', 'done', total > 0
         ? `${r.results.length} solved, ${r.resubmissions.length} revised`
-        : 'Nothing new')
-      if (total > 0) note(`LeetCode: ${r.results.length} solved, ${r.resubmissions.length} revised`)
+        : 'Nothing new since the last check')
+      // Name them, so the count can be checked against something.
+      for (const p of r.results) note(`Solved: ${p.title || p.slug}`)
+      for (const x of r.resubmissions) {
+        note(`Revised: ${store.getProblems()[x.slug]?.title || x.slug}`)
+      }
     }
   } catch (e) {
     problems.push('LeetCode')

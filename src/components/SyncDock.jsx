@@ -91,7 +91,7 @@ export default function SyncDock() {
             <div className="max-h-40 overflow-y-auto border-t border-slate-100 px-4 py-3">
               <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">What changed</p>
               {s.log.map(e => (
-                <p key={e.at} className="text-[11px] leading-relaxed text-slate-600">
+                <p key={e.id} className="text-[11px] leading-relaxed text-slate-600">
                   <span className="tabular-nums text-slate-400">{e.at.slice(11, 16)}</span> {e.text}
                 </p>
               ))}
