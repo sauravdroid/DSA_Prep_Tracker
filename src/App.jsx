@@ -11,6 +11,8 @@ import DebtPage from './components/DebtPage'
 import SyncNotesPanel from './components/SyncNotesPanel'
 import ColdTestModal from './components/ColdTestModal'
 import { syncToday, syncProblems } from './services/leetcode'
+import { githubStatus, pushToGithub } from './utils/github'
+import { saveNow } from './utils/dataFile'
 import { computeRetention } from './utils/retention'
 import { todayStr } from './utils/dateUtils'
 import * as store from './store'
@@ -86,11 +88,28 @@ export default function App() {
         items.push({ slug: r.slug, title: all[r.slug]?.title || r.slug, type: 'revision' })
       }
       if (items.length > 0) setSyncedItems(items)
+
+      // Back up too, so the published tracker the coach reads cannot quietly
+      // fall behind. A failure here must not look like a failed sync: the work
+      // is already saved locally.
+      if (results.length > 0 || resubmissions.length > 0 || failures.length > 0) {
+        try {
+          const gh = await githubStatus()
+          if (gh?.hasToken) {
+            setSyncMsg(m => `${m} · backing up…`)
+            await saveNow({ force: true })
+            const pushed = await pushToGithub()
+            setSyncMsg(m => `${m.replace(' · backing up…', '')} · backed up${pushed.committed ? ` (${pushed.committed})` : ''}`)
+          }
+        } catch (e) {
+          setSyncMsg(m => `${m.replace(' · backing up…', '')} · backup failed: ${e.message}`)
+        }
+      }
     } catch (err) {
       setSyncMsg('Sync failed: ' + err.message)
     }
     setSyncing(false)
-    setTimeout(() => setSyncMsg(''), 4000)
+    setTimeout(() => setSyncMsg(''), 6000)
   }, [])
 
   const handleQuickSync = useCallback(
