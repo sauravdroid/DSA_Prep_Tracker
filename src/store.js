@@ -17,7 +17,7 @@ const KEYS = {
   META: 'dsa_meta',
 }
 
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 function read(key, fallback) {
   try {
@@ -305,8 +305,11 @@ export function getMeta() {
 }
 
 /**
- * Brings v1 data up to the current schema. Runs once after hydration and is
- * additive — no practice fact is discarded.
+ * Brings older data up to the current schema. Runs once after hydration.
+ *
+ * It discards exactly one thing: duplicate records for the same problem on the
+ * same day, which a day is no longer allowed to hold. The surviving grade is
+ * the last one made, since a later grade is a correction of the earlier.
  */
 export function migrateStore() {
   const meta = getMeta()
@@ -335,6 +338,25 @@ export function migrateStore() {
     })
     localStorage.setItem(KEYS.PRACTICE_LOG, JSON.stringify(upgraded))
     changes.push(`practice log (${upgraded.length})`)
+  }
+
+  // Days holding several records exist only because a crash in the grader let
+  // one click record repeatedly. The log is ordered by time, so the last write
+  // for a day wins and the earliest timestamp is kept as its first recording.
+  const current = read(KEYS.PRACTICE_LOG, [])
+  const byDay = new Map()
+  for (const e of current) {
+    const key = `${e.slug}|${e.date}`
+    const prior = byDay.get(key)
+    byDay.set(key, {
+      ...e,
+      firstRecordedAt: prior?.firstRecordedAt || prior?.at || e.firstRecordedAt || e.at,
+    })
+  }
+  if (byDay.size !== current.length) {
+    const collapsed = [...byDay.values()].sort((a, b) => (a.at || a.date).localeCompare(b.at || b.date))
+    localStorage.setItem(KEYS.PRACTICE_LOG, JSON.stringify(collapsed))
+    changes.push(`collapsed ${current.length - collapsed.length} duplicate day records`)
   }
 
   const anchors = read(KEYS.ANCHORS, {})
