@@ -105,8 +105,12 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
   // A stale decision stops driving the day; fall back to the live derivation.
   const decisionSteps = d && !staleness.stale ? d.today : null
   // A graded step is finished, and the Done section already carries it.
-  const doNowRecorded = decisionSteps?.doNow?.slug
-    ? practiceLog.some(e => e.slug === decisionSteps.doNow.slug && e.date === today)
+  const recorded = slug => !!slug && practiceLog.some(e => e.slug === slug && e.date === today)
+  const doNowRecorded = recorded(decisionSteps?.doNow?.slug)
+  // A follow-up with no target of its own hangs off the step before it — there
+  // is nothing else it could be waiting on.
+  const thenRecorded = decisionSteps?.then
+    ? (decisionSteps.then.slug ? recorded(decisionSteps.then.slug) : doNowRecorded)
     : false
 
   const headline = d?.mode?.headline
@@ -262,12 +266,16 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
                 )}
 
                 {decisionSteps.then && (
-                  <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 px-4 py-3">
-                    <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">
-                      Then
+                  <div className={`flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 ${
+                    thenRecorded ? 'bg-slate-50' : ''
+                  }`}>
+                    <span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                      thenRecorded ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {thenRecorded ? 'Done' : 'Then'}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <span className="font-medium text-slate-900">
+                      <span className={`font-medium ${thenRecorded ? 'text-slate-600' : 'text-slate-900'}`}>
                         {decisionSteps.then.title || decisionSteps.then.action}
                       </span>
                       {decisionSteps.then.why && (

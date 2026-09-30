@@ -75,8 +75,10 @@
         },
         "then": {
           "type": "object",
+          "description": "The follow-up step. Give it a `slug` when it has a target of its own. Without one the tracker treats it as finished once `doNow` is recorded, since there is nothing else it could be waiting on.",
           "properties": {
             "action": { "type": "string" },
+            "slug": { "type": "string" },
             "title": { "type": "string" },
             "why": { "type": "string" }
           },
