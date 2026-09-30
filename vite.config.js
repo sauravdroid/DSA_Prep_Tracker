@@ -413,42 +413,22 @@ function githubSync() {
           (tree.status === 200 ? tree.body.tree : []).filter(t => t.type === 'blob').map(t => t.path)
         )
 
-        // Outcome summaries already in the index are carried forward, so a
-        // sealed file is read once rather than on every archive run.
+        // Index entries already published are reused, so a run costs a handful
+        // of requests regardless of how many assessments have accumulated. A
+        // decision is fetched only when it is new, or about to be sealed.
         const priorIndex = present.has(INDEX_PATH)
           ? await gh(token, 'GET', `/repos/${repo}/contents/${INDEX_PATH}`)
           : null
-        let priorOutcomes = new Map()
+        let priorByCommit = new Map()
         if (priorIndex?.status === 200) {
           try {
             const parsed = JSON.parse(Buffer.from(priorIndex.body.content || '', 'base64').toString('utf8'))
-            priorOutcomes = new Map((parsed.assessments || []).filter(a => a.outcome).map(a => [a.id, a.outcome]))
+            priorByCommit = new Map((parsed.assessments || []).filter(a => a.sourceCommit).map(a => [a.sourceCommit, a]))
           } catch {
-            priorOutcomes = new Map()
+            priorByCommit = new Map()
           }
         }
 
-        const seen = []
-        const toWrite = new Map()
-        for (const c of log.body) {
-          const at = await gh(token, 'GET', `${coachingContents}?ref=${c.sha}`)
-          if (at.status !== 200) continue
-          let decision
-          try {
-            decision = decodeContent(at)
-          } catch {
-            continue
-          }
-          const id = assessmentId(decision.assessedAt)
-          if (!id) continue
-
-          const content = JSON.stringify(decision, null, 2)
-          seen.push({ id, decision, commit: c.sha.slice(0, 7), bytes: Buffer.byteLength(content) })
-          if (!present.has(assessmentPath(id))) toWrite.set(assessmentPath(id), content)
-        }
-
-        // How each forecast resolved, recorded once. Recomputing it later would
-        // let a correction to the evidence rewrite the verdict on old advice.
         const today = new Date().toISOString().slice(0, 10)
         let practiceLog = []
         if (fs.existsSync(dataFile)) {
@@ -459,28 +439,66 @@ function githubSync() {
           }
         }
 
-        const latestId = seen[0]?.id ?? null
-        const outcomes = new Map(priorOutcomes)
+        const toWrite = new Map()
+        const summaries = []
         let sealed = 0
         let resealed = 0
-        for (const { id, decision } of seen) {
+        let fetched = 0
+
+        const readDecision = async sha => {
+          const at = await gh(token, 'GET', `${coachingContents}?ref=${sha}`)
+          if (at.status !== 200) return null
+          fetched++
+          try {
+            return decodeContent(at)
+          } catch {
+            return null
+          }
+        }
+
+        for (const [i, c] of log.body.entries()) {
+          const short = c.sha.slice(0, 7)
+          const isLatest = i === 0
+          const prior = priorByCommit.get(short)
+          const known = prior && prior.id && present.has(assessmentPath(prior.id))
+
+          // Already archived and already sealed: nothing can change it.
+          if (known && prior.outcome) {
+            summaries.push(prior)
+            continue
+          }
+
+          // Already archived and not yet sealable: the index alone answers that.
+          if (known && !sealReason({ covers: prior.covers || [], isLatest, today })) {
+            summaries.push({ ...prior, outcome: null })
+            continue
+          }
+
+          const decision = await readDecision(c.sha)
+          if (!decision) {
+            if (prior) summaries.push(prior)
+            continue
+          }
+          const id = assessmentId(decision.assessedAt)
+          if (!id) continue
+
+          const content = JSON.stringify(decision, null, 2)
+          if (!present.has(assessmentPath(id))) toWrite.set(assessmentPath(id), content)
+
+          let outcome = null
           if (present.has(outcomePath(id))) {
             const existing = await gh(token, 'GET', `/repos/${repo}/contents/${outcomePath(id)}`)
-            if (existing.status !== 200) continue
-            let parsed
-            try {
-              parsed = decodeContent(existing)
-            } catch {
-              continue
+            let parsed = null
+            if (existing.status === 200) {
+              try {
+                parsed = decodeContent(existing)
+              } catch { /* fall through and leave it alone */ }
             }
-
             // An older format can be rewritten, but only while the evidence
             // behind it is unchanged. Otherwise the rewrite would quietly
             // restate the verdict against evidence the original never saw,
             // which is what sealing exists to prevent.
-            const stale = (parsed.outcomeVersion ?? 1) < OUTCOME_VERSION
-            const { drifted } = outcomeDrift(parsed, practiceLog)
-            if (stale && !drifted) {
+            if (parsed && (parsed.outcomeVersion ?? 1) < OUTCOME_VERSION && !outcomeDrift(parsed, practiceLog).drifted) {
               const reSealed = sealOutcome({
                 decision,
                 assessmentId: id,
@@ -490,40 +508,31 @@ function githubSync() {
                 supersededBy: parsed.supersededBy ?? null,
               })
               toWrite.set(outcomePath(id), JSON.stringify(reSealed, null, 2))
-              outcomes.set(id, summariseOutcome(reSealed))
+              outcome = summariseOutcome(reSealed)
               resealed++
-            } else if (!outcomes.has(id)) {
-              outcomes.set(id, summariseOutcome(parsed))
+            } else if (parsed) {
+              outcome = summariseOutcome(parsed)
             }
-            continue
+          } else {
+            const because = sealReason({ decision, covers: coveredDates(decision), isLatest, today })
+            if (because) {
+              // Newest first, so whatever replaced this one is already here.
+              const fresh = sealOutcome({
+                decision,
+                assessmentId: id,
+                practiceLog,
+                sealedAt: new Date().toISOString(),
+                sealedBecause: because,
+                supersededBy: because === 'superseded' ? summaries[0]?.id ?? null : null,
+              })
+              toWrite.set(outcomePath(id), JSON.stringify(fresh, null, 2))
+              outcome = summariseOutcome(fresh)
+              sealed++
+            }
           }
 
-          if (outcomes.has(id)) continue
-
-          const because = sealReason({
-            decision,
-            covers: coveredDates(decision),
-            isLatest: id === latestId,
-            today,
-          })
-          if (!because) continue
-
-          const outcome = sealOutcome({
-            decision,
-            assessmentId: id,
-            practiceLog,
-            sealedAt: new Date().toISOString(),
-            sealedBecause: because,
-            supersededBy: because === 'superseded' ? latestId : null,
-          })
-          toWrite.set(outcomePath(id), JSON.stringify(outcome, null, 2))
-          outcomes.set(id, summariseOutcome(outcome))
-          sealed++
+          summaries.push(summarise(decision, { commit: short, bytes: Buffer.byteLength(content), outcome }))
         }
-
-        const summaries = seen.map(s =>
-          summarise(s.decision, { commit: s.commit, bytes: s.bytes, outcome: outcomes.get(s.id) ?? null })
-        )
 
         const index = buildIndex(summaries)
         const indexContent = JSON.stringify(index, null, 2)
@@ -532,7 +541,7 @@ function githubSync() {
         if (indexChanged) toWrite.set(INDEX_PATH, indexContent)
 
         if (toWrite.size === 0) {
-          return send(res, 200, { committed: null, unchanged: true, archived: 0, sealed: 0, resealed: 0, count: index.count })
+          return send(res, 200, { committed: null, unchanged: true, archived: 0, sealed: 0, resealed: 0, fetched, count: index.count })
         }
 
         const newTree = await gh(token, 'POST', `/repos/${repo}/git/trees`, {
@@ -560,6 +569,7 @@ function githubSync() {
           archived: [...toWrite.keys()].filter(p => p.startsWith('coaching/assessments/')).length,
           sealed,
           resealed,
+          fetched,
           count: index.count,
           files: [...toWrite.keys()],
         })
