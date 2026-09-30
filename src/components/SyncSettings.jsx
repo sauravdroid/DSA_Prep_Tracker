@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { syncProblems } from '../services/leetcode'
 import { subscribe, saveNow, reloadFromDisk } from '../utils/dataFile'
-import { githubStatus, saveToken, pullFromGithub, pushToGithub, getRepo, setRepo } from '../utils/github'
+import { githubStatus, saveToken, pullFromGithub, pushToGithub, getRepo, setRepo, pullCoaching } from '../utils/github'
+import { saveDecision } from '../utils/coaching'
 import RemoteFreshness from './RemoteFreshness'
 import * as store from '../store'
 
@@ -210,7 +211,32 @@ export default function SyncSettings({ onSyncComplete }) {
       return
     }
     const s = r.summary
-    setStatus(`Restored +${s.problemsAdded} problems, +${s.revisionsAdded} revisions, +${s.attemptsAdded} graded attempts.`)
+
+    // The plan lives outside the tracker file, so restoring only the tracker
+    // leaves a machine with evidence and no coaching.
+    let plan = ''
+    try {
+      const c = await pullCoaching()
+      if (c.empty) plan = ' No coaching plan published yet.'
+      else if (!c.valid) plan = ' The published plan did not validate, so it was not adopted.'
+      else {
+        await saveDecision({
+          ...c.decision,
+          adoptedFrom: {
+            repo: getRepo(),
+            path: c.path || 'coaching/decision.json',
+            commit: c.commit?.sha || null,
+            shortCommit: c.commit?.shortSha || null,
+            adoptedAt: new Date().toISOString(),
+          },
+        })
+        plan = ` Coaching plan adopted${c.commit?.shortSha ? ` (${c.commit.shortSha})` : ''}.`
+      }
+    } catch (e) {
+      plan = ` The tracker is restored, but the coaching plan could not be fetched: ${e.message}`
+    }
+
+    setStatus(`Restored +${s.problemsAdded} problems, +${s.revisionsAdded} revisions, +${s.attemptsAdded} graded attempts.${plan}`)
     onSyncComplete()
   })
 

@@ -59,6 +59,21 @@
       "additionalProperties": true
     },
 
+    "adoptedFrom": {
+      "type": "object",
+      "description": "Written by the tracker when a decision is adopted, never by the coach. It records which revision the local copy was pinned from, so the adopted plan can be traced back to a commit. A coach publishing this field will have it overwritten.",
+      "properties": {
+        "repo": { "type": "string" },
+        "path": { "type": "string" },
+        "commit": { "type": ["string", "null"] },
+        "shortCommit": { "type": ["string", "null"] },
+        "source": { "type": "string", "enum": ["file"] },
+        "name": { "type": "string" },
+        "adoptedAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": true
+    },
+
     "today": {
       "type": "object",
       "properties": {

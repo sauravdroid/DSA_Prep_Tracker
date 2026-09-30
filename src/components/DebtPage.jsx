@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { computeRetention, daysBetween, HEALTH, ROLES, suggestAnchors } from '../utils/retention'
 import { loadDecision, saveDecision, decisionStaleness, forecastValidity, trackerSnapshot } from '../utils/coaching'
-import { pullCoaching, coachingHistory, backupIfConnected } from '../utils/github'
+import { pullCoaching, coachingHistory, backupIfConnected, getRepo } from '../utils/github'
 import { getSyncState } from '../utils/dataFile'
 import { todayStr } from '../utils/dateUtils'
 import ColdTestModal from './ColdTestModal'
@@ -96,7 +96,7 @@ function BackupNote({ backup, onDismiss }) {
     </div>
   )
 }
-function TodayHeadline({ retention, decision, staleness, validity, practiceLog, today, tab, onTabChange, onGrade, onOpenSetup, onOpenProblem, problems }) {
+function TodayHeadline({ retention, decision, staleness, validity, practiceLog, today, tab, onTabChange, onGrade, onOpenSetup, onOpenProblem, onOpenCoaching, problems }) {
   const [dayDate, setDayDate] = useState(null)
   const { mode, modeProvisional, plan, totalDebt, debtCalculable, agenda, doneToday, focusTopics, maintenanceTopics, trackedCount } = retention
   const roleOf = name => retention.topics.find(t => t.name === name)?.role
@@ -206,6 +206,23 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
         <section className="mt-5">
           <SectionHeading label="Do now" />
           <div className="mt-2 space-y-2">
+          {!decisionSteps && (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 px-4 py-2.5 text-xs ring-1 ring-slate-200">
+              <span className="min-w-0 flex-1 text-slate-600">
+                {d
+                  ? 'The adopted plan no longer fits today, so this day is worked out from your own records rather than coached.'
+                  : 'No coaching plan adopted. This day is worked out from your own records.'}
+              </span>
+              {onOpenCoaching && (
+                <button
+                  onClick={onOpenCoaching}
+                  className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-700 transition hover:bg-white"
+                >
+                  {d ? 'Fetch a newer plan' : 'Fetch a plan'}
+                </button>
+              )}
+            </div>
+          )}
           {decisionSteps
             ? (
               <>
@@ -709,6 +726,44 @@ function AnchorRow({ anchor, today, onGrade, onOpenProblem, onRemove }) {
 /* ---------- Coaching source ---------- */
 
 /**
+ * Which revision is being followed. The disk file is a pinned copy, so naming
+ * it as the source invites the reader to treat a cache as the origin.
+ */
+function AdoptedFrom({ from, path, hasDecision }) {
+  if (!hasDecision) {
+    return (
+      <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200">
+        No plan adopted yet. Fetch one below.
+      </p>
+    )
+  }
+
+  const when = from?.adoptedAt ? new Date(from.adoptedAt).toLocaleString() : null
+
+  return (
+    <div className="mt-2 space-y-1">
+      {from?.repo && from?.shortCommit ? (
+        <code className="block overflow-x-auto rounded-lg bg-slate-100 px-2 py-1.5 text-[11px] text-slate-700">
+          {from.repo}@{from.shortCommit} · {from.path}
+        </code>
+      ) : from?.source === 'file' ? (
+        <code className="block overflow-x-auto rounded-lg bg-slate-100 px-2 py-1.5 text-[11px] text-slate-700">
+          imported from {from.name}
+        </code>
+      ) : (
+        <p className="text-[11px] text-amber-700">
+          Adopted before revisions were recorded, so which one this is cannot be established.
+          Fetching again will pin it.
+        </p>
+      )}
+      <p className="text-[11px] text-slate-400">
+        {when ? `Adopted ${when} · ` : ''}cached at {path}
+      </p>
+    </div>
+  )
+}
+
+/**
  * Fetch the coach's decision from GitHub, show what validation found, and adopt
  * it only on an explicit second step. A committed file is not automatically
  * trustworthy: it is checked against the published schema, and the commit that
@@ -733,7 +788,18 @@ function CoachingSource({ decision, decisionPath, onReload }) {
   })
 
   const adopt = () => run(async () => {
-    await saveDecision(candidate.decision)
+    // Without this the adopted copy is an unlabelled duplicate: you cannot tell
+    // which revision you are following, or whether a newer one exists.
+    await saveDecision({
+      ...candidate.decision,
+      adoptedFrom: {
+        repo: getRepo(),
+        path: candidate.path || 'coaching/decision.json',
+        commit: candidate.commit?.sha || null,
+        shortCommit: candidate.commit?.shortSha || null,
+        adoptedAt: new Date().toISOString(),
+      },
+    })
     setAdopted(candidate.commit?.shortSha || 'local')
     setCandidate(null)
     onReload()
@@ -759,7 +825,10 @@ function CoachingSource({ decision, decisionPath, onReload }) {
     } catch (e) {
       throw new Error(`${file.name} is not valid JSON: ${e.message}`)
     }
-    await saveDecision(parsed)
+    await saveDecision({
+      ...parsed,
+      adoptedFrom: { source: 'file', name: file.name, adoptedAt: new Date().toISOString() },
+    })
     setAdopted(file.name)
     setCandidate(null)
     onReload()
@@ -775,11 +844,8 @@ function CoachingSource({ decision, decisionPath, onReload }) {
         The app owns practice facts. This file only holds the current recommendation, and
         fetching advice can never change your practice history.
       </p>
-      {decisionPath && (
-        <code className="mt-2 block overflow-x-auto rounded-lg bg-slate-100 px-2 py-1.5 text-[11px] text-slate-700">
-          {decisionPath}
-        </code>
-      )}
+
+      <AdoptedFrom from={decision?.adoptedFrom} path={decisionPath} hasDecision={!!decision} />
 
       {/* The coach reads the tracker from the data repository, so an unpushed
           change means advice would be authored against facts that have moved. */}
@@ -1050,6 +1116,7 @@ export default function DebtPage({ problems, revisions, onChanged }) {
             onGrade={(slug, mode) => setTesting({ slug, mode })}
             onOpenSetup={() => setSetupOpen(v => !v)}
             onOpenProblem={openProblem}
+            onOpenCoaching={() => setRightTab('history')}
             problems={problems}
           />
           <BackupNote backup={backup} onDismiss={() => setBackup(null)} />
