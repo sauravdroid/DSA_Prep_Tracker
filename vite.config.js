@@ -334,6 +334,44 @@ function githubSync() {
         })
       }
 
+      // Freshness only: the comparison runs here so the browser does not fetch
+      // the whole tracker file just to learn whether a push is outstanding.
+      if (url === '/remote-status') {
+        const local = fs.existsSync(dataFile)
+          ? JSON.parse(fs.readFileSync(dataFile, 'utf8'))
+          : { savedAt: null, data: {} }
+        const localKeys = Object.keys(local.data || {})
+
+        const r = await gh(token, 'GET', contentsPath)
+        if (r.status === 404) {
+          return send(res, 200, {
+            remote: { empty: true },
+            local: { savedAt: local.savedAt, keys: localKeys.length },
+            behind: localKeys.length > 0,
+            missingOnRemote: localKeys,
+            changedSincePush: [],
+          })
+        }
+        if (r.status !== 200) {
+          return send(res, r.status, { error: r.body?.message || `GitHub returned ${r.status}` })
+        }
+
+        const remote = decodeContent(r)
+        const remoteKeys = Object.keys(remote.data || {})
+        const missing = localKeys.filter(k => !remoteKeys.includes(k))
+        // A shared key whose content differs also means a push is outstanding.
+        const changed = localKeys.filter(k => remoteKeys.includes(k) && remote.data[k] !== local.data[k])
+
+        return send(res, 200, {
+          remote: { savedAt: remote.savedAt || null, keys: remoteKeys.length, sha: r.body.sha },
+          local: { savedAt: local.savedAt || null, keys: localKeys.length },
+          behind: missing.length > 0 || changed.length > 0,
+          ahead: !!(local.savedAt && remote.savedAt && remote.savedAt > local.savedAt),
+          missingOnRemote: missing,
+          changedSincePush: changed,
+        })
+      }
+
       if (url === '/pull') {
         const r = await gh(token, 'GET', contentsPath)
         if (r.status === 404) return send(res, 200, { empty: true, data: {}, savedAt: null })

@@ -61,6 +61,15 @@ export function pushToGithub() {
   return call('/push', { repo: getRepo() })
 }
 
+/**
+ * Whether the remote tracker is behind local work, and what is missing.
+ * Compared server-side so this stays a small response rather than the whole
+ * tracker file.
+ */
+export function remoteStatus() {
+  return call('/remote-status', { repo: getRepo() })
+}
+
 /* ---------- Coaching advice ---------- */
 
 /**

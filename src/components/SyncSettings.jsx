@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { syncProblems } from '../services/leetcode'
 import { subscribe, saveNow, reloadFromDisk } from '../utils/dataFile'
 import { githubStatus, saveToken, pullFromGithub, pushToGithub, getRepo, setRepo } from '../utils/github'
+import RemoteFreshness from './RemoteFreshness'
 import * as store from '../store'
 
 // Overlap by a day so a timezone boundary can't drop a submission.
@@ -158,6 +159,12 @@ function GithubPanel({ onChanged, onResume }) {  const [status, setStatus] = use
         Keeps a copy in your repo so any machine can pick up where the last one left off.
         Pulling merges rather than replaces, so no history is lost either way.
       </p>
+
+      {status?.hasToken && (
+        <div className="mt-3">
+          <RemoteFreshness key={repo} />
+        </div>
+      )}
 
       <label className="mt-4 block">
         <span className="block text-xs font-semibold uppercase tracking-wide text-slate-400">Repository</span>

@@ -8,6 +8,7 @@ import { todayStr } from '../utils/dateUtils'
 import ColdTestModal from './ColdTestModal'
 import ProblemDrawer from './ProblemDrawer'
 import Outlook, { DayBreadcrumb } from './Outlook'
+import RemoteFreshness from './RemoteFreshness'
 import { Chip, ProblemLink } from './ui'
 import * as store from '../store'
 
@@ -720,6 +721,12 @@ function CoachingSource({ decision, decisionPath, onReload }) {
           {decisionPath}
         </code>
       )}
+
+      {/* The coach reads the tracker from the data repository, so an unpushed
+          change means advice would be authored against facts that have moved. */}
+      <div className="mt-3">
+        <RemoteFreshness />
+      </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
         <button
