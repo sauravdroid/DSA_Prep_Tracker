@@ -39,6 +39,40 @@ const ctx = (log = [], anchors = []) => ({ practiceLog: log, anchors, today: '20
 
 /* ---------- Contract ---------- */
 
+const schema = fixture('../schemas/coaching-decision.schema.json')
+
+/**
+ * Minimal stand-in for the `oneOf` discrimination between the two day shapes.
+ * Only `required` and `not.required` matter for disjointness, which is the
+ * property under test — not full JSON Schema validation.
+ */
+function matchingDayBranches(day) {
+  const branches = schema.properties.nextThreeDays.items.oneOf
+  return branches.filter(ref => {
+    const def = schema.$defs[ref.$ref.split('/').pop()]
+    const has = k => Object.prototype.hasOwnProperty.call(day, k)
+    if (!(def.required || []).every(has)) return false
+    if (def.not?.required?.some(has)) return false
+    return true
+  }).length
+}
+
+test('the two day shapes are disjoint, so oneOf can never match both', () => {
+  // Regression: legacyDay once required only `date` with additionalProperties
+  // true, so every structured day matched both branches and failed oneOf.
+  for (const day of example.nextThreeDays) {
+    assert.equal(matchingDayBranches(day), 1, `structured ${day.date} matched more than one branch`)
+  }
+  for (const day of fixture('coaching-decision.legacy-prose.example.json').nextThreeDays) {
+    assert.equal(matchingDayBranches(day), 1, `legacy ${day.date} matched more than one branch`)
+  }
+  // A day carrying both shapes resolves as structured, and the schema agrees:
+  // it matches structuredDay only, because legacyDay now excludes `scenarios`.
+  const both = { date: '2026-10-01', scenarios: [], conditional: [] }
+  assert.equal(matchingDayBranches(both), 1)
+  assert.equal(resolveOutlookDay(both, ctx([])).legacy, false)
+})
+
 test('a structured outlook still lives inside a version 1 document', () => {
   // The two version fields are independent; "v2" refers only to the outlook.
   assert.equal(example.version, 1)

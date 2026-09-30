@@ -150,7 +150,8 @@
     "legacyDay": {
       "type": "object",
       "required": ["date"],
-      "description": "outlookSchemaVersion 1. `conditional[].if` is prose, so the app cannot verify which branch applies and offers previews only.",
+      "not": { "required": ["scenarios"] },
+      "description": "outlookSchemaVersion 1. `conditional[].if` is prose, so the app cannot verify which branch applies and offers previews only. The `not` clause keeps this branch disjoint from structuredDay: without it a structured day would satisfy both and fail `oneOf`. A day carrying both `scenarios` and `conditional` is rejected as ambiguous.",
       "properties": {
         "date": { "$ref": "#/$defs/localDate" },
         "headline": { "type": "string" },

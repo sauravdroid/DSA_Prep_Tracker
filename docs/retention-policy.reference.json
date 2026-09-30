@@ -1,0 +1,86 @@
+{
+  "referenceFormatVersion": 1,
+  "capturedOn": "2026-09-30",
+  "authority": "Reference copy of the agreed coaching policy. This is the TARGET, not the runtime behaviour. For what the engine actually computes today, read docs/retention-policy.md, which also lists the open discrepancies.",
+  "source": "Captured from the proposedFixedPolicy field of a coaching decision. The app has never consumed that field.",
+  "implementationStatus": {
+    "note": "Per-rule status as of the capture date. Authoritative status lives in docs/retention-policy.md.",
+    "implemented": [
+      "debt.unmeasuredPoints - unmeasured topics are charged nothing",
+      "debt.combine - paused and untracked topics do not contribute; no eligible results means score null",
+      "debt.modeOverrides[1] - incomplete baseline coverage gives provisional Mixed with one reserved slot",
+      "coldEligibility.help and coldEligibility.sessionRepeat - enforced for the debt-calculable gate and for forecast dependencies"
+    ],
+    "pending": [
+      "coldEligibility.promotion - the spacing ladder still uses a fixed two-day gap rather than requiring the scheduled interval to elapse (D3)",
+      "coldEligibility.help and sessionRepeat within the ladder itself - an assisted or repeat attempt can still advance a stage (D4)",
+      "debt.modeOverrides[0] - an unresolved Red does not yet force Consolidation below the numeric threshold",
+      "health.maintained and health.stable - promotion does not yet require actual 14 and 30 day elapsed gaps",
+      "capacity.* - completed work is not yet deducted from the daily allowance (D6)"
+    ]
+  },
+  "policy": {
+    "version": 1,
+    "status": "agreed_reference",
+    "note": "Initial coaching heuristics, not calibrated probabilities of forgetting. A coaching decision cannot install these formulas; changing them is an application change.",
+    "ownership": {
+      "app": "Practice facts, eligibility, dates, debt arithmetic and enforced scheduling constraints.",
+      "coach": "Learning focus, anchor coverage, reasoning gaps, task selection and explanation; cannot manufacture attempts or override evidence."
+    },
+    "debt": {
+      "unmeasuredPoints": 0,
+      "duePoints": 1,
+      "overdueAtLeastDays": 7,
+      "significantlyOverduePoints": 2,
+      "latestYellowPoints": 1,
+      "latestRedPoints": 3,
+      "combine": "Per unique scheduled anchor: one due/overdue term plus one latest eligible result term. Paused and untracked topics do not contribute. Report measured points and coverage separately; no eligible results means score null.",
+      "modeThresholds": {
+        "expansionBelow": 3,
+        "mixedFrom": 3,
+        "consolidationFrom": 6
+      },
+      "modeOverrides": [
+        "Any unresolved Red selects recovery/Consolidation even below the numeric threshold.",
+        "Incomplete baseline coverage reserves one retention slot and gives provisional Mixed mode."
+      ]
+    },
+    "coldEligibility": {
+      "help": "none",
+      "minimumBaselineGapDays": 2,
+      "promotion": "Subsequent Green advances only when the existing scheduled interval has actually elapsed.",
+      "sessionRepeat": "A repeat or early/assisted solve is warm evidence. It cannot promote, clear Red, postpone due dates or change the latest eligible cold grade."
+    },
+    "spacing": {
+      "firstEligibleGreenNextDays": 7,
+      "successiveGreenNextDays": [14, 30],
+      "yellowNextDays": 3,
+      "redNextDays": 1,
+      "redRule": "Repair does not clear Red. Cold retest after repair and at least a next-day delay; use repair timestamps in eligibility."
+    },
+    "health": {
+      "role": "Active learning is a separate role from measured retention health.",
+      "unmeasured": "No eligible cold test.",
+      "fragile": "Measured but incomplete coverage, unresolved Yellow/Red, or insufficient spaced passes.",
+      "maintained": "Every declared subpattern has current passing evidence after at least a 14-day gap, with no unresolved failures or overdue validation.",
+      "stable": "Every declared subpattern has current passing evidence after an actual 30-day gap, with no unresolved failures or overdue validation. Scheduling a test 30 days away is not this evidence."
+    },
+    "capacity": {
+      "maximumDistinctProblemSessionsPerDay": 2,
+      "maximumBaselineColdTestsPerDay": 1,
+      "countExistingWork": true,
+      "deduplicate": "Merge solve, revision and attempt records for the same problem session before calculating remaining capacity."
+    },
+    "forecast": {
+      "priority": [
+        "unresolved_red",
+        "due_yellow_or_other_retest",
+        "unmeasured_baseline",
+        "learning"
+      ],
+      "redBranch": "Use the actual failed slug, never a hard-coded anchor.",
+      "staleness": "Invalidate today and all outlook days when local day, practice facts, roles, anchors, policy version or learning evidence changes. Use snapshot hash and source references, not attempt count alone.",
+      "singlePlan": "Debt, Today's Revision and Study Plan must consume one effective plan. Resolve one mutually exclusive branch and clearly label unknown results."
+    }
+  }
+}

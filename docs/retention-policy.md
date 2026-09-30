@@ -4,6 +4,9 @@
 `src/utils/retention.js` *actually computes today*, which is not yet the same as
 the agreed policy. Where they differ it is recorded below as a discrepancy.
 
+The agreed target is [`retention-policy.reference.json`](./retention-policy.reference.json).
+Read that for what the rules *should* be; read this for what runs.
+
 This version is a third, independent concept from the decision-document
 `version` (1) and the `outlookSchemaVersion` (2). Raising one does not raise the
 others.
