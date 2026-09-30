@@ -106,7 +106,9 @@
     "coaching": {
       "type": "object",
       "properties": {
-        "decision": { "type": "string" },
+        "decision": { "type": "string", "description": "The current plan. Overwritten on every revision." },
+        "index": { "type": "string", "description": "Summaries of every published assessment, newest first, with the dates each covers. Read this for prior advice rather than walking commits." },
+        "assessments": { "type": "string", "description": "Directory of archived assessments, addressable by id." },
         "current": { "type": ["string", "null"] }
       },
       "additionalProperties": true

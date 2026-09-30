@@ -53,8 +53,37 @@ debt is not calculable at all.
 | dsa-leetcode-storage, private | `context/coaching-context.json` | Interview target, timezone, time ceilings and rest preferences |
 | dsa-leetcode-storage, private | `tracker-data.json` | The complete snapshot. Needed for roles, anchors and anything the shards do not carry, and as the fallback when a month is missing |
 | dsa-leetcode-storage, private | `coaching/decision.json` | Current recommendation and its evidence basis; advice is not a source of practice facts |
+| dsa-leetcode-storage, private | `coaching/index.json` | Every assessment ever published, newest first, summarised. **Read this for prior advice** rather than walking commits |
+| dsa-leetcode-storage, private | `coaching/assessments/<id>.json` | A past assessment in full. Fetch only when the index summary is not enough |
 | dsa-leetcode-storage, private | `coaching/handoffs/` | Durable reasoning and note summaries with source references; **proposed, not yet created** |
 | dsa-leetcode-storage, private | `reports/` | Daily, weekly, monthly or overall snapshots when the tracker cannot answer the review; **proposed, not yet created** |
+
+### Using previous assessments
+
+`coaching/decision.json` holds only the current plan and is overwritten on every
+revision, so it cannot answer what was advised before. The archive can.
+
+Each index entry carries `assessedAt`, the dates it `covers`, its headline,
+mode, debt and `doNow`, which is usually enough to judge follow-through without
+fetching anything. Fetch the full assessment only when the reasoning matters.
+
+Two questions the index answers differently, and conflating them rewrites
+history:
+
+- **What governs a date now?** The first entry in `byDate[date]`, which is the
+  newest assessment covering it.
+- **What was in force on that date?** The newest entry covering it whose
+  `assessedAt` falls on or before the end of that date. An assessment written
+  later may also cover the date, but the user never saw it then.
+
+When reviewing whether advice was followed, use the second. Judging a past day
+against a plan written after it is not a review, and the recorded outcome
+cannot be evidence about advice that did not yet exist.
+
+Note also that the archive records what was **published**, not what was
+followed. The tracker pins the revision it adopted in `adoptedFrom.commit`;
+where that differs from the newest published assessment, the pin is what the
+user acted on.
 
 ### Reading a date range
 

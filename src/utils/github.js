@@ -107,3 +107,8 @@ export function coachingAtRef(ref) {
 export function coachingHistory() {
   return call('/coaching/history', { repo: getRepo() })
 }
+
+/** Copy any unarchived revision of the decision to an addressable path. */
+export function archiveCoaching() {
+  return call('/coaching/archive', { repo: getRepo() })
+}

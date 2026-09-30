@@ -8,6 +8,7 @@ import crypto from 'crypto'
 import { validateDecision, outOfScopeFiles } from './src/utils/validateDecision.js'
 import { unpublishedKeys } from './src/utils/trackerDiff.js'
 import { publishSet } from './src/utils/publishSet.js'
+import { assessmentId, assessmentPath, summarise, buildIndex, INDEX_PATH } from './src/utils/assessments.js'
 
 const DATA_DIR = 'data'
 const DATA_FILE = 'tracker-data.json'
@@ -389,6 +390,86 @@ function githubSync() {
           savedAt: parsed.savedAt || null,
           sha: r.body.sha,
           keys: Object.keys(parsed.data || {}).length,
+        })
+      }
+
+      // Copies each published revision of the decision to an addressable path
+      // and rebuilds the index. Derived from commit history rather than written
+      // as the coach publishes, so a revision missed while the app was closed
+      // is picked up later instead of leaving a hole.
+      if (url === '/coaching/archive') {
+        const log = await gh(token, 'GET', `/repos/${repo}/commits?path=${encodeURIComponent(COACHING_PATH)}&per_page=100`)
+        if (log.status !== 200 || !Array.isArray(log.body)) {
+          return send(res, log.status === 200 ? 500 : log.status, { error: log.body?.message || 'Cannot read the decision history' })
+        }
+
+        const head = await gh(token, 'GET', `/repos/${repo}/git/ref/heads/${BRANCH}`)
+        if (head.status !== 200) return send(res, head.status, { error: head.body?.message || `Cannot read ${BRANCH}` })
+        const parentSha = head.body.object.sha
+
+        const tree = await gh(token, 'GET', `/repos/${repo}/git/trees/${parentSha}?recursive=1`)
+        const present = new Set(
+          (tree.status === 200 ? tree.body.tree : []).filter(t => t.type === 'blob').map(t => t.path)
+        )
+
+        const summaries = []
+        const toWrite = new Map()
+        for (const c of log.body) {
+          const at = await gh(token, 'GET', `${coachingContents}?ref=${c.sha}`)
+          if (at.status !== 200) continue
+          let decision
+          try {
+            decision = decodeContent(at)
+          } catch {
+            continue
+          }
+          const id = assessmentId(decision.assessedAt)
+          if (!id) continue
+
+          const path = assessmentPath(id)
+          const content = JSON.stringify(decision, null, 2)
+          summaries.push(summarise(decision, { commit: c.sha.slice(0, 7), bytes: Buffer.byteLength(content) }))
+          if (!present.has(path)) toWrite.set(path, content)
+        }
+
+        const index = buildIndex(summaries)
+        const indexContent = JSON.stringify(index, null, 2)
+        const currentIndex = present.has(INDEX_PATH)
+          ? await gh(token, 'GET', `/repos/${repo}/contents/${INDEX_PATH}`)
+          : null
+        const indexChanged = !currentIndex || currentIndex.status !== 200 ||
+          Buffer.from(currentIndex.body.content || '', 'base64').toString('utf8') !== indexContent
+        if (indexChanged) toWrite.set(INDEX_PATH, indexContent)
+
+        if (toWrite.size === 0) {
+          return send(res, 200, { committed: null, unchanged: true, archived: 0, count: index.count })
+        }
+
+        const newTree = await gh(token, 'POST', `/repos/${repo}/git/trees`, {
+          base_tree: parentSha,
+          tree: [...toWrite].map(([p, content]) => ({ path: p, mode: '100644', type: 'blob', content })),
+        })
+        if (newTree.status !== 201) {
+          return send(res, newTree.status, { error: newTree.body?.message || 'Could not build the tree' })
+        }
+        const commit = await gh(token, 'POST', `/repos/${repo}/git/commits`, {
+          message: `archive coaching assessments (${index.count})`,
+          tree: newTree.body.sha,
+          parents: [parentSha],
+        })
+        if (commit.status !== 201) {
+          return send(res, commit.status, { error: commit.body?.message || 'Could not create the commit' })
+        }
+        const moved = await gh(token, 'PATCH', `/repos/${repo}/git/refs/heads/${BRANCH}`, { sha: commit.body.sha })
+        if (moved.status !== 200) {
+          return send(res, moved.status, { error: moved.body?.message || `Could not move ${BRANCH}` })
+        }
+
+        return send(res, 200, {
+          committed: commit.body.sha.slice(0, 7),
+          archived: [...toWrite.keys()].filter(p => p !== INDEX_PATH).length,
+          count: index.count,
+          files: [...toWrite.keys()],
         })
       }
 

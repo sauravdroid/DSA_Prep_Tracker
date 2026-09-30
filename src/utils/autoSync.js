@@ -1,5 +1,5 @@
 import { syncToday } from '../services/leetcode'
-import { backupIfConnected, pullFromGithub, remoteStatus, coachingHistory, pullCoaching, getRepo } from './github'
+import { backupIfConnected, pullFromGithub, remoteStatus, coachingHistory, pullCoaching, archiveCoaching, getRepo } from './github'
 import { loadDecision, saveDecision } from './coaching'
 import * as store from '../store'
 
@@ -162,6 +162,18 @@ async function pushStep(changed, status) {
   note(`Published tracker${r.committed ? ` (${r.committed})` : ''}`)
 }
 
+/** Copies published revisions somewhere addressable. Never blocks adoption. */
+async function archiveStep() {
+  try {
+    const r = await withTimeout(archiveCoaching(), 'Archiving assessments')
+    if (r.archived > 0) note(`Archived ${r.archived} assessment${r.archived === 1 ? '' : 's'} (${r.count} in the index)`)
+    return r
+  } catch (e) {
+    note(`Could not archive assessments: ${e.message}`)
+    return null
+  }
+}
+
 /** The published plan, downloaded only when its head differs from the pin. */
 async function planStep(changed) {
   step('plan', 'running')
@@ -175,6 +187,9 @@ async function planStep(changed) {
     return
   }
   if (adopted === head.sha) {
+    // Still archive: a revision published while this app was closed would
+    // otherwise never be copied, since the pin already matches.
+    await archiveStep()
     step('plan', 'done', `Up to date (${head.shortSha})`)
     return
   }
@@ -206,6 +221,7 @@ async function planStep(changed) {
       adoptedAutomatically: true,
     },
   }), 'Adopting the plan')
+  await archiveStep()
   step('plan', 'done', `Adopted ${head.shortSha}`)
   note(`Adopted a new plan: ${head.shortSha} — ${head.message || 'no message'}`)
   changed.push('new plan')

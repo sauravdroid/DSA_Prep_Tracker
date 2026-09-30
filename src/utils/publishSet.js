@@ -185,6 +185,8 @@ export function buildManifest({ data = {}, savedAt = null, shards = [], repo, co
     },
     coaching: {
       decision: 'coaching/decision.json',
+      index: 'coaching/index.json',
+      assessments: 'coaching/assessments/',
       current: currentAssessment,
     },
   }
