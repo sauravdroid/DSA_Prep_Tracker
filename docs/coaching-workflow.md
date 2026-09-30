@@ -4,6 +4,12 @@ Repository-owned copy of the reusable protocol. This file is the authority for
 how coaching works; refresh any ChatGPT project upload from this version rather
 than editing a separate copy.
 
+**Producing a plan?** Start with
+[coach-planning-protocol.md](./coach-planning-protocol.md) — it is the entry
+point, and covers which files to read, how to choose a review horizon, and how
+to author today plus three conditional days. This document supplies the rules
+that protocol applies.
+
 **Personal context is deliberately absent.** Interview target, weekday time
 ceilings, rest days and current focus live in the private data repository
 (`context/coaching-context.json`), not here. This repository is public-facing
