@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import ProblemsPage from './components/ProblemsPage'
 import CalendarView from './components/CalendarView'
 import DailyRevisions from './components/DailyRevisions'
@@ -10,8 +10,10 @@ import RecursionVisualizer from './components/RecursionVisualizer'
 import DebtPage from './components/DebtPage'
 import SyncNotesPanel from './components/SyncNotesPanel'
 import ColdTestModal from './components/ColdTestModal'
+import SyncDock from './components/SyncDock'
 import { syncToday, syncProblems } from './services/leetcode'
 import { backupIfConnected } from './utils/github'
+import { startAutoSync } from './utils/autoSync'
 import { computeRetention } from './utils/retention'
 import { todayStr } from './utils/dateUtils'
 import * as store from './store'
@@ -43,11 +45,12 @@ export default function App() {
     store.addRevision(slug)
     setRevisions(store.getRevisions())
   }, [])
-
   const handleRemoveRevision = useCallback((slug, date) => {
     store.removeRevision(slug, date)
     setRevisions(store.getRevisions())
   }, [])
+
+  useEffect(() => startAutoSync({ onChanged: reload }), [reload])
 
   const runSync = useCallback(async fetcher => {
     const session = store.getSession()
@@ -223,6 +226,8 @@ export default function App() {
         revisions={revisions}
         onClose={() => setSelectedProblem(null)}
       />
+
+      <SyncDock />
 
       {syncedItems.length > 0 && (
         <SyncNotesPanel
