@@ -5,6 +5,7 @@ import https from 'https'
 import fs from 'fs'
 import path from 'path'
 import { validateDecision, outOfScopeFiles } from './src/utils/validateDecision.js'
+import { unpublishedKeys } from './src/utils/trackerDiff.js'
 
 const DATA_DIR = 'data'
 const DATA_FILE = 'tracker-data.json'
@@ -358,15 +359,15 @@ function githubSync() {
 
         const remote = decodeContent(r)
         const remoteKeys = Object.keys(remote.data || {})
-        const missing = localKeys.filter(k => !remoteKeys.includes(k))
-        // A shared key whose content differs also means a push is outstanding.
-        const changed = localKeys.filter(k => remoteKeys.includes(k) && remote.data[k] !== local.data[k])
+        const { missing, changed } = unpublishedKeys(local.data || {}, remote.data || {})
 
         return send(res, 200, {
           remote: { savedAt: remote.savedAt || null, keys: remoteKeys.length, sha: r.body.sha },
           local: { savedAt: local.savedAt || null, keys: localKeys.length },
           behind: missing.length > 0 || changed.length > 0,
-          ahead: !!(local.savedAt && remote.savedAt && remote.savedAt > local.savedAt),
+          // Only meaningful if the remote actually carries something local does
+          // not; a newer timestamp over identical facts is just a reordered save.
+          ahead: Object.keys(remote.data || {}).some(k => !(k in (local.data || {}))),
           missingOnRemote: missing,
           changedSincePush: changed,
         })

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { remoteStatus, pushToGithub } from '../utils/github'
+import { subscribe } from '../utils/dataFile'
 
 /** Friendly names for the storage keys a reader would otherwise have to decode. */
 const KEY_LABEL = {
@@ -38,6 +39,17 @@ export default function RemoteFreshness({ compact = false, onPushed, onState }) 
   }, [onState])
 
   useEffect(() => { check() }, [check])
+
+  // Local work lands after this panel mounts, so a mount-only check would keep
+  // describing whatever was true when the page opened.
+  useEffect(() => {
+    let seen = null
+    return subscribe(s => {
+      if (s.status !== 'saved' || s.savedAt === seen) return
+      if (seen !== null) check()
+      seen = s.savedAt
+    })
+  }, [check])
 
   const push = async () => {
     setBusy(true)
