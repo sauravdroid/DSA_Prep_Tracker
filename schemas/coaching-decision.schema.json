@@ -36,6 +36,32 @@
       "additionalProperties": true
     },
 
+    "provenance": {
+      "type": "object",
+      "description": "Which sources this decision was actually built from. Without it, whether the coach read the manifest and the months it needed, or fell back to the whole tracker, is an assumption rather than a fact.",
+      "properties": {
+        "dataRepository": { "type": "string" },
+        "dataCommit": { "type": "string" },
+        "codeRepository": { "type": "string" },
+        "codeCommit": { "type": "string" },
+        "manifestFingerprint": {
+          "type": ["string", "null"],
+          "description": "describes.trackerFingerprint from the manifest that was read, so the evidence behind this decision can be identified later."
+        },
+        "readFiles": {
+          "type": "array",
+          "description": "Paths actually fetched from the data repository, such as manifest.json and the evidence shards covering the review window. List only what was read.",
+          "items": { "type": "string" }
+        },
+        "reviewWindow": {
+          "type": ["object", "null"],
+          "properties": { "from": { "type": "string" }, "to": { "type": "string" } },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+
     "debt": {
       "type": "object",
       "description": "Reported debt. `calculable: false` with a null score is the correct representation of no eligible cold evidence; zero would wrongly read as 'retention verified'.",
