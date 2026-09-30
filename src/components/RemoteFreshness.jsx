@@ -25,15 +25,17 @@ const label = k => KEY_LABEL[k] || k
  * repository, so an unpushed anchor change means advice is authored against
  * facts that no longer hold, with nothing on screen to say so.
  */
-export default function RemoteFreshness({ compact = false, onPushed }) {
+export default function RemoteFreshness({ compact = false, onPushed, onState }) {
   const [state, setState] = useState(null)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
   const check = useCallback(() => {
     setError(null)
-    remoteStatus().then(setState).catch(e => setError(e.message))
-  }, [])
+    remoteStatus()
+      .then(s => { setState(s); onState?.(s) })
+      .catch(e => setError(e.message))
+  }, [onState])
 
   useEffect(() => { check() }, [check])
 
