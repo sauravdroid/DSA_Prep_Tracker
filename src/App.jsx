@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import ProblemsPage from './components/ProblemsPage'
 import CalendarView from './components/CalendarView'
 import DailyRevisions from './components/DailyRevisions'
@@ -7,10 +7,17 @@ import SyncSettings from './components/SyncSettings'
 import StudyPlanCalendar from './components/StudyPlanCalendar'
 import StatsPage from './components/StatsPage'
 import RecursionVisualizer from './components/RecursionVisualizer'
+import DebtPage from './components/DebtPage'
+import SyncNotesPanel from './components/SyncNotesPanel'
+import ColdTestModal from './components/ColdTestModal'
 import { syncToday, syncProblems } from './services/leetcode'
+import { computeRetention } from './utils/retention'
+import { todayStr } from './utils/dateUtils'
 import * as store from './store'
 
-const TABS = ['Calendar', 'Study Plan', "Today's Revision", 'Problems', 'Stats', 'Recursion', 'Settings']
+// Study Plan and Today's Revision are intentionally not navigable while the
+// coaching page owns daily planning; their components are still wired below.
+const TABS = ['Calendar', 'Problems', 'Debt', 'Stats', 'Recursion', 'Settings']
 
 export default function App() {
   const [tab, setTab] = useState('Calendar')
@@ -20,11 +27,15 @@ export default function App() {
   const [selectedProblem, setSelectedProblem] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
+  const [syncedItems, setSyncedItems] = useState([])
+  const [grading, setGrading] = useState(null)
+  const [practiceLog, setPracticeLog] = useState(() => store.getPracticeLog())
 
   const reload = useCallback(() => {
     setProblems(store.getProblems())
     setRevisions(store.getRevisions())
     setFailures(store.getFailures())
+    setPracticeLog(store.getPracticeLog())
   }, [])
 
   const handleRevise = useCallback(slug => {
@@ -59,6 +70,22 @@ export default function App() {
       setFailures(store.getFailures())
       if (resubmissions.length > 0) setRevisions(store.getRevisions())
       setSyncMsg(`Synced ${results.length} problem${results.length !== 1 ? 's' : ''}, ${resubmissions.length} revision${resubmissions.length !== 1 ? 's' : ''}`)
+
+      // Offer a note while the attempt is still fresh.
+      const seen = new Set()
+      const items = []
+      for (const p of results) {
+        if (seen.has(p.slug)) continue
+        seen.add(p.slug)
+        items.push({ slug: p.slug, title: p.title, type: 'new' })
+      }
+      const all = store.getProblems()
+      for (const r of resubmissions) {
+        if (seen.has(r.slug)) continue
+        seen.add(r.slug)
+        items.push({ slug: r.slug, title: all[r.slug]?.title || r.slug, type: 'revision' })
+      }
+      if (items.length > 0) setSyncedItems(items)
     } catch (err) {
       setSyncMsg('Sync failed: ' + err.message)
     }
@@ -78,6 +105,21 @@ export default function App() {
 
   const count = Object.keys(problems).length
 
+  const debtSummary = useMemo(
+    () => {
+      const r = computeRetention({
+        problems,
+        revisions,
+        log: practiceLog,
+        anchorOverrides: store.getAnchors(),
+        topicRoles: store.getTopicRoles(),
+        today: todayStr(),
+      })
+      return { totalDebt: r.totalDebt, calculable: r.debtCalculable }
+    },
+    [problems, revisions, practiceLog, tab]
+  )
+
   return (
     <div className="app">
       <header className="app-header">
@@ -90,6 +132,11 @@ export default function App() {
             >
               {t}
               {t === 'Problems' && count > 0 && <span className="tab-badge">{count}</span>}
+              {t === 'Debt' && debtSummary.calculable && debtSummary.totalDebt > 0 && (
+                <span className={`tab-badge debt ${debtSummary.totalDebt >= 6 ? 'critical' : debtSummary.totalDebt >= 3 ? 'warn' : ''}`}>
+                  {debtSummary.totalDebt}
+                </span>
+              )}
             </button>
           ))}
           <div className="quick-sync">
@@ -110,7 +157,6 @@ export default function App() {
           <ProblemsPage
             problems={problems}
             revisions={revisions}
-            onRevise={handleRevise}
           />
         )}
         {tab === 'Calendar' && (
@@ -118,7 +164,6 @@ export default function App() {
             problems={problems}
             revisions={revisions}
             failures={failures}
-            onRevise={handleRevise}
             onRemoveRevision={handleRemoveRevision}
             onSyncMonth={handleSyncMonth}
             syncing={syncing}
@@ -144,6 +189,13 @@ export default function App() {
             revisions={revisions}
           />
         )}
+        {tab === 'Debt' && (
+          <DebtPage
+            problems={problems}
+            revisions={revisions}
+            onChanged={reload}
+          />
+        )}
         {tab === 'Recursion' && <RecursionVisualizer />}
         {tab === 'Settings' && <SyncSettings onSyncComplete={reload} />}
       </main>
@@ -152,8 +204,30 @@ export default function App() {
         problem={selectedProblem}
         revisions={revisions}
         onClose={() => setSelectedProblem(null)}
-        onRevise={handleRevise}
       />
+
+      {syncedItems.length > 0 && (
+        <SyncNotesPanel
+          items={syncedItems}
+          onClose={() => setSyncedItems([])}
+          onGrade={slug => setGrading(slug)}
+        />
+      )}
+
+      {grading && (
+        <ColdTestModal
+          slug={grading}
+          problem={problems[grading]}
+          defaultMode="warm"
+          onClose={() => setGrading(null)}
+          onSave={entry => {
+            store.addPracticeEntry(entry)
+            if (entry.notes) store.addNote(entry.slug, entry.notes)
+            setPracticeLog(store.getPracticeLog())
+            setGrading(null)
+          }}
+        />
+      )}
     </div>
   )
 }

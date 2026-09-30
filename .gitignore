@@ -3,3 +3,9 @@ dist
 .env
 .DS_Store
 *.local
+
+# Local tracker data mirrored from the browser
+data/
+
+# GitHub personal access token used by the cloud sync
+.github-token
