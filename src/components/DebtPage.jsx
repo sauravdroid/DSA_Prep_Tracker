@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { computeRetention, daysBetween, HEALTH, ROLES, suggestAnchors } from '../utils/retention'
-import { loadDecision, decisionStaleness, forecastValidity, trackerSnapshot } from '../utils/coaching'
+import { loadDecision, saveDecision, decisionStaleness, forecastValidity, trackerSnapshot } from '../utils/coaching'
+import { pullCoaching, coachingHistory } from '../utils/github'
 import { getSyncState } from '../utils/dataFile'
 import { todayStr } from '../utils/dateUtils'
 import ColdTestModal from './ColdTestModal'
@@ -645,6 +646,165 @@ function AnchorRow({ anchor, today, onGrade, onOpenProblem, onRemove }) {
 
 /* ---------- Page ---------- */
 
+/* ---------- Coaching source ---------- */
+
+/**
+ * Fetch the coach's decision from GitHub, show what validation found, and adopt
+ * it only on an explicit second step. A committed file is not automatically
+ * trustworthy: it is checked against the published schema, and the commit that
+ * produced it must have stayed inside `coaching/`.
+ */
+function CoachingSource({ decisionPath, onReload }) {
+  const [busy, setBusy] = useState(false)
+  const [candidate, setCandidate] = useState(null)
+  const [error, setError] = useState(null)
+  const [adopted, setAdopted] = useState(null)
+  const [history, setHistory] = useState(null)
+
+  const run = async (fn) => {
+    setBusy(true); setError(null); setAdopted(null)
+    try { await fn() } catch (e) { setError(e.message) } finally { setBusy(false) }
+  }
+
+  const fetchRemote = (ref) => run(async () => {
+    const r = await pullCoaching(ref)
+    setCandidate(r.empty ? { empty: true } : r)
+  })
+
+  const adopt = () => run(async () => {
+    await saveDecision(candidate.decision)
+    setAdopted(candidate.commit?.shortSha || 'local')
+    setCandidate(null)
+    onReload()
+  })
+
+  const blocked = candidate && !candidate.empty &&
+    (!candidate.valid || candidate.outOfScope?.length > 0)
+
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+      <h3 className="text-sm font-semibold text-slate-900">Coaching source</h3>
+      <p className="mt-1 text-xs leading-relaxed text-slate-500">
+        The app owns practice facts. This file only holds the current recommendation, and
+        fetching advice can never change your practice history.
+      </p>
+      {decisionPath && (
+        <code className="mt-2 block overflow-x-auto rounded-lg bg-slate-100 px-2 py-1.5 text-[11px] text-slate-700">
+          {decisionPath}
+        </code>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          onClick={() => fetchRemote()}
+          disabled={busy}
+          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
+        >
+          {busy ? 'Checking…' : 'Fetch from GitHub'}
+        </button>
+        <button
+          onClick={onReload}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+        >
+          Reload local file
+        </button>
+        <button
+          onClick={() => run(async () => setHistory((await coachingHistory()).revisions))}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+        >
+          Revisions
+        </button>
+      </div>
+
+      {error && (
+        <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800 ring-1 ring-rose-200/60">{error}</p>
+      )}
+      {adopted && (
+        <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800 ring-1 ring-emerald-200/60">
+          Adopted revision {adopted}.
+        </p>
+      )}
+
+      {candidate?.empty && (
+        <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          No coaching decision published yet at that path.
+        </p>
+      )}
+
+      {candidate && !candidate.empty && (
+        <div className="mt-3 rounded-xl border border-slate-200 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Chip className={candidate.valid ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}>
+              {candidate.valid ? 'valid' : 'invalid'}
+            </Chip>
+            {candidate.commit && (
+              <span className="text-xs text-slate-500">
+                {candidate.commit.shortSha} · {(candidate.commit.date || '').slice(0, 10)}
+                {candidate.commit.author && ` · ${candidate.commit.author}`}
+              </span>
+            )}
+          </div>
+          {candidate.commit?.message && (
+            <p className="mt-1 truncate text-xs text-slate-600">{candidate.commit.message}</p>
+          )}
+
+          {candidate.outOfScope?.length > 0 && (
+            <div className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800 ring-1 ring-rose-200/60">
+              <p className="font-medium">That commit changed files outside coaching/.</p>
+              <ul className="mt-1 list-none space-y-0.5 pl-0">
+                {candidate.outOfScope.slice(0, 5).map(f => <li key={f}>· {f}</li>)}
+              </ul>
+              <p className="mt-1">Coaching updates may only touch coaching/. Not adopting.</p>
+            </div>
+          )}
+
+          {candidate.errors?.length > 0 && (
+            <ul className="mt-2 list-none space-y-0.5 pl-0">
+              {candidate.errors.slice(0, 8).map(e => (
+                <li key={e} className="text-xs text-rose-700">· {e}</li>
+              ))}
+            </ul>
+          )}
+
+          <button
+            onClick={adopt}
+            disabled={busy || blocked}
+            className="mt-3 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Adopt this recommendation
+          </button>
+        </div>
+      )}
+
+      {history && (
+        <div className="mt-3">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            Published revisions
+          </span>
+          {history.length === 0 ? (
+            <p className="mt-1 text-xs text-slate-400">Nothing published yet.</p>
+          ) : (
+            <ul className="mt-1 list-none space-y-1 pl-0">
+              {history.map(rev => (
+                <li key={rev.sha} className="flex flex-wrap items-center gap-2 text-xs">
+                  <button
+                    onClick={() => fetchRemote(rev.sha)}
+                    className="rounded border-0 bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-700 hover:bg-slate-200"
+                  >
+                    {rev.shortSha}
+                  </button>
+                  <span className="text-slate-400">{(rev.date || '').slice(0, 10)}</span>
+                  <span className="min-w-0 flex-1 truncate text-slate-600">{rev.message}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function DebtPage({ problems, revisions, onChanged }) {
   const today = todayStr()
   const [log, setLog] = useState(() => store.getPracticeLog())
@@ -1063,24 +1223,10 @@ export default function DebtPage({ problems, revisions, onChanged }) {
             )}
           </div>
 
-          <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
-            <h3 className="text-sm font-semibold text-slate-900">Coaching file</h3>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">
-              The app owns practice facts. This file only holds the current recommendation and is
-              never written by the app.
-            </p>
-            {decisionPath && (
-              <code className="mt-2 block overflow-x-auto rounded-lg bg-slate-100 px-2 py-1.5 text-[11px] text-slate-700">
-                {decisionPath}
-              </code>
-            )}
-            <button
-              onClick={() => loadDecision().then(r => { setDecision(r.decision); setDecisionPath(r.path) })}
-              className="mt-3 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
-            >
-              Reload recommendation
-            </button>
-          </div>
+          <CoachingSource
+            decisionPath={decisionPath}
+            onReload={() => loadDecision().then(r => { setDecision(r.decision); setDecisionPath(r.path) })}
+          />
         </div>
         )}
         </div>

@@ -60,3 +60,28 @@ export async function pullFromGithub() {
 export function pushToGithub() {
   return call('/push', { repo: getRepo() })
 }
+
+/* ---------- Coaching advice ---------- */
+
+/**
+ * Fetch the coach's current decision. Read-only and entirely separate from
+ * tracker sync: this can never write practice facts, and a tracker push can
+ * never overwrite advice.
+ *
+ * Returns the decision alongside its validation result, source commit and any
+ * files the authoring commit touched outside `coaching/`. Adoption is a second,
+ * explicit step — see `saveDecision` in coaching.js.
+ */
+export function pullCoaching(ref) {
+  return call('/coaching/pull', { repo: getRepo(), ...(ref ? { ref } : {}) })
+}
+
+/** One earlier revision, retrieved at its commit SHA. */
+export function coachingAtRef(ref) {
+  return call('/coaching/at', { repo: getRepo(), ref })
+}
+
+/** Published decision history: commits that touched the coaching path. */
+export function coachingHistory() {
+  return call('/coaching/history', { repo: getRepo() })
+}

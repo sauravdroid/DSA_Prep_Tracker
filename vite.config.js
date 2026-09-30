@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import https from 'https'
 import fs from 'fs'
 import path from 'path'
+import { validateDecision, outOfScopeFiles } from './src/utils/validateDecision.js'
 
 const DATA_DIR = 'data'
 const DATA_FILE = 'tracker-data.json'
@@ -163,6 +164,9 @@ function githubSync() {
   let dataFile = ''
   const REPO_RE = /^[\w.-]+\/[\w.-]+$/
   const REMOTE_PATH = 'tracker-data.json'
+  // Coaching advice lives on its own path so a tracker push can never carry a
+  // stale decision, and a coaching pull can never touch practice facts.
+  const COACHING_PATH = 'coaching/decision.json'
 
   const readToken = () => {
     if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN.trim()
@@ -234,6 +238,7 @@ function githubSync() {
         hasToken: !!token,
         tokenSource: process.env.GITHUB_TOKEN ? 'env' : token ? 'file' : null,
         remotePath: REMOTE_PATH,
+        coachingPath: COACHING_PATH,
       })
     }
 
@@ -256,8 +261,79 @@ function githubSync() {
     const repo = (body.repo || '').trim()
     if (!REPO_RE.test(repo)) return send(res, 400, { error: 'Invalid repo, expected owner/name' })
     const contentsPath = `/repos/${repo}/contents/${REMOTE_PATH}`
+    const coachingContents = `/repos/${repo}/contents/${COACHING_PATH}`
+
+    const decodeContent = r => JSON.parse(Buffer.from(r.body.content || '', 'base64').toString('utf8'))
 
     try {
+      // --- Coaching advice. Read-only here: the app never publishes advice,
+      // and this path never writes practice facts.
+      if (url === '/coaching/pull' || url === '/coaching/at') {
+        const ref = (body.ref || '').trim()
+        const at = url === '/coaching/at' && ref ? `${coachingContents}?ref=${encodeURIComponent(ref)}` : coachingContents
+        const r = await gh(token, 'GET', at)
+        if (r.status === 404) {
+          return send(res, 200, { empty: true, decision: null, path: COACHING_PATH })
+        }
+        if (r.status !== 200) {
+          return send(res, r.status, { error: r.body?.message || `GitHub returned ${r.status}` })
+        }
+
+        let decision
+        try {
+          decision = decodeContent(r)
+        } catch (e) {
+          return send(res, 422, { error: `Remote file is not valid JSON: ${e.message}` })
+        }
+
+        const { valid, errors } = validateDecision(decision)
+
+        // Which commit produced this, and did it stay inside coaching/?
+        let commit = null
+        let outOfScope = []
+        const log = await gh(token, 'GET', `/repos/${repo}/commits?path=${encodeURIComponent(COACHING_PATH)}&per_page=1${ref ? `&sha=${encodeURIComponent(ref)}` : ''}`)
+        if (log.status === 200 && Array.isArray(log.body) && log.body[0]) {
+          const head = log.body[0]
+          commit = {
+            sha: head.sha,
+            shortSha: head.sha.slice(0, 7),
+            date: head.commit?.committer?.date || head.commit?.author?.date || null,
+            message: (head.commit?.message || '').split('\n')[0],
+            author: head.commit?.author?.name || null,
+          }
+          const detail = await gh(token, 'GET', `/repos/${repo}/commits/${head.sha}`)
+          if (detail.status === 200) outOfScope = outOfScopeFiles(detail.body?.files)
+        }
+
+        return send(res, 200, {
+          empty: false,
+          decision,
+          valid,
+          errors,
+          commit,
+          outOfScope,
+          path: COACHING_PATH,
+          sha: r.body.sha,
+        })
+      }
+
+      if (url === '/coaching/history') {
+        const r = await gh(token, 'GET', `/repos/${repo}/commits?path=${encodeURIComponent(COACHING_PATH)}&per_page=20`)
+        if (r.status === 404 || !Array.isArray(r.body)) return send(res, 200, { revisions: [] })
+        if (r.status !== 200) {
+          return send(res, r.status, { error: r.body?.message || `GitHub returned ${r.status}` })
+        }
+        return send(res, 200, {
+          revisions: r.body.map(c => ({
+            sha: c.sha,
+            shortSha: c.sha.slice(0, 7),
+            date: c.commit?.committer?.date || c.commit?.author?.date || null,
+            message: (c.commit?.message || '').split('\n')[0],
+            author: c.commit?.author?.name || null,
+          })),
+        })
+      }
+
       if (url === '/pull') {
         const r = await gh(token, 'GET', contentsPath)
         if (r.status === 404) return send(res, 200, { empty: true, data: {}, savedAt: null })
@@ -347,9 +423,11 @@ function coachingDecisionStore() {
       req.on('end', () => {
         try {
           const decision = JSON.parse(body)
-          if (!decision || typeof decision !== 'object' || Array.isArray(decision)) {
-            return send(res, 400, { error: 'Decision must be a JSON object' })
-          }
+          // Advice must satisfy the contract the coach was asked to author
+          // against; a committed file is not automatically trustworthy.
+          const { valid, errors } = validateDecision(decision)
+          if (!valid) return send(res, 400, { error: 'Decision failed validation', errors })
+
           fs.mkdirSync(dir, { recursive: true })
           const tmp = file + '.tmp'
           fs.writeFileSync(tmp, JSON.stringify(decision, null, 2))
