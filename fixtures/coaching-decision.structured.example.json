@@ -1,0 +1,291 @@
+{
+  "_fixture": "SYNTHETIC. Illustrates the structured outlook contract (decision version 1, outlookSchemaVersion 2). Counts, dates and judgements are invented for tests and documentation — this is not anyone's real coaching advice or practice history.",
+  "version": 1,
+  "outlookSchemaVersion": 2,
+  "assessedAt": "2026-09-30T06:46:41.000Z",
+  "assessmentDate": "2026-09-30",
+  "timezone": "Asia/Kolkata",
+  "trackerSnapshot": {
+    "savedAt": "2026-09-30T05:28:06.128Z",
+    "problems": 100,
+    "revisions": 120,
+    "attempts": 0,
+    "lastAttemptAt": null
+  },
+  "debt": {
+    "calculable": false,
+    "score": null,
+    "note": "No eligible cold evidence yet. Reported as unknown rather than zero, because zero would read as 'retention verified'.",
+    "coverage": "Example topic has 0 of 4 configured subpatterns cold-validated."
+  },
+  "mode": {
+    "key": "MIXED",
+    "headline": "Mixed — one Stack baseline",
+    "why": "Keep Greedy as the learning focus and use the remaining slot for one Stack cold check."
+  },
+  "today": {
+    "doNow": {
+      "slug": "next-greater-element-ii",
+      "title": "Next Greater Element II",
+      "mode": "cold",
+      "minutes": 25,
+      "why": "Test the circular monotonic-stack invariant unaided."
+    },
+    "then": {
+      "action": "Record the result, then finish today's session",
+      "why": "Record elapsed time, help used and the failure point."
+    }
+  },
+
+  "nextThreeDays": [
+    {
+      "date": "2026-10-01",
+      "headline": "Result-dependent",
+      "note": "One plan applies. Recovery outranks everything else.",
+      "dependencies": [
+        {
+          "id": "nge-baseline",
+          "slug": "next-greater-element-ii",
+          "title": "Next Greater Element II",
+          "date": "2026-09-30",
+          "mode": "cold"
+        }
+      ],
+      "unresolved": {
+        "dependency": "nge-baseline",
+        "message": "Waiting for Wednesday's Next Greater Element II result."
+      },
+      "scenarios": [
+        {
+          "id": "carry-forward",
+          "priority": 0,
+          "label": "Wednesday's test was not done",
+          "when": { "op": "not_completed", "dependency": "nge-baseline" },
+          "basis": "Wednesday's baseline was recorded as not completed.",
+          "items": [
+            {
+              "type": "problem",
+              "slug": "next-greater-element-ii",
+              "title": "Next Greater Element II",
+              "kind": "cold",
+              "purpose": "carried-forward baseline",
+              "topic": "Stack",
+              "minutes": 25,
+              "why": "Carry the missed baseline forward before adding anything new.",
+              "detail": "Nothing else is scheduled today: the rest of the week's plan depends on this measurement, so guessing past it would compound."
+            }
+          ]
+        },
+        {
+          "id": "recovery",
+          "priority": 1,
+          "label": "Red — recover first",
+          "when": { "op": "result_is", "dependency": "nge-baseline", "values": ["red"] },
+          "basis": "Based on Wednesday's Red result on Next Greater Element II.",
+          "items": [
+            {
+              "type": "problem",
+              "slug": "next-greater-element-ii",
+              "title": "Next Greater Element II",
+              "kind": "repair",
+              "purpose": "recovery",
+              "topic": "Stack",
+              "minutes": 25,
+              "why": "Rebuild the invariant and a counterexample. Defer new Greedy learning.",
+              "detail": "Repair does not clear the Red. Only a later cold retest, after at least a next-day delay, can do that — so today is repair, not a retest."
+            }
+          ],
+          "followUps": [
+            { "text": "Cold retest once repair is finished and a day has passed", "date": "2026-10-02" }
+          ]
+        },
+        {
+          "id": "learning-and-retention",
+          "priority": 2,
+          "label": "Green or Yellow — same two tasks",
+          "when": { "op": "result_is", "dependency": "nge-baseline", "values": ["green", "yellow"] },
+          "items": [
+            {
+              "type": "problem",
+              "slug": "jump-game-ii",
+              "title": "Jump Game II",
+              "kind": "learn",
+              "purpose": "focused relearning",
+              "topic": "Greedy",
+              "minutes": 30,
+              "why": "Derive how a jump expands the reachable frontier.",
+              "detail": "Previously solved, so this is relearning rather than a new solve or a cold validation."
+            },
+            {
+              "type": "problem",
+              "slug": "decode-string",
+              "title": "Decode String",
+              "kind": "cold",
+              "purpose": "cold check",
+              "topic": "Stack",
+              "minutes": 25,
+              "why": "One separate simulation baseline.",
+              "detail": "Measuring simulation separately is what stops one anchor standing in for a whole topic."
+            }
+          ],
+          "followUps": [
+            { "text": "Green schedules Next Greater Element II's next check", "date": "2026-10-07" },
+            { "text": "Yellow instead brings that recheck forward", "date": "2026-10-03" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "date": "2026-10-02",
+      "headline": "Recovery first",
+      "note": "Any unresolved Stack failure outranks Yellow and expansion.",
+      "dependencies": [
+        {
+          "id": "decode-baseline",
+          "slug": "decode-string",
+          "title": "Decode String",
+          "date": "2026-10-01",
+          "mode": "cold"
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "resolve-failure",
+          "priority": 0,
+          "label": "A Stack anchor is still failed",
+          "when": { "op": "unresolved_failure", "scope": { "topic": "Stack" } },
+          "basis": "A Stack anchor is still carrying an unresolved cold failure.",
+          "items": [
+            {
+              "type": "problem",
+              "kind": "repair",
+              "purpose": "recovery",
+              "topic": "Stack",
+              "minutes": 25,
+              "title": "Repair the anchor that actually failed",
+              "why": "Use the failed anchor from the log, not a fixed problem.",
+              "detail": "If it is already repaired and a delayed cold retest is due, retest it instead."
+            }
+          ]
+        },
+        {
+          "id": "broaden",
+          "priority": 1,
+          "label": "No unresolved failure",
+          "when": { "op": "result_is", "dependency": "decode-baseline", "values": ["green", "yellow"] },
+          "items": [
+            {
+              "type": "problem",
+              "slug": "largest-rectangle-in-histogram",
+              "title": "Largest Rectangle in Histogram",
+              "kind": "cold",
+              "purpose": "cold check",
+              "topic": "Stack",
+              "minutes": 35,
+              "why": "One boundary-stack baseline.",
+              "detail": "A third distinct subpattern. Two Greens are useful coverage, not a Stable topic."
+            },
+            {
+              "type": "action",
+              "title": "Refresh coaching after logging the result",
+              "topic": "Greedy",
+              "why": "Pick the next learning task from the actual evidence."
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "date": "2026-10-03",
+      "headline": "Recheck or broaden",
+      "note": "A due recheck replaces the baseline slot rather than being added to it.",
+      "dependencies": [
+        {
+          "id": "nge-baseline",
+          "slug": "next-greater-element-ii",
+          "title": "Next Greater Element II",
+          "date": "2026-09-30",
+          "mode": "cold"
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "resolve-failure",
+          "priority": 0,
+          "label": "A Stack anchor is still failed",
+          "when": { "op": "unresolved_failure", "scope": { "topic": "Stack" } },
+          "items": [
+            {
+              "type": "problem",
+              "kind": "repair",
+              "purpose": "recovery",
+              "topic": "Stack",
+              "minutes": 25,
+              "title": "Recover the failed anchor",
+              "why": "Repair, or run its delayed cold retest when eligible."
+            }
+          ]
+        },
+        {
+          "id": "yellow-recheck",
+          "priority": 1,
+          "label": "The Yellow recheck is due",
+          "when": {
+            "op": "all",
+            "of": [
+              { "op": "result_is", "dependency": "nge-baseline", "values": ["yellow"] },
+              { "op": "recheck_due", "slug": "next-greater-element-ii" }
+            ]
+          },
+          "basis": "Wednesday's Yellow put this anchor on a three-day recheck, which falls today.",
+          "items": [
+            {
+              "type": "problem",
+              "slug": "next-greater-element-ii",
+              "title": "Next Greater Element II",
+              "kind": "cold",
+              "purpose": "Yellow recheck",
+              "topic": "Stack",
+              "minutes": 25,
+              "why": "This replaces the other baseline today rather than adding to it.",
+              "detail": "A different baseline cannot substitute for this recheck, which is why the slot is taken rather than doubled."
+            }
+          ]
+        },
+        {
+          "id": "expand",
+          "priority": 2,
+          "label": "Nothing due — broaden coverage",
+          "when": { "op": "always" },
+          "items": [
+            {
+              "type": "problem",
+              "slug": "remove-k-digits",
+              "title": "Remove K Digits",
+              "kind": "cold",
+              "purpose": "cold check",
+              "topic": "Stack",
+              "minutes": 25,
+              "why": "Measure greedy stack once the earlier baselines are complete.",
+              "detail": "Failed submissions on LeetCode are not a Red cold grade; only a recorded cold attempt is."
+            },
+            {
+              "type": "action",
+              "title": "Refresh coaching after logging the result",
+              "topic": "Greedy",
+              "why": "Keep a maximum of two distinct problem sessions per day."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "branches": [
+    { "if": "green", "then": "Schedule the next check further out; the rest of the topic stays unmeasured." },
+    { "if": "yellow", "then": "Recheck the same anchor after a short gap." },
+    { "if": "red", "then": "Recovery takes priority. Repair, then cold retest after at least a next-day delay." }
+  ]
+}

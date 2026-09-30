@@ -1,0 +1,172 @@
+{
+  "_fixture": "SYNTHETIC. Illustrates the legacy prose outlook (outlookSchemaVersion 1 / omitted). Its `conditional[].if` strings are explanatory prose, so the app cannot verify which branch applies and offers previews only. Kept so the legacy code path has a stable test input that does not depend on anyone's live coaching file.",
+  "version": 1,
+  "assessedAt": "2026-09-30T06:46:41.000Z",
+  "assessmentDate": "2026-09-30",
+  "timezone": "Asia/Kolkata",
+  "trackerSnapshot": {
+    "savedAt": "2026-09-30T05:28:06.128Z",
+    "problems": 100,
+    "revisions": 120,
+    "attempts": 0,
+    "lastAttemptAt": null
+  },
+  "mode": {
+    "key": "MIXED",
+    "headline": "Mixed — one Stack baseline",
+    "why": "Synthetic example mode text."
+  },
+  "today": {
+    "doNow": {
+      "slug": "next-greater-element-ii",
+      "title": "Next Greater Element II",
+      "mode": "cold",
+      "minutes": 25,
+      "why": "Synthetic example rationale."
+    },
+    "then": {
+      "action": "Record the result, then finish today's session",
+      "why": "Synthetic example rationale."
+    }
+  },
+
+  "nextThreeDays": [
+    {
+      "date": "2026-10-01",
+      "headline": "Result-dependent",
+      "note": "Choose one scenario. Red takes priority.",
+      "conditional": [
+        {
+          "if": "red on September 30",
+          "items": [
+            {
+              "slug": "next-greater-element-ii",
+              "title": "Next Greater Element II",
+              "kind": "cold",
+              "topic": "Stack",
+              "minutes": 25,
+              "why": "Retest only after repair and a next-day delay."
+            }
+          ]
+        },
+        {
+          "if": "yellow on September 30",
+          "items": [
+            {
+              "slug": "jump-game-ii",
+              "title": "Jump Game II",
+              "kind": "learn",
+              "topic": "Greedy",
+              "minutes": 30,
+              "why": "Focused relearning, not a cold validation."
+            },
+            {
+              "slug": "decode-string",
+              "title": "Decode String",
+              "kind": "cold",
+              "topic": "Stack",
+              "minutes": 25,
+              "why": "One separate simulation baseline."
+            }
+          ]
+        },
+        {
+          "if": "green on September 30",
+          "items": [
+            {
+              "slug": "jump-game-ii",
+              "title": "Jump Game II",
+              "kind": "learn",
+              "topic": "Greedy",
+              "minutes": 30,
+              "why": "Continue the agreed Greedy progression."
+            },
+            {
+              "slug": "decode-string",
+              "title": "Decode String",
+              "kind": "cold",
+              "topic": "Stack",
+              "minutes": 25,
+              "why": "Measure simulation separately."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "date": "2026-10-02",
+      "headline": "Recovery first",
+      "note": "Evaluate the latest eligible results.",
+      "conditional": [
+        {
+          "if": "red remains unresolved",
+          "items": [
+            {
+              "title": "Repair the anchor that actually failed",
+              "kind": "repair",
+              "topic": "Stack",
+              "minutes": 25,
+              "why": "Use the failed anchor's slug from the log."
+            }
+          ]
+        },
+        {
+          "if": "no unresolved failure",
+          "items": [
+            {
+              "slug": "largest-rectangle-in-histogram",
+              "title": "Largest Rectangle in Histogram",
+              "kind": "cold",
+              "topic": "Stack",
+              "minutes": 35,
+              "why": "One boundary-stack baseline."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "date": "2026-10-03",
+      "headline": "Recheck or broaden coverage",
+      "note": "A due recovery check replaces the baseline slot.",
+      "conditional": [
+        {
+          "if": "red remains unresolved",
+          "items": [
+            {
+              "title": "Recover the failed anchor",
+              "kind": "repair",
+              "topic": "Stack",
+              "minutes": 25,
+              "why": "Repair, or perform its delayed cold retest when eligible."
+            }
+          ]
+        },
+        {
+          "if": "no unresolved failure or recovery check due",
+          "items": [
+            {
+              "slug": "remove-k-digits",
+              "title": "Remove K Digits",
+              "kind": "cold",
+              "topic": "Stack",
+              "minutes": 25,
+              "why": "Measure greedy stack if earlier baselines are complete."
+            },
+            {
+              "title": "Refresh coaching after logging the result",
+              "topic": "Greedy",
+              "why": "Choose the next learning task from current evidence."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "branches": [
+    { "if": "green", "then": "Synthetic example." },
+    { "if": "yellow", "then": "Synthetic example." },
+    { "if": "red", "then": "Synthetic example." }
+  ]
+}
