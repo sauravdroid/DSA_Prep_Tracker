@@ -240,9 +240,7 @@ export default function App() {
           defaultMode="warm"
           onClose={() => setGrading(null)}
           onSave={entry => {
-            store.addPracticeEntry(entry)
-            if (entry.notes) store.addNote(entry.slug, entry.notes)
-            setPracticeLog(store.getPracticeLog())
+            setPracticeLog(store.recordAttempt(entry))
             setGrading(null)
           }}
         />

@@ -906,10 +906,7 @@ export default function DebtPage({ problems, revisions, onChanged }) {
   )
 
   const saveAttempt = useCallback(entry => {
-    setLog(store.addPracticeEntry(entry))
-    const n = entry.notes || {}
-    const text = [n.invariant, n.whyHelp, n.clicked].filter(Boolean).join(' · ')
-    if (text) store.addNote(entry.slug, text)
+    setLog(store.recordAttempt(entry))
     setTesting(null)
     onChanged?.()
   }, [onChanged])

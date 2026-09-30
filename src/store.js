@@ -209,6 +209,19 @@ export function removePracticeEntry(id) {
   return log
 }
 
+/**
+ * The whole of recording an attempt: the graded entry, plus its learning notes
+ * filed against the problem. Callers must not do these separately — the notes
+ * arrive as fields and have to be flattened before they reach addNote.
+ */
+export function recordAttempt(entry) {
+  const log = addPracticeEntry(entry)
+  const n = entry.notes || {}
+  const text = [n.invariant, n.whyHelp, n.clicked].filter(Boolean).join(' · ')
+  if (text) addNote(entry.slug, text)
+  return log
+}
+
 // Anchor mappings: topic -> subpattern -> [slug]. Absent topic means
 // "use the auto-suggested anchors".
 export function getAnchors() {
