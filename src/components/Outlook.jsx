@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, Fragment } from 'react'
 import { resolveOutlookDay, STATUS, OUTCOMES, workloadOf } from '../utils/outlook'
 import { Chip, ProblemLink } from './ui'
 
@@ -91,51 +91,53 @@ const NODE_STATE = {
 }
 
 /**
- * Every stop occupies the same two rows — a fixed-height band for the marker
- * and one for the date — so mixed sizes stay on one axis.
+ * A column of the axis: a fixed-height band for markers and one for the date,
+ * so mixed sizes and labelled/unlabelled columns stay on one line.
  */
 function Stop({ children, date }) {
   return (
     <div className="flex shrink-0 flex-col items-center">
-      <div className="flex h-5 items-center">{children}</div>
+      <div className="flex h-5 items-center gap-1">{children}</div>
       <span className="h-3.5 text-[10px] font-medium leading-[14px] tabular-nums text-slate-500">{date || ''}</span>
     </div>
   )
 }
 
-/** Status is carried by the icon; only dates are written out. */
+/** Status is carried by the icon; the date belongs to the column, not the marker. */
 function TimelineNode({ state, date, title, small, onClick, note }) {
   const s = NODE_STATE[state] || NODE_STATE.pending
   const mark = MARK[state]
-  const label = `${title}: ${s.label}${note ? ` (${note})` : ''}`
+  const label = `${title}${date ? ` on ${date}` : ''}: ${s.label}${note ? ` (${note})` : ''}`
   const Tag = onClick ? 'button' : 'span'
 
   return (
-    <Stop date={date}>
-      <Tag
-        {...(onClick ? { onClick, type: 'button' } : { role: 'img' })}
-        aria-label={label}
-        title={label}
-        className={`tl-node flex items-center justify-center rounded-full border-0 ${
-          small ? 'size-3.5' : 'size-5'
-        } ${s.ring} ${onClick ? 'cursor-pointer hover:brightness-95' : ''}`}
-      >
-        <svg viewBox="0 0 20 20" className={small ? 'size-2' : 'size-3'} fill="none" aria-hidden="true">
-          {mark ? (
-            <path d={mark} stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="tl-mark" />
-          ) : (
-            <circle cx="10" cy="10" r="3.6" fill="currentColor" className="tl-wait" />
-          )}
-        </svg>
-      </Tag>
-    </Stop>
+    <Tag
+      {...(onClick ? { onClick, type: 'button' } : { role: 'img' })}
+      aria-label={label}
+      title={label}
+      className={`tl-node flex shrink-0 items-center justify-center rounded-full border-0 ${
+        small ? 'size-3.5' : 'size-5'
+      } ${s.ring} ${onClick ? 'cursor-pointer hover:brightness-95' : ''}`}
+    >
+      <svg viewBox="0 0 20 20" className={small ? 'size-2' : 'size-3'} fill="none" aria-hidden="true">
+        {mark ? (
+          <path d={mark} stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="tl-mark" />
+        ) : (
+          <circle cx="10" cy="10" r="3.6" fill="currentColor" className="tl-wait" />
+        )}
+      </svg>
+    </Tag>
   )
+}
+
+function Hop() {
+  return <span className="tl-link h-px w-4 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
 }
 
 function Link() {
   return (
     <Stop>
-      <span className="tl-link h-px w-4 rounded-full bg-slate-300" aria-hidden="true" />
+      <Hop />
     </Stop>
   )
 }
@@ -158,41 +160,76 @@ function dayState(view) {
 
 /**
  * What this day hangs off, and how much of it is finished. Earlier days of the
- * same forecast lead in, because each one's result feeds the next; declared
- * dependencies sit closest to the day, since those are the stated conditions.
+ * same forecast and the conditions declared against them share one axis, so
+ * they are ordered by date rather than by how the decision happened to list
+ * them — a line that reads left to right has to move forwards in time.
  */
 function Timeline({ view, priorDays = [], onSelectDay }) {
   const checkpoints = view.items.filter(i => i.type === 'problem')
 
+  const groups = useMemo(() => {
+    // A day's own node precedes the evidence dated to it.
+    const rank = s => (s.kind === 'day' ? 0 : 1)
+    const ordered = [
+      ...priorDays.map(p => ({ kind: 'day', key: `day:${p.date}`, date: p.date, day: p })),
+      ...view.dependencies.map(d => ({ kind: 'dep', key: `dep:${d.id}`, date: d.date, dep: d })),
+    ].sort((a, b) => (a.date || '').localeCompare(b.date || '') || rank(a) - rank(b))
+
+    ordered.push({ kind: 'self', key: 'self', date: view.date })
+
+    // One date can carry several conditions, so it is written once over the
+    // whole run rather than repeated under each marker.
+    const byDate = []
+    for (const stop of ordered) {
+      const last = byDate[byDate.length - 1]
+      if (last && last.date === stop.date) last.stops.push(stop)
+      else byDate.push({ date: stop.date, stops: [stop] })
+    }
+    return byDate
+  }, [priorDays, view.dependencies, view.date])
+
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1 rounded-xl bg-slate-50 px-3 py-1.5">
-      {priorDays.map(p => (
-        <span key={p.date} className="flex items-center gap-1">
-          <TimelineNode
-            small
-            state={dayState(p)}
-            date={p.date}
-            title={`${p.weekday}'s plan`}
-            note="earlier day in this forecast"
-            onClick={onSelectDay ? () => onSelectDay(p.date) : undefined}
-          />
-          <Link />
-        </span>
+    <div className="mt-3 flex flex-wrap items-start gap-1 rounded-xl bg-slate-50 px-3 py-1.5">
+      {groups.map((g, gi) => (
+        <Fragment key={g.date}>
+          {gi > 0 && <Link />}
+          <Stop date={g.date}>
+            {g.stops.map((s, i) => (
+              <Fragment key={s.key}>
+                {i > 0 && <Hop />}
+                {s.kind === 'day' && (
+                  <TimelineNode
+                    small
+                    state={dayState(s.day)}
+                    date={s.date}
+                    title={`${s.day.weekday}'s plan`}
+                    note="earlier day in this forecast"
+                    onClick={onSelectDay ? () => onSelectDay(s.date) : undefined}
+                  />
+                )}
+                {s.kind === 'dep' && (
+                  <TimelineNode state={dependencyState(s.dep)} date={s.date} title={s.dep.title} />
+                )}
+                {s.kind === 'self' && (
+                  <TimelineNode state={dayState(view)} date={s.date} title={`${view.weekday}'s plan`} />
+                )}
+              </Fragment>
+            ))}
+          </Stop>
+        </Fragment>
       ))}
-
-      {view.dependencies.map(d => (
-        <span key={d.id} className="flex items-center gap-1">
-          <TimelineNode state={dependencyState(d)} date={d.date} title={d.title} />
-          <Link />
-        </span>
-      ))}
-
-      <TimelineNode state={dayState(view)} date={view.date} title={`${view.weekday}'s plan`} />
 
       {checkpoints.length > 0 && <Link />}
-      {checkpoints.map(c => (
-        <TimelineNode key={c.key} small state={c.done ? 'done' : 'pending'} title={c.title} />
-      ))}
+      {checkpoints.length > 0 && (
+        <Stop>
+          {checkpoints.map((c, i) => (
+            <Fragment key={c.key}>
+              {i > 0 && <Hop />}
+              <TimelineNode small state={c.done ? 'done' : 'pending'} title={c.title} />
+            </Fragment>
+          ))}
+        </Stop>
+      )}
     </div>
   )
 }
