@@ -8,7 +8,8 @@ import crypto from 'crypto'
 import { validateDecision, outOfScopeFiles } from './src/utils/validateDecision.js'
 import { unpublishedKeys } from './src/utils/trackerDiff.js'
 import { publishSet } from './src/utils/publishSet.js'
-import { assessmentId, assessmentPath, summarise, buildIndex, INDEX_PATH } from './src/utils/assessments.js'
+import { assessmentId, assessmentPath, summarise, buildIndex, INDEX_PATH, coveredDates } from './src/utils/assessments.js'
+import { sealReason, sealOutcome, outcomePath } from './src/utils/outcomes.js'
 
 const DATA_DIR = 'data'
 const DATA_FILE = 'tracker-data.json'
@@ -414,6 +415,7 @@ function githubSync() {
 
         const summaries = []
         const toWrite = new Map()
+        const seen = []
         for (const c of log.body) {
           const at = await gh(token, 'GET', `${coachingContents}?ref=${c.sha}`)
           if (at.status !== 200) continue
@@ -429,7 +431,42 @@ function githubSync() {
           const path = assessmentPath(id)
           const content = JSON.stringify(decision, null, 2)
           summaries.push(summarise(decision, { commit: c.sha.slice(0, 7), bytes: Buffer.byteLength(content) }))
+          seen.push({ id, decision })
           if (!present.has(path)) toWrite.set(path, content)
+        }
+
+        // How each forecast resolved, recorded once. Recomputing it later would
+        // let a correction to the evidence rewrite the verdict on old advice.
+        const today = new Date().toISOString().slice(0, 10)
+        let practiceLog = []
+        if (fs.existsSync(dataFile)) {
+          try {
+            practiceLog = JSON.parse(JSON.parse(fs.readFileSync(dataFile, 'utf8')).data?.dsa_practice_log || '[]')
+          } catch {
+            practiceLog = []
+          }
+        }
+        const latestId = seen[0]?.id ?? null
+        let sealed = 0
+        for (const { id, decision } of seen) {
+          const path = outcomePath(id)
+          if (present.has(path)) continue
+          const because = sealReason({
+            decision,
+            covers: coveredDates(decision),
+            isLatest: id === latestId,
+            today,
+          })
+          if (!because) continue
+          toWrite.set(path, JSON.stringify(sealOutcome({
+            decision,
+            assessmentId: id,
+            practiceLog,
+            sealedAt: new Date().toISOString(),
+            sealedBecause: because,
+            supersededBy: because === 'superseded' ? latestId : null,
+          }), null, 2))
+          sealed++
         }
 
         const index = buildIndex(summaries)
@@ -442,7 +479,7 @@ function githubSync() {
         if (indexChanged) toWrite.set(INDEX_PATH, indexContent)
 
         if (toWrite.size === 0) {
-          return send(res, 200, { committed: null, unchanged: true, archived: 0, count: index.count })
+          return send(res, 200, { committed: null, unchanged: true, archived: 0, sealed: 0, count: index.count })
         }
 
         const newTree = await gh(token, 'POST', `/repos/${repo}/git/trees`, {
@@ -467,7 +504,8 @@ function githubSync() {
 
         return send(res, 200, {
           committed: commit.body.sha.slice(0, 7),
-          archived: [...toWrite.keys()].filter(p => p !== INDEX_PATH).length,
+          archived: [...toWrite.keys()].filter(p => p.startsWith('coaching/assessments/')).length,
+          sealed,
           count: index.count,
           files: [...toWrite.keys()],
         })

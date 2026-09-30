@@ -55,6 +55,7 @@ debt is not calculable at all.
 | dsa-leetcode-storage, private | `coaching/decision.json` | Current recommendation and its evidence basis; advice is not a source of practice facts |
 | dsa-leetcode-storage, private | `coaching/index.json` | Every assessment ever published, newest first, summarised. **Read this for prior advice** rather than walking commits |
 | dsa-leetcode-storage, private | `coaching/assessments/<id>.json` | A past assessment in full. Fetch only when the index summary is not enough |
+| dsa-leetcode-storage, private | `coaching/outcomes/<id>.json` | How that assessment's forecast resolved, sealed once it could no longer change |
 | dsa-leetcode-storage, private | `coaching/handoffs/` | Durable reasoning and note summaries with source references; **proposed, not yet created** |
 | dsa-leetcode-storage, private | `reports/` | Daily, weekly, monthly or overall snapshots when the tracker cannot answer the review; **proposed, not yet created** |
 
@@ -84,6 +85,33 @@ Note also that the archive records what was **published**, not what was
 followed. The tracker pins the revision it adopted in `adoptedFrom.commit`;
 where that differs from the newest published assessment, the pin is what the
 user acted on.
+
+### Comparing assessments, and judging whether advice worked
+
+Comparing what two assessments **saw and concluded** needs only their files:
+`trackerSnapshot` says what evidence each had, `debt` and `mode` what each
+concluded, and the scenario and dependency counts how conditional each was.
+
+Judging whether a forecast **held** needs `coaching/outcomes/<id>.json`. It
+records which branch the evidence actually selected, which dependencies
+resolved and which were never answered, and which planned items were done —
+sealed once the assessment was superseded or its days had passed, so the
+verdict does not move.
+
+Three things it is honest about, and you should carry through:
+
+- `elapsed: false` means the day had not arrived when the outcome was sealed.
+  It is not a plan that went unfollowed and must not be scored as one.
+- `resolved: false` with dependencies in state `missing` means the branch was
+  never settled, because the result it waited on was never recorded. Absence of
+  a record is not a failure.
+- `evidence.fingerprint` is the practice log the verdict was based on. If it no
+  longer matches the log, the evidence was corrected afterwards and the sealed
+  verdict describes what was believed then. Report that drift; do not silently
+  recompute.
+
+An assessment with no outcome file is still live. Do not infer failure from a
+missing outcome.
 
 ### Reading a date range
 
