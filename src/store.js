@@ -229,14 +229,31 @@ export function removePracticeEntry(id) {
 /**
  * The whole of recording an attempt: the graded entry, plus its learning notes
  * filed against the problem. Callers must not do these separately — the notes
- * arrive as fields and have to be flattened before they reach addNote.
+ * arrive as fields and have to be flattened before they are filed.
  */
 export function recordAttempt(entry) {
   const log = addPracticeEntry(entry)
+  const date = entry.date || todayStr()
   const n = entry.notes || {}
   const text = [n.invariant, n.whyHelp, n.clicked].filter(Boolean).join(' · ')
-  if (text) addNote(entry.slug, text)
+  setGradeNote(entry.slug, date, text)
   return log
+}
+
+/**
+ * The note a grade files, replacing the one that grade filed before. Notes
+ * written by hand are left alone, so correcting a grade cannot delete them.
+ */
+function setGradeNote(slug, date, text) {
+  const notes = getNotes()
+  const kept = (notes[slug] || []).filter(x => !(x.source === 'grade' && x.date === date))
+  const trimmed = (text || '').trim()
+  if (trimmed) kept.push({ date, text: trimmed, ts: Date.now(), source: 'grade' })
+
+  if (kept.length) notes[slug] = kept
+  else delete notes[slug]
+  write(KEYS.NOTES, notes)
+  return notes
 }
 
 // Anchor mappings: topic -> subpattern -> [slug]. Absent topic means

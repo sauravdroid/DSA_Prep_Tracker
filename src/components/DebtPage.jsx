@@ -104,6 +104,10 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
   const d = decision
   // A stale decision stops driving the day; fall back to the live derivation.
   const decisionSteps = d && !staleness.stale ? d.today : null
+  // A graded step is finished, and the Done section already carries it.
+  const doNowRecorded = decisionSteps?.doNow?.slug
+    ? practiceLog.some(e => e.slug === decisionSteps.doNow.slug && e.date === today)
+    : false
 
   const headline = d?.mode?.headline
     || (trackedCount === 0 ? 'Set up your topics' : `${mode.label}${modeProvisional ? ' (provisional)' : ''} — ${plan.retentionCount > 0 ? 'baseline validation' : 'keep learning'}`)
@@ -201,7 +205,7 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
           {decisionSteps
             ? (
               <>
-                {decisionSteps.doNow && (
+                {decisionSteps.doNow && !doNowRecorded && (
                   <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 px-4 py-3">
                     <span className="shrink-0 rounded-md bg-slate-900 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
                       First
@@ -237,6 +241,23 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
                         </button>
                       </>
                     )}
+                  </div>
+                )}
+
+                {decisionSteps.doNow && doNowRecorded && (
+                  <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5">
+                    <span className="shrink-0 rounded-md bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                      Recorded
+                    </span>
+                    <span className="min-w-0 flex-1 text-sm text-slate-600">
+                      {decisionSteps.doNow.title || decisionSteps.doNow.slug} is graded for today.
+                    </span>
+                    <button
+                      onClick={() => onGrade(decisionSteps.doNow.slug, decisionSteps.doNow.mode || 'cold')}
+                      className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-white"
+                    >
+                      Update record
+                    </button>
                   </div>
                 )}
 
