@@ -151,7 +151,13 @@ export async function syncProblems(session, startDate, onProgress, existingProbl
   const results = []
   for (let i = 0; i < submissions.length; i++) {
     const s = submissions[i]
-    onProgress?.(`Fetching details ${i + 1}/${submissions.length}: ${s.title}`)
+    // Whether this is a first solve or a re-solve is only knowable here, and it
+    // is the part a reader wants while the fetch is still running.
+    const kind = existingProblems[s.slug] ? 'revision' : 'new'
+    onProgress?.(
+      `${i + 1}/${submissions.length} · ${s.title} (${kind})`,
+      { phase: 'details', index: i + 1, total: submissions.length, title: s.title, slug: s.slug, kind }
+    )
     try {
       const details = await fetchProblemDetails(s.slug, session)
       results.push({

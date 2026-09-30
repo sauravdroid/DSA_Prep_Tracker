@@ -3,7 +3,7 @@ import { backupIfConnected, pullFromGithub, remoteStatus, coachingHistory, pullC
 import { loadDecision, saveDecision } from './coaching'
 import * as store from '../store'
 
-export const INTERVAL_MS = 2 * 60 * 1000
+export const INTERVAL_MS = 10 * 60 * 1000
 
 // A step that never settles would otherwise leave the cycle marked running,
 // and the guard at the top of runCycle would then refuse every later cycle.
@@ -71,6 +71,146 @@ function note(text) {
   set({ log: [{ id: noteSeq, at: new Date().toISOString(), text }, ...state.log].slice(0, 40) })
 }
 
+/**
+ * At most one request in flight per path. A second caller joins the first
+ * rather than starting a competing request, which matters most for the two
+ * paths that read, merge and write the whole tracker.
+ */
+const inflight = new Map()
+
+function once(key, fn) {
+  const pending = inflight.get(key)
+  if (pending) return pending
+  const p = Promise.resolve().then(fn).finally(() => inflight.delete(key))
+  inflight.set(key, p)
+  return p
+}
+
+export function pendingPaths() {
+  return [...inflight.keys()]
+}
+
+/** LeetCode submissions since the last sync, merged into the store. */
+async function leetcodeStep(changed) {
+  const session = store.getSession()
+  if (!session) {
+    step('leetcode', 'skipped', 'No session cookie set')
+    return
+  }
+  step('leetcode', 'running', 'Contacting LeetCode…')
+  const r = await withTimeout(
+    syncToday(session, msg => step('leetcode', 'running', msg), store.getProblems(), store.getLastSync()),
+    'LeetCode sync'
+  )
+
+  // Titles are resolved before the merge, so a revision is still described by
+  // the name the tracker already held rather than by its slug.
+  const known = store.getProblems()
+  const revisedTitles = r.resubmissions.map(x => known[x.slug]?.title || x.slug)
+
+  if (r.results.length > 0) store.mergeProblems(r.results)
+  for (const x of r.resubmissions) store.addRevision(x.slug, x.date)
+  store.addFailures(r.failures)
+
+  const total = r.results.length + r.resubmissions.length
+  if (total > 0) changed.push(`${r.results.length} solved, ${r.resubmissions.length} revised`)
+  step('leetcode', 'done', total > 0
+    ? `${r.results.length} solved, ${r.resubmissions.length} revised`
+    : 'Nothing new since the last check')
+
+  for (const p of r.results) note(`Solved: ${p.title || p.slug}`)
+  for (const t of revisedTitles) note(`Revised: ${t}`)
+}
+
+/** Remote tracker, pulled only when it is genuinely newer. */
+async function pullStep(changed) {
+  step('pull', 'running')
+  const status = await withTimeout(remoteStatus(), 'Remote status')
+  const remoteNewer = status.remote?.savedAt && status.local?.savedAt
+    && status.remote.savedAt > status.local.savedAt
+
+  if (!remoteNewer) {
+    step('pull', 'done', 'Nothing newer on GitHub')
+    return status
+  }
+
+  const r = await withTimeout(pullFromGithub(), 'Pull')
+  const s = r.summary || {}
+  const added = (s.problemsAdded || 0) + (s.revisionsAdded || 0) + (s.attemptsAdded || 0)
+  step('pull', 'done', added > 0
+    ? `+${s.problemsAdded || 0} problems, +${s.revisionsAdded || 0} revisions, +${s.attemptsAdded || 0} attempts`
+    : 'Already up to date')
+  if (added > 0) {
+    changed.push('pulled from GitHub')
+    note(`Pulled from GitHub: +${s.problemsAdded || 0} problems, +${s.revisionsAdded || 0} revisions, +${s.attemptsAdded || 0} attempts`)
+  }
+  return status
+}
+
+async function pushStep(changed, status) {
+  if (!(changed.length > 0 || status?.behind)) {
+    step('push', 'skipped', 'Nothing to publish')
+    return
+  }
+  step('push', 'running')
+  const r = await withTimeout(backupIfConnected(), 'Publish')
+  if (r.skipped) {
+    step('push', 'skipped', 'No GitHub token configured')
+    return
+  }
+  step('push', 'done', r.committed ? `Published ${r.committed}` : 'Published')
+  note(`Published tracker${r.committed ? ` (${r.committed})` : ''}`)
+}
+
+/** The published plan, downloaded only when its head differs from the pin. */
+async function planStep(changed) {
+  step('plan', 'running')
+  const { decision } = await withTimeout(loadDecision(), 'Reading the adopted plan')
+  const adopted = decision?.adoptedFrom?.commit || null
+  const { revisions } = await withTimeout(coachingHistory(), 'Plan history')
+  const head = revisions?.[0] || null
+
+  if (!head) {
+    step('plan', 'skipped', 'No plan published yet')
+    return
+  }
+  if (adopted === head.sha) {
+    step('plan', 'done', `Up to date (${head.shortSha})`)
+    return
+  }
+
+  const c = await withTimeout(pullCoaching(), 'Fetching the plan')
+  if (c.empty) {
+    step('plan', 'skipped', 'No plan published yet')
+    return
+  }
+  if (!c.valid) {
+    step('plan', 'failed', `Revision ${head.shortSha} failed validation, so it was not adopted`)
+    note(`Plan ${head.shortSha} failed validation and was not adopted`)
+    return
+  }
+  if (c.outOfScope?.length > 0) {
+    step('plan', 'failed', `Revision ${head.shortSha} also changed ${c.outOfScope.join(', ')}, so it was not adopted`)
+    note(`Plan ${head.shortSha} touched files outside coaching/ and was not adopted`)
+    return
+  }
+
+  await withTimeout(saveDecision({
+    ...c.decision,
+    adoptedFrom: {
+      repo: getRepo(),
+      path: c.path || 'coaching/decision.json',
+      commit: c.commit?.sha || head.sha,
+      shortCommit: c.commit?.shortSha || head.shortSha,
+      adoptedAt: new Date().toISOString(),
+      adoptedAutomatically: true,
+    },
+  }), 'Adopting the plan')
+  step('plan', 'done', `Adopted ${head.shortSha}`)
+  note(`Adopted a new plan: ${head.shortSha} — ${head.message || 'no message'}`)
+  changed.push('new plan')
+}
+
 /** One pass. Never throws: a failed step is reported, the rest still run. */
 export async function runCycle({ manual = false } = {}) {
   const stuck = state.running && state.startedAt
@@ -88,128 +228,25 @@ export async function runCycle({ manual = false } = {}) {
 
   const changed = []
   const problems = []
-
-  // --- LeetCode
-  try {
-    const session = store.getSession()
-    if (!session) {
-      step('leetcode', 'skipped', 'No session cookie set')
-    } else {
-      step('leetcode', 'running', 'Contacting LeetCode…')
-      // syncToday reports which page and which problem it is on; without this
-      // the longest step of the cycle is the one that says least.
-      const r = await withTimeout(
-        syncToday(session, msg => step('leetcode', 'running', msg), store.getProblems(), store.getLastSync()),
-        'LeetCode sync'
-      )
-      if (r.results.length > 0) store.mergeProblems(r.results)
-      for (const x of r.resubmissions) store.addRevision(x.slug, x.date)
-      store.addFailures(r.failures)
-      const total = r.results.length + r.resubmissions.length
-      if (total > 0) changed.push(`${r.results.length} solved, ${r.resubmissions.length} revised`)
-      step('leetcode', 'done', total > 0
-        ? `${r.results.length} solved, ${r.resubmissions.length} revised`
-        : 'Nothing new since the last check')
-      // Name them, so the count can be checked against something.
-      for (const p of r.results) note(`Solved: ${p.title || p.slug}`)
-      for (const x of r.resubmissions) {
-        note(`Revised: ${store.getProblems()[x.slug]?.title || x.slug}`)
-      }
-    }
-  } catch (e) {
-    problems.push('LeetCode')
-    step('leetcode', 'failed', e.message)
-    note(`LeetCode sync failed: ${e.message}`)
+  const fail = (label, key) => e => {
+    problems.push(label)
+    step(key, 'failed', e.message)
   }
 
-  // --- GitHub, both directions. Checked before acting so an idle cycle is
-  // cheap and says so.
-  let status = null
-  try {
-    step('pull', 'running')
-    status = await withTimeout(remoteStatus(), 'Remote status')
-    const remoteNewer = status.remote?.savedAt && status.local?.savedAt
-      && status.remote.savedAt > status.local.savedAt
-    if (remoteNewer) {
-      const r = await withTimeout(pullFromGithub(), 'Pull')
-      const s = r.summary || {}
-      const added = (s.problemsAdded || 0) + (s.revisionsAdded || 0) + (s.attemptsAdded || 0)
-      step('pull', 'done', added > 0 ? `+${s.problemsAdded || 0} problems, +${s.revisionsAdded || 0} revisions, +${s.attemptsAdded || 0} attempts` : 'Already up to date')
-      if (added > 0) {
-        changed.push('pulled from GitHub')
-        note(`Pulled from GitHub: +${s.problemsAdded || 0} problems, +${s.revisionsAdded || 0} revisions, +${s.attemptsAdded || 0} attempts`)
-      }
-    } else {
-      step('pull', 'done', 'Nothing newer on GitHub')
-    }
-  } catch (e) {
-    problems.push('pull')
-    step('pull', 'failed', e.message)
-  }
+  // The tracker paths share one file: LeetCode merges into it, a pull replaces
+  // it wholesale, and a push sends whatever resulted. Running them together
+  // would let one overwrite another's work, so only the plan — which touches a
+  // different file entirely — runs alongside.
+  const trackerLane = (async () => {
+    let status = null
+    await once('leetcode', () => leetcodeStep(changed)).catch(fail('LeetCode', 'leetcode'))
+    await once('pull', () => pullStep(changed)).then(s => { status = s }).catch(fail('pull', 'pull'))
+    await once('push', () => pushStep(changed, status)).catch(fail('publish', 'push'))
+  })()
 
-  try {
-    const needsPush = changed.length > 0 || status?.behind
-    if (!needsPush) {
-      step('push', 'skipped', 'Nothing to publish')
-    } else {
-      step('push', 'running')
-      const r = await withTimeout(backupIfConnected(), 'Publish')
-      if (r.skipped) step('push', 'skipped', 'No GitHub token configured')
-      else {
-        step('push', 'done', r.committed ? `Published ${r.committed}` : 'Published')
-        note(`Published tracker${r.committed ? ` (${r.committed})` : ''}`)
-      }
-    }
-  } catch (e) {
-    problems.push('publish')
-    step('push', 'failed', e.message)
-    note(`Publishing failed: ${e.message}`)
-  }
+  const planLane = once('plan', () => planStep(changed)).catch(fail('plan', 'plan'))
 
-  // --- Coaching plan. The history call is one small request, so a cycle that
-  // finds nothing new never downloads the decision.
-  try {
-    step('plan', 'running')
-    const { decision } = await withTimeout(loadDecision(), 'Reading the adopted plan')
-    const adopted = decision?.adoptedFrom?.commit || null
-    const { revisions } = await withTimeout(coachingHistory(), 'Plan history')
-    const head = revisions?.[0] || null
-
-    if (!head) {
-      step('plan', 'skipped', 'No plan published yet')
-    } else if (adopted === head.sha) {
-      step('plan', 'done', `Up to date (${head.shortSha})`)
-    } else {
-      const c = await withTimeout(pullCoaching(), 'Fetching the plan')
-      if (c.empty) {
-        step('plan', 'skipped', 'No plan published yet')
-      } else if (!c.valid) {
-        step('plan', 'failed', `Revision ${head.shortSha} failed validation, so it was not adopted`)
-        note(`Plan ${head.shortSha} failed validation and was not adopted`)
-      } else if (c.outOfScope?.length > 0) {
-        step('plan', 'failed', `Revision ${head.shortSha} also changed ${c.outOfScope.join(', ')}, so it was not adopted`)
-        note(`Plan ${head.shortSha} touched files outside coaching/ and was not adopted`)
-      } else {
-        await withTimeout(saveDecision({
-          ...c.decision,
-          adoptedFrom: {
-            repo: getRepo(),
-            path: c.path || 'coaching/decision.json',
-            commit: c.commit?.sha || head.sha,
-            shortCommit: c.commit?.shortSha || head.shortSha,
-            adoptedAt: new Date().toISOString(),
-            adoptedAutomatically: true,
-          },
-        }), 'Adopting the plan')
-        step('plan', 'done', `Adopted ${head.shortSha}`)
-        note(`Adopted a new plan: ${head.shortSha} — ${head.message || 'no message'}`)
-        changed.push('new plan')
-      }
-    }
-  } catch (e) {
-    problems.push('plan')
-    step('plan', 'failed', e.message)
-  }
+  await Promise.allSettled([trackerLane, planLane])
 
   const failed = problems.length > 0
   set({
