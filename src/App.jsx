@@ -11,8 +11,7 @@ import DebtPage from './components/DebtPage'
 import SyncNotesPanel from './components/SyncNotesPanel'
 import ColdTestModal from './components/ColdTestModal'
 import { syncToday, syncProblems } from './services/leetcode'
-import { githubStatus, pushToGithub } from './utils/github'
-import { saveNow } from './utils/dataFile'
+import { backupIfConnected } from './utils/github'
 import { computeRetention } from './utils/retention'
 import { todayStr } from './utils/dateUtils'
 import * as store from './store'
@@ -94,13 +93,13 @@ export default function App() {
       // is already saved locally.
       if (results.length > 0 || resubmissions.length > 0 || failures.length > 0) {
         try {
-          const gh = await githubStatus()
-          if (gh?.hasToken) {
-            setSyncMsg(m => `${m} · backing up…`)
-            await saveNow({ force: true })
-            const pushed = await pushToGithub()
-            setSyncMsg(m => `${m.replace(' · backing up…', '')} · backed up${pushed.committed ? ` (${pushed.committed})` : ''}`)
-          }
+          setSyncMsg(m => `${m} · backing up…`)
+          const r = await backupIfConnected()
+          setSyncMsg(m => {
+            const base = m.replace(' · backing up…', '')
+            if (r.skipped) return base
+            return `${base} · backed up${r.committed ? ` (${r.committed})` : ''}`
+          })
         } catch (e) {
           setSyncMsg(m => `${m.replace(' · backing up…', '')} · backup failed: ${e.message}`)
         }
@@ -242,6 +241,13 @@ export default function App() {
           onSave={entry => {
             setPracticeLog(store.recordAttempt(entry))
             setGrading(null)
+            setSyncMsg('Recorded · publishing…')
+            backupIfConnected()
+              .then(r => setSyncMsg(r.skipped
+                ? 'Recorded'
+                : `Recorded · published${r.committed ? ` (${r.committed})` : ''}`))
+              .catch(e => setSyncMsg(`Recorded and saved locally, but publishing failed: ${e.message}`))
+              .finally(() => setTimeout(() => setSyncMsg(''), 6000))
           }}
         />
       )}

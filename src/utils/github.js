@@ -62,6 +62,19 @@ export function pushToGithub() {
 }
 
 /**
+ * Publish the tracker after evidence changed, so the coach never authors advice
+ * against facts that have moved. Not being connected is a configuration choice,
+ * not a failure, so it reports `skipped` rather than throwing.
+ */
+export async function backupIfConnected() {
+  const gh = await githubStatus()
+  if (!gh?.hasToken) return { skipped: true }
+  await saveNow({ force: true })
+  const pushed = await pushToGithub()
+  return { skipped: false, committed: pushed.committed, bytes: pushed.bytes }
+}
+
+/**
  * Whether the remote tracker is behind local work, and what is missing.
  * Compared server-side so this stays a small response rather than the whole
  * tracker file.

@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { computeRetention, daysBetween, HEALTH, ROLES, suggestAnchors } from '../utils/retention'
 import { loadDecision, saveDecision, decisionStaleness, forecastValidity, trackerSnapshot } from '../utils/coaching'
-import { pullCoaching, coachingHistory } from '../utils/github'
+import { pullCoaching, coachingHistory, backupIfConnected } from '../utils/github'
 import { getSyncState } from '../utils/dataFile'
 import { todayStr } from '../utils/dateUtils'
 import ColdTestModal from './ColdTestModal'
@@ -66,6 +66,36 @@ function dueLabel(anchor, today) {
 
 /* ---------- Headline ---------- */
 
+/**
+ * The grade is already saved locally by the time this shows, so a failed backup
+ * is reported as unpublished work rather than as a lost attempt.
+ */
+function BackupNote({ backup, onDismiss }) {
+  if (!backup) return null
+
+  const tone = backup.state === 'failed'
+    ? 'bg-amber-50 text-amber-900 ring-amber-200'
+    : 'bg-slate-50 text-slate-600 ring-slate-200'
+
+  return (
+    <div className={`flex items-start gap-2 rounded-xl px-3 py-2 text-xs ring-1 ${tone}`}>
+      <span className="flex-1">
+        {backup.state === 'running' && 'Publishing to the data repository…'}
+        {backup.state === 'done' && (
+          <>Recorded and published{backup.commit ? <> · <code className="font-mono">{backup.commit}</code></> : null}. The coach can read it.</>
+        )}
+        {backup.state === 'failed' && (
+          <>Recorded and saved locally, but publishing failed: {backup.error}. The coach will not see it until this is pushed.</>
+        )}
+      </span>
+      {backup.state !== 'running' && (
+        <button onClick={onDismiss} className="shrink-0 border-0 bg-transparent p-0 font-medium underline-offset-2 hover:underline">
+          Dismiss
+        </button>
+      )}
+    </div>
+  )
+}
 function TodayHeadline({ retention, decision, staleness, validity, practiceLog, today, tab, onTabChange, onGrade, onOpenSetup, onOpenProblem, problems }) {
   const [dayDate, setDayDate] = useState(null)
   const { mode, modeProvisional, plan, totalDebt, debtCalculable, agenda, doneToday, focusTopics, maintenanceTopics, trackedCount } = retention
@@ -874,6 +904,7 @@ export default function DebtPage({ problems, revisions, onChanged }) {
   const [anchorOverrides, setAnchorOverrides] = useState(() => store.getAnchors())
   const [topicRoles, setTopicRoles] = useState(() => store.getTopicRoles())
   const [testing, setTesting] = useState(null)
+  const [backup, setBackup] = useState(null)
   const [expanded, setExpanded] = useState({})
   const [setupOpen, setSetupOpen] = useState(() => Object.keys(store.getTopicRoles()).length === 0)
   const [picker, setPicker] = useState(null)
@@ -909,6 +940,13 @@ export default function DebtPage({ problems, revisions, onChanged }) {
     setLog(store.recordAttempt(entry))
     setTesting(null)
     onChanged?.()
+
+    // A grade is the evidence the coach reasons from, and it is the one action
+    // that has no other reason to reach the data repository.
+    setBackup({ state: 'running' })
+    backupIfConnected()
+      .then(r => setBackup(r.skipped ? null : { state: 'done', commit: r.committed }))
+      .catch(e => setBackup({ state: 'failed', error: e.message }))
   }, [onChanged])
 
   const setRole = useCallback((topic, role) => {
@@ -983,6 +1021,7 @@ export default function DebtPage({ problems, revisions, onChanged }) {
             onOpenProblem={openProblem}
             problems={problems}
           />
+          <BackupNote backup={backup} onDismiss={() => setBackup(null)} />
         </div>
 
         <div className="space-y-4">
