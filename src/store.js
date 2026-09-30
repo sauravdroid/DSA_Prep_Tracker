@@ -178,29 +178,46 @@ export function getPracticeLog() {
 export function addPracticeEntry(entry) {
   const log = getPracticeLog()
   const date = entry.date || todayStr()
-  // A repeat inside the same day proves recall, not retention.
-  const sessionRepeat = log.some(e => e.slug === entry.slug && e.date === date)
+  const now = new Date().toISOString()
 
-  log.push({
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  // One record per problem per day. Grading the same problem again is a
+  // correction of that day's record, not a second piece of evidence, so it
+  // replaces rather than accumulates. Days that already hold several records
+  // collapse to one here rather than needing a migration.
+  const sameDay = e => e.slug === entry.slug && e.date === date
+  const prior = log.filter(sameDay)[0] || null
+  const rest = log.filter(e => !sameDay(e))
+
+  const next = {
+    id: prior?.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     slug: entry.slug,
     date,
-    at: entry.at || new Date().toISOString(),
+    at: entry.at || now,
+    // Kept so a corrected grade is still visibly a correction.
+    firstRecordedAt: prior?.firstRecordedAt || prior?.at || entry.at || now,
     mode: entry.mode || 'cold',
     result: entry.result,
     timeMinutes: entry.timeMinutes ?? null,
     help: entry.help || 'none',
-    sessionRepeat,
+    sessionRepeat: false,
     notes: {
       invariant: entry.notes?.invariant || '',
       whyHelp: entry.notes?.whyHelp || '',
       clicked: entry.notes?.clicked || '',
     },
     freeNote: entry.freeNote || '',
-  })
-  log.sort((a, b) => (a.at || a.date).localeCompare(b.at || b.date))
-  write(KEYS.PRACTICE_LOG, log)
-  return log
+  }
+
+  rest.push(next)
+  rest.sort((a, b) => (a.at || a.date).localeCompare(b.at || b.date))
+  write(KEYS.PRACTICE_LOG, rest)
+  return rest
+}
+
+/** Today's record for a problem, if one has already been made. */
+export function practiceEntryFor(slug, date) {
+  const on = date || todayStr()
+  return getPracticeLog().find(e => e.slug === slug && e.date === on) || null
 }
 
 export function removePracticeEntry(id) {

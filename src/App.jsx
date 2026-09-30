@@ -237,6 +237,7 @@ export default function App() {
           slug={grading}
           problem={problems[grading]}
           defaultMode="warm"
+          existing={store.practiceEntryFor(grading)}
           onClose={() => setGrading(null)}
           onSave={entry => {
             setPracticeLog(store.recordAttempt(entry))

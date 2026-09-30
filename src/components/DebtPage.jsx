@@ -979,7 +979,9 @@ export default function DebtPage({ problems, revisions, onChanged }) {
   const testingAnchor = testing
     ? scheduledList.flatMap(t => t.anchors).find(a => a.slug === testing.slug)
     : null
-  const sameDayAlready = testing ? log.some(e => e.slug === testing.slug && e.date === today) : false
+  const existingEntry = testing
+    ? log.find(e => e.slug === testing.slug && e.date === today) || null
+    : null
 
   const openProblem = useCallback((slug, title) => setDrawer({ slug, title }), [])
   // A planned problem may not be solved yet, so fall back to a stub rather than
@@ -1338,7 +1340,7 @@ export default function DebtPage({ problems, revisions, onChanged }) {
           problem={problems[testing.slug]}
           coldTests={testingAnchor?.coldTests || []}
           defaultMode={testing.mode || 'cold'}
-          sameDayAlready={sameDayAlready}
+          existing={existingEntry}
           onClose={() => setTesting(null)}
           onSave={saveAttempt}
         />

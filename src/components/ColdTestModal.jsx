@@ -55,21 +55,24 @@ export default function ColdTestModal({
   slug,
   coldTests = [],
   defaultMode = 'cold',
-  sameDayAlready = false,
+  existing = null,
   onClose,
   onSave,
 }) {
-  const [result, setResult] = useState('')
-  const [mode, setMode] = useState(defaultMode)
-  const [timeMinutes, setTimeMinutes] = useState('')
-  const [help, setHelp] = useState('none')
-  const [invariant, setInvariant] = useState('')
-  const [whyHelp, setWhyHelp] = useState('')
-  const [clicked, setClicked] = useState('')
+  const [result, setResult] = useState(existing?.result || '')
+  const [mode, setMode] = useState(existing?.mode || defaultMode)
+  const [timeMinutes, setTimeMinutes] = useState(existing?.timeMinutes ?? '')
+  const [help, setHelp] = useState(existing?.help || 'none')
+  const [invariant, setInvariant] = useState(existing?.notes?.invariant || '')
+  const [whyHelp, setWhyHelp] = useState(existing?.notes?.whyHelp || '')
+  const [clicked, setClicked] = useState(existing?.notes?.clicked || '')
 
   const today = todayStr()
-  const movesLadder = mode === 'cold' && !sameDayAlready
-  const preview = result && movesLadder ? previewNextDue(coldTests, result, today) : null
+  // Today's own record is being rewritten, so it must not also count as the
+  // history this grade is measured against.
+  const priorTests = existing ? coldTests.filter(t => t.id !== existing.id) : coldTests
+  const movesLadder = mode === 'cold'
+  const preview = result && movesLadder ? previewNextDue(priorTests, result, today) : null
 
   const budget = problem?.difficulty === 'Hard' ? 35 : problem?.difficulty === 'Easy' ? 15 : 30
   const overBudget = timeMinutes !== '' && Number(timeMinutes) > budget
@@ -109,7 +112,9 @@ export default function ColdTestModal({
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold tracking-tight text-slate-900">Record attempt</h2>
+            <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+              {existing ? "Update today's record" : 'Record attempt'}
+            </h2>
             <p className="mt-0.5 truncate text-sm text-slate-500">{problem?.title || slug}</p>
           </div>
           <button
@@ -124,6 +129,12 @@ export default function ColdTestModal({
         </div>
 
         <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+          {existing && (
+            <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200">
+              You already recorded this problem today. Saving replaces that record rather than
+              adding a second one, so the day keeps one honest result.
+            </p>
+          )}
           <div>
             <span className="block text-xs font-semibold uppercase tracking-wide text-slate-400">Practice mode</span>
             <div className="mt-2 grid grid-cols-4 gap-1 rounded-lg bg-slate-100 p-1">
@@ -140,12 +151,6 @@ export default function ColdTestModal({
               ))}
             </div>
             <p className="mt-2 text-xs leading-relaxed text-slate-500">{MODE_META[mode].blurb}</p>
-            {sameDayAlready && mode === 'cold' && (
-              <p className="mt-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
-                Already attempted today. This will be recorded, but repeats within a session
-                do not advance spaced retention.
-              </p>
-            )}
           </div>
 
           <div>
@@ -252,9 +257,7 @@ export default function ColdTestModal({
                 <span className="text-slate-400"> ({preview.interval}d interval)</span>
               </span>
             ) : result ? (
-              <span className="text-slate-400">
-                {mode === 'cold' ? 'Session repeat — schedule unchanged.' : 'This mode does not reschedule the anchor.'}
-              </span>
+              <span className="text-slate-400">This mode does not reschedule the anchor.</span>
             ) : null}
           </div>
           <div className="flex shrink-0 gap-2">
@@ -269,7 +272,7 @@ export default function ColdTestModal({
               disabled={!result}
               className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              Record attempt
+              {existing ? 'Update record' : 'Record attempt'}
             </button>
           </div>
         </div>
