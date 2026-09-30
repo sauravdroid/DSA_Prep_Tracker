@@ -42,6 +42,56 @@ function Hop({ label, value, tone = 'bg-slate-100 text-slate-600', last }) {
   )
 }
 
+const STEP_MARK = {
+  done: 'M5 10.5l3.2 3.2L15 7',
+  failed: 'M6.5 6.5l7 7M13.5 6.5l-7 7',
+  skipped: 'M6 10h8',
+}
+
+const STEP_TONE = {
+  pending: 'bg-white text-slate-300 ring-1 ring-slate-200',
+  running: 'bg-white text-sky-500 ring-1 ring-sky-300',
+  done: 'bg-emerald-500 text-white',
+  failed: 'bg-rose-500 text-white',
+  skipped: 'bg-slate-300 text-white',
+}
+
+/** Which step the sync is on, so a failure is attributable rather than a line of text. */
+function SyncProgress({ steps }) {
+  if (!steps) return null
+  return (
+    <ol className="mt-3 list-none space-y-1.5 rounded-xl bg-slate-50 px-4 py-3 pl-4">
+      {steps.map(s => (
+        <li key={s.key} className="flex items-start gap-2.5">
+          <span
+            role="img"
+            aria-label={`${s.label}: ${s.state}`}
+            className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full ${STEP_TONE[s.state]}`}
+          >
+            <svg viewBox="0 0 20 20" className="size-2.5" fill="none" aria-hidden="true">
+              {STEP_MARK[s.state] ? (
+                <path d={STEP_MARK[s.state]} stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" className="tl-mark" />
+              ) : (
+                <circle cx="10" cy="10" r="4" fill="currentColor" className={s.state === 'running' ? 'tl-wait' : ''} />
+              )}
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className={`text-xs font-medium ${s.state === 'pending' ? 'text-slate-400' : 'text-slate-700'}`}>
+              {s.label}
+            </span>
+            {s.note && (
+              <span className={`ml-1.5 text-xs ${s.state === 'failed' ? 'text-rose-600' : 'text-slate-500'}`}>
+                {s.note}
+              </span>
+            )}
+          </span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
 export default function SyncSettings({ onSyncComplete }) {
   const [session, setSession] = useState(store.getSession())
   const [startDate, setStartDate] = useState(store.getStartDate())
@@ -54,6 +104,7 @@ export default function SyncSettings({ onSyncComplete }) {
   const [repo, setRepoState] = useState(getRepo())
   const [token, setToken] = useState('')
   const [advanced, setAdvanced] = useState(false)
+  const [steps, setSteps] = useState(null)
 
   useEffect(() => subscribe(setDisk), [])
   useEffect(() => { githubStatus().then(setGh).catch(() => setGh(null)) }, [])
@@ -73,49 +124,82 @@ export default function SyncSettings({ onSyncComplete }) {
     try { await fn() } catch (e) { setError(e.message) } finally { setBusy('') }
   }
 
+  const step = (key, state, note) =>
+    setSteps(prev => (prev || []).map(s => (s.key === key ? { ...s, state, note: note ?? s.note } : s)))
+
   /** Pull, fetch only what is newer, push. The whole round trip in one action. */
   const handleSync = () => run('sync', async () => {
     if (!session.trim()) throw new Error('Paste your LEETCODE_SESSION cookie first.')
     store.saveSession(session.trim())
     store.saveStartDate(startDate)
 
+    const hasGh = !!gh?.hasToken
+    const failed = []
+    setSteps([
+      { key: 'pull', label: 'Check GitHub for newer data', state: hasGh ? 'running' : 'skipped', note: hasGh ? '' : 'no token' },
+      { key: 'fetch', label: 'Download from LeetCode', state: 'pending' },
+      { key: 'push', label: 'Back up to GitHub', state: hasGh ? 'pending' : 'skipped', note: hasGh ? '' : 'no token' },
+    ])
+
+    // Step 1 — pull first, so another machine's work is merged before fetching
+    // and the LeetCode window can start from the newest date either side holds.
     let resumeFrom = null
-    let cloudNote = ''
-    if (gh?.hasToken) {
-      setStatus('Pulling from GitHub…')
+    if (hasGh) {
       try {
         const pulled = await pullFromGithub()
-        if (!pulled.empty) {
+        if (pulled.empty) {
+          step('pull', 'done', 'nothing published yet')
+        } else {
           resumeFrom = pulled.resumeFrom
-          cloudNote = ` Merged +${pulled.summary.problemsAdded} problems from GitHub.`
+          const s = pulled.summary
+          step('pull', 'done', `+${s.problemsAdded} problems, +${s.revisionsAdded} revisions, +${s.attemptsAdded} attempts`)
         }
       } catch (e) {
-        cloudNote = ` (GitHub pull failed: ${e.message})`
+        failed.push('the GitHub check')
+        step('pull', 'failed', e.message)
       }
     }
 
+    // Step 2 — ask LeetCode only for what is newer than what is already held.
     const syncFrom = resumeFrom ? stepBackOneDay(resumeFrom) : lastSync || startDate
-    setStatus(`Fetching LeetCode submissions since ${String(syncFrom).slice(0, 10)}…`)
-    const { results: problems, resubmissions, failures } =
-      await syncProblems(session.trim(), syncFrom, setStatus, store.getProblems())
+    const from = String(syncFrom).slice(0, 10)
+    step('fetch', 'running', `since ${from}`)
 
-    const merged = store.mergeProblems(problems)
-    for (const r of resubmissions) store.addRevision(r.slug, r.date)
-    store.addFailures(failures)
+    let merged, resubmissions
+    try {
+      const r = await syncProblems(
+        session.trim(),
+        syncFrom,
+        m => step('fetch', 'running', `since ${from} · ${m}`),
+        store.getProblems()
+      )
+      resubmissions = r.resubmissions
+      merged = store.mergeProblems(r.results)
+      for (const x of r.resubmissions) store.addRevision(x.slug, x.date)
+      store.addFailures(r.failures)
+      step('fetch', 'done', `${Object.keys(merged).length} problems, ${r.resubmissions.length} re-submissions`)
+    } catch (e) {
+      step('fetch', 'failed', e.message)
+      throw e
+    }
 
-    let pushNote = ''
-    if (gh?.hasToken) {
-      setStatus('Pushing to GitHub…')
+    // Step 3 — publish, so the coach and any other machine see the same facts.
+    if (hasGh) {
+      step('push', 'running')
       try {
         await saveNow({ force: true })
         const pushed = await pushToGithub()
-        pushNote = pushed.committed ? ` Pushed (${pushed.committed}).` : ' Pushed.'
+        step('push', 'done', pushed.committed ? `commit ${pushed.committed}` : 'up to date')
       } catch (e) {
-        pushNote = ` (GitHub push failed: ${e.message})`
+        failed.push('the backup')
+        step('push', 'failed', e.message)
       }
     }
 
-    setStatus(`Done. ${Object.keys(merged).length} problems, ${resubmissions.length} re-submissions.${cloudNote}${pushNote}`)
+    // Downloaded work is saved locally either way; only the summary changes.
+    setStatus(failed.length === 0
+      ? `Sync complete — ${Object.keys(merged).length} problems, ${resubmissions.length} re-submissions.`
+      : `Downloaded ${Object.keys(merged).length} problems, but ${failed.join(' and ')} failed. Your work is saved locally.`)
     onSyncComplete()
   })
 
@@ -212,6 +296,8 @@ export default function SyncSettings({ onSyncComplete }) {
               Fetches only submissions since {syncSince}, then backs up.
             </span>
           </div>
+
+          <SyncProgress steps={steps} />
 
           {status && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-900 ring-1 ring-emerald-200/60">{status}</p>}
           {error && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-900 ring-1 ring-rose-200/60">{error}</p>}
