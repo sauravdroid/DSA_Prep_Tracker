@@ -31,8 +31,28 @@ export async function saveDecision(decision) {
 }
 
 /**
- * A decision goes stale when the day rolls over or when practice evidence has
- * been recorded since it was written — both change what today should be.
+ * The attempts a decision already anticipates, as `slug|date`. Today's step
+ * counts alongside the forecast's dependencies: a plan that asks for a result
+ * must not treat that result as a surprise.
+ */
+function plannedAttempts(decision) {
+  const keys = new Set()
+  const date = decision.assessmentDate || (decision.assessedAt || '').slice(0, 10)
+  for (const step of [decision.today?.doNow, decision.today?.then]) {
+    if (step?.slug && date) keys.add(`${step.slug}|${date}`)
+  }
+  for (const day of decision.nextThreeDays || []) {
+    for (const dep of day.dependencies || []) keys.add(`${dep.slug}|${dep.date}`)
+  }
+  return keys
+}
+
+/**
+ * A decision goes stale when the day rolls over, when evidence appears that it
+ * never accounted for, or when attempts it was based on have vanished.
+ *
+ * Carrying out the plan is not a reason to discard the plan, so the attempt it
+ * asked for is expected rather than invalidating.
  */
 export function decisionStaleness(decision, { practiceLog, today = todayStr() } = {}) {
   if (!decision) return { stale: true, reasons: ['No recommendation loaded yet.'] }
@@ -44,14 +64,19 @@ export function decisionStaleness(decision, { practiceLog, today = todayStr() } 
     reasons.push(`Written for ${assessed}; today is ${today}.`)
   }
 
+  const planned = plannedAttempts(decision)
   const since = decision.trackerSnapshot?.lastAttemptAt || decision.assessedAt || ''
-  const newer = (practiceLog || []).filter(e => (e.at || e.date) > since)
-  if (newer.length > 0) {
-    reasons.push(`${newer.length} attempt${newer.length !== 1 ? 's' : ''} recorded since it was written.`)
+  const unexpected = (practiceLog || []).filter(e =>
+    (e.at || e.date) > since && !planned.has(`${e.slug}|${e.date}`)
+  )
+  if (unexpected.length > 0) {
+    const names = [...new Set(unexpected.map(e => e.slug))].slice(0, 3).join(', ')
+    reasons.push(`${unexpected.length} attempt${unexpected.length !== 1 ? 's' : ''} it does not account for (${names}).`)
   }
 
+  // Growth is expected; attempts disappearing means the log no longer matches.
   const expected = decision.trackerSnapshot?.attempts
-  if (typeof expected === 'number' && practiceLog && practiceLog.length !== expected) {
+  if (typeof expected === 'number' && practiceLog && practiceLog.length < expected) {
     reasons.push(`Based on ${expected} attempts, tracker now has ${practiceLog.length}.`)
   }
 
@@ -96,9 +121,7 @@ export function forecastValidity(decision, { practiceLog = [], today = todayStr(
   }
 
   // Attempts the forecast explicitly depends on are expected, not invalidating.
-  const expectedKeys = new Set(
-    days.flatMap(d => (d.dependencies || []).map(dep => `${dep.slug}|${dep.date}`))
-  )
+  const expectedKeys = plannedAttempts(decision)
   const since = decision.trackerSnapshot?.lastAttemptAt || decision.assessedAt || ''
   const unexpected = practiceLog.filter(e =>
     (e.at || e.date) > since && !expectedKeys.has(`${e.slug}|${e.date}`)

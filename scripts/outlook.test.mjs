@@ -289,6 +289,65 @@ test('an expired window is reported rather than relabelled as the next three day
   assert.match(v.reasons.join(' '), /2026-10-03/)
 })
 
+/* ---------- Staleness ---------- */
+
+test('doing what today asked for does not make today stale', () => {
+  const decision = {
+    ...example,
+    assessedAt: '2026-10-01T06:00:00Z',
+    assessmentDate: '2026-10-01',
+    trackerSnapshot: { ...example.trackerSnapshot, attempts: 0, lastAttemptAt: null },
+    today: { doNow: { slug: 'next-greater-element-ii', mode: 'cold' } },
+  }
+  const s = decisionStaleness(decision, {
+    practiceLog: [attempt({
+      slug: 'next-greater-element-ii',
+      date: '2026-10-01',
+      at: '2026-10-01T09:00:00.000Z',
+    })],
+    today: '2026-10-01',
+  })
+  assert.equal(s.stale, false, s.reasons.join(' '))
+})
+
+test('evidence today never asked for still marks it stale', () => {
+  const decision = {
+    ...example,
+    assessedAt: '2026-10-01T06:00:00Z',
+    assessmentDate: '2026-10-01',
+    trackerSnapshot: { ...example.trackerSnapshot, attempts: 0, lastAttemptAt: null },
+    today: { doNow: { slug: 'next-greater-element-ii', mode: 'cold' } },
+  }
+  const s = decisionStaleness(decision, {
+    practiceLog: [attempt({
+      slug: 'two-sum',
+      date: '2026-10-01',
+      at: '2026-10-01T09:00:00.000Z',
+    })],
+    today: '2026-10-01',
+  })
+  assert.equal(s.stale, true)
+  assert.match(s.reasons.join(' '), /two-sum/)
+})
+
+test('attempts disappearing is still reported, since the log no longer matches', () => {
+  const decision = {
+    ...example,
+    assessedAt: '2026-10-01T06:00:00Z',
+    assessmentDate: '2026-10-01',
+    trackerSnapshot: { ...example.trackerSnapshot, attempts: 5, lastAttemptAt: null },
+  }
+  const s = decisionStaleness(decision, { practiceLog: [], today: '2026-10-01' })
+  assert.equal(s.stale, true)
+  assert.match(s.reasons.join(' '), /5 attempts/)
+})
+
+test('a rolled-over day is stale however clean the evidence is', () => {
+  const s = decisionStaleness(example, { practiceLog: [], today: '2026-10-05' })
+  assert.equal(s.stale, true)
+  assert.match(s.reasons.join(' '), /today is 2026-10-05/)
+})
+
 /* ---------- Dates ---------- */
 
 test('dates are read locally and never shifted through UTC', () => {
