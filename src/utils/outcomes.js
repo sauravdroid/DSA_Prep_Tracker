@@ -93,3 +93,26 @@ export function outcomeDrift(outcome, practiceLog = []) {
     currentFingerprint: now,
   }
 }
+
+/**
+ * The part of an outcome worth carrying in the index: enough to see whether a
+ * forecast held without fetching it, and no verdict that the detail would
+ * contradict.
+ */
+export function summariseOutcome(outcome) {
+  if (!outcome) return null
+  const days = outcome.days || []
+  const elapsed = days.filter(d => d.elapsed)
+  return {
+    file: outcomePath(outcome.assessmentId),
+    sealedAt: outcome.sealedAt ?? null,
+    sealedBecause: outcome.sealedBecause ?? null,
+    supersededBy: outcome.supersededBy ?? null,
+    evidenceFingerprint: outcome.evidence?.fingerprint ?? null,
+    days: days.length,
+    daysElapsed: elapsed.length,
+    daysResolved: days.filter(d => d.resolved).length,
+    // Which branch each day settled on, null where nothing settled it.
+    branches: Object.fromEntries(days.map(d => [d.date, d.branch])),
+  }
+}

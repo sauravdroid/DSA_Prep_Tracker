@@ -41,7 +41,7 @@ export function coveredDates(decision = {}) {
  * file is worth fetching — a window of several weeks should cost one read, not
  * one per assessment.
  */
-export function summarise(decision = {}, { commit = null, bytes = null } = {}) {
+export function summarise(decision = {}, { commit = null, bytes = null, outcome = null } = {}) {
   const id = assessmentId(decision.assessedAt)
   return {
     id,
@@ -56,6 +56,8 @@ export function summarise(decision = {}, { commit = null, bytes = null } = {}) {
     doNow: decision.today?.doNow?.slug ?? null,
     sourceCommit: commit,
     bytes,
+    // Null means still live, not that the forecast failed.
+    outcome,
   }
 }
 
@@ -76,8 +78,9 @@ export function buildIndex(summaries = []) {
 
   return {
     indexVersion: INDEX_VERSION,
-    note: 'Ordered newest first. An assessment governs a date if that date is in its covers. For what was in force on a past date, take the latest whose assessedAt falls on or before the end of that date; the newest entry may have been written afterwards.',
+    note: 'Ordered newest first. An assessment governs a date if that date is in its covers. For what was in force on a past date, take the latest whose assessedAt falls on or before the end of that date; the newest entry may have been written afterwards. A null outcome means the assessment is still live, not that its forecast failed.',
     count: assessments.length,
+    sealed: assessments.filter(a => a.outcome).length,
     latest: assessments[0]?.id ?? null,
     coversThrough: assessments.flatMap(s => s.covers).sort().pop() ?? null,
     assessments,

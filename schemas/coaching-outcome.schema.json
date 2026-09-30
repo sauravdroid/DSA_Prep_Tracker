@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sauravdroid/DSA_Prep_Tracker/schemas/coaching-outcome.schema.json",
+  "title": "Sealed coaching outcome",
+  "description": "How one assessment's forecast resolved, recorded once and never recomputed. Resolution otherwise runs against whatever the practice log holds when it is asked, so correcting evidence would silently rewrite the verdict on advice given weeks earlier. Written by the tracker, never by the coach. An assessment with no outcome file is still live: absence is not failure.",
+  "type": "object",
+  "required": ["outcomeVersion", "assessmentId", "sealedAt", "sealedBecause", "evidence", "days"],
+  "properties": {
+    "outcomeVersion": { "const": 1 },
+    "assessmentId": { "type": "string" },
+    "assessedAt": { "type": ["string", "null"] },
+    "sealedAt": { "type": "string", "format": "date-time" },
+
+    "sealedBecause": {
+      "type": "string",
+      "enum": ["superseded", "window elapsed"],
+      "description": "An assessment is sealed only once it can no longer change: something newer replaced it, or every day it spoke to is behind us."
+    },
+
+    "supersededBy": {
+      "type": ["string", "null"],
+      "description": "The assessment that replaced this one, when that is why it was sealed."
+    },
+
+    "evidence": {
+      "type": "object",
+      "required": ["fingerprint"],
+      "description": "The practice log this verdict was based on.",
+      "properties": {
+        "attempts": { "type": "integer" },
+        "lastAttemptAt": { "type": ["string", "null"] },
+        "fingerprint": {
+          "type": "string",
+          "description": "Canonical hash of the log, so reordering is not a change. If it no longer matches the current log, the evidence was corrected after sealing and this file records what was believed at the time. Report that drift rather than recomputing."
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "days": {
+      "type": "array",
+      "description": "One entry per forecast day, in the order the assessment issued them.",
+      "items": {
+        "type": "object",
+        "required": ["date", "elapsed", "resolved"],
+        "properties": {
+          "date": { "type": "string" },
+          "elapsed": {
+            "type": "boolean",
+            "description": "False means the day had not arrived when this was sealed. It is not a plan that went unfollowed and must not be scored as one."
+          },
+          "status": { "type": ["string", "null"] },
+          "branch": {
+            "type": ["string", "null"],
+            "description": "The scenario the evidence selected. Null where nothing settled it."
+          },
+          "resolved": {
+            "type": "boolean",
+            "description": "False means the branch was never settled, because a result it waited on was never recorded. Absence of a record is not a failure."
+          },
+          "workload": { "type": ["string", "null"] },
+          "dependencies": {
+            "type": "array",
+            "description": "What the day waited on and how each turned out. State `missing` means no attempt was ever recorded.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": { "type": ["string", "null"] },
+                "date": { "type": ["string", "null"] },
+                "state": { "type": ["string", "null"], "enum": ["known", "missing", "not_completed", "ambiguous", "malformed", null] },
+                "result": { "type": ["string", "null"] }
+              },
+              "additionalProperties": true
+            }
+          },
+          "items": {
+            "type": "array",
+            "description": "What the selected branch asked for, and whether it was done. Empty where no branch was selected.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": { "type": ["string", "null"] },
+                "type": { "type": ["string", "null"] },
+                "done": { "type": "boolean" }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

@@ -98,6 +98,12 @@ resolved and which were never answered, and which planned items were done —
 sealed once the assessment was superseded or its days had passed, so the
 verdict does not move.
 
+You will usually not need to fetch it. Each index entry carries an `outcome`
+summary: where it was sealed and why, how many of its days elapsed and
+resolved, which branch each day settled on, and the evidence fingerprint behind
+that. Fetch the outcome file only when the per-dependency detail matters. An
+entry whose `outcome` is `null` is still live — that is not a failed forecast.
+
 Three things it is honest about, and you should carry through:
 
 - `elapsed: false` means the day had not arrived when the outcome was sealed.

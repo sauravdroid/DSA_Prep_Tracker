@@ -155,6 +155,7 @@ export function buildManifest({ data = {}, savedAt = null, shards = [], repo, co
       schema: 'schemas/coaching-decision.schema.json',
       manifestSchema: 'schemas/manifest.schema.json',
       evidenceSchema: 'schemas/evidence-shard.schema.json',
+      outcomeSchema: 'schemas/coaching-outcome.schema.json',
       policy: 'docs/retention-policy.md',
       policyReference: 'docs/retention-policy.reference.json',
     },

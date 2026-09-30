@@ -9,7 +9,7 @@ import { validateDecision, outOfScopeFiles } from './src/utils/validateDecision.
 import { unpublishedKeys } from './src/utils/trackerDiff.js'
 import { publishSet } from './src/utils/publishSet.js'
 import { assessmentId, assessmentPath, summarise, buildIndex, INDEX_PATH, coveredDates } from './src/utils/assessments.js'
-import { sealReason, sealOutcome, outcomePath } from './src/utils/outcomes.js'
+import { sealReason, sealOutcome, outcomePath, summariseOutcome } from './src/utils/outcomes.js'
 
 const DATA_DIR = 'data'
 const DATA_FILE = 'tracker-data.json'
@@ -413,9 +413,23 @@ function githubSync() {
           (tree.status === 200 ? tree.body.tree : []).filter(t => t.type === 'blob').map(t => t.path)
         )
 
-        const summaries = []
-        const toWrite = new Map()
+        // Outcome summaries already in the index are carried forward, so a
+        // sealed file is read once rather than on every archive run.
+        const priorIndex = present.has(INDEX_PATH)
+          ? await gh(token, 'GET', `/repos/${repo}/contents/${INDEX_PATH}`)
+          : null
+        let priorOutcomes = new Map()
+        if (priorIndex?.status === 200) {
+          try {
+            const parsed = JSON.parse(Buffer.from(priorIndex.body.content || '', 'base64').toString('utf8'))
+            priorOutcomes = new Map((parsed.assessments || []).filter(a => a.outcome).map(a => [a.id, a.outcome]))
+          } catch {
+            priorOutcomes = new Map()
+          }
+        }
+
         const seen = []
+        const toWrite = new Map()
         for (const c of log.body) {
           const at = await gh(token, 'GET', `${coachingContents}?ref=${c.sha}`)
           if (at.status !== 200) continue
@@ -428,11 +442,9 @@ function githubSync() {
           const id = assessmentId(decision.assessedAt)
           if (!id) continue
 
-          const path = assessmentPath(id)
           const content = JSON.stringify(decision, null, 2)
-          summaries.push(summarise(decision, { commit: c.sha.slice(0, 7), bytes: Buffer.byteLength(content) }))
-          seen.push({ id, decision })
-          if (!present.has(path)) toWrite.set(path, content)
+          seen.push({ id, decision, commit: c.sha.slice(0, 7), bytes: Buffer.byteLength(content) })
+          if (!present.has(assessmentPath(id))) toWrite.set(assessmentPath(id), content)
         }
 
         // How each forecast resolved, recorded once. Recomputing it later would
@@ -446,11 +458,24 @@ function githubSync() {
             practiceLog = []
           }
         }
+
         const latestId = seen[0]?.id ?? null
+        const outcomes = new Map(priorOutcomes)
         let sealed = 0
         for (const { id, decision } of seen) {
-          const path = outcomePath(id)
-          if (present.has(path)) continue
+          if (outcomes.has(id)) continue
+
+          if (present.has(outcomePath(id))) {
+            // Sealed by an earlier run that predates the index carrying them.
+            const existing = await gh(token, 'GET', `/repos/${repo}/contents/${outcomePath(id)}`)
+            if (existing.status === 200) {
+              try {
+                outcomes.set(id, summariseOutcome(decodeContent(existing)))
+              } catch { /* leave unsummarised rather than guess */ }
+            }
+            continue
+          }
+
           const because = sealReason({
             decision,
             covers: coveredDates(decision),
@@ -458,24 +483,28 @@ function githubSync() {
             today,
           })
           if (!because) continue
-          toWrite.set(path, JSON.stringify(sealOutcome({
+
+          const outcome = sealOutcome({
             decision,
             assessmentId: id,
             practiceLog,
             sealedAt: new Date().toISOString(),
             sealedBecause: because,
             supersededBy: because === 'superseded' ? latestId : null,
-          }), null, 2))
+          })
+          toWrite.set(outcomePath(id), JSON.stringify(outcome, null, 2))
+          outcomes.set(id, summariseOutcome(outcome))
           sealed++
         }
 
+        const summaries = seen.map(s =>
+          summarise(s.decision, { commit: s.commit, bytes: s.bytes, outcome: outcomes.get(s.id) ?? null })
+        )
+
         const index = buildIndex(summaries)
         const indexContent = JSON.stringify(index, null, 2)
-        const currentIndex = present.has(INDEX_PATH)
-          ? await gh(token, 'GET', `/repos/${repo}/contents/${INDEX_PATH}`)
-          : null
-        const indexChanged = !currentIndex || currentIndex.status !== 200 ||
-          Buffer.from(currentIndex.body.content || '', 'base64').toString('utf8') !== indexContent
+        const indexChanged = !priorIndex || priorIndex.status !== 200 ||
+          Buffer.from(priorIndex.body.content || '', 'base64').toString('utf8') !== indexContent
         if (indexChanged) toWrite.set(INDEX_PATH, indexContent)
 
         if (toWrite.size === 0) {

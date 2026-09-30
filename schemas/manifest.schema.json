@@ -38,6 +38,7 @@
         "schema": { "type": "string" },
         "manifestSchema": { "type": "string" },
         "evidenceSchema": { "type": "string" },
+        "outcomeSchema": { "type": "string" },
         "policy": { "type": "string" },
         "policyReference": { "type": "string" }
       },
@@ -109,7 +110,7 @@
         "decision": { "type": "string", "description": "The current plan. Overwritten on every revision." },
         "index": { "type": "string", "description": "Summaries of every published assessment, newest first, with the dates each covers. Read this for prior advice rather than walking commits." },
         "assessments": { "type": "string", "description": "Directory of archived assessments, addressable by id." },
-        "outcomes": { "type": "string", "description": "How each assessment's forecast resolved, sealed once it could no longer change, with the evidence fingerprint it was based on." },
+        "outcomes": { "type": "string", "description": "How each assessment's forecast resolved, sealed once it could no longer change, with the evidence fingerprint it was based on. Whether a given assessment is sealed, and how it turned out, is summarised in the index." },
         "current": { "type": ["string", "null"] }
       },
       "additionalProperties": true
