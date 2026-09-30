@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sauravdroid/DSA_Prep_Tracker/schemas/manifest.schema.json",
+  "title": "Data repository manifest",
+  "description": "The entry point of the data repository. Written by the tracker, never by the coach. It is an inventory, not an interpretation: it says what exists, over which dates, and how to tell whether a file has changed. Conclusions such as mode, retention debt or topic health are deliberately absent, because planning from a summary means planning without the evidence behind it.",
+  "type": "object",
+  "required": ["manifestVersion", "describes", "evidence"],
+  "properties": {
+    "manifestVersion": { "const": 1 },
+
+    "generatedFor": {
+      "type": ["string", "null"],
+      "description": "The tracker savedAt this manifest describes. Deliberately not the time of generation, so regenerating unchanged data produces an identical file."
+    },
+
+    "describes": {
+      "type": "object",
+      "required": ["trackerSavedAt", "trackerFingerprint"],
+      "properties": {
+        "dataRepository": { "type": ["string", "null"] },
+        "trackerPath": { "type": "string" },
+        "trackerSavedAt": { "type": ["string", "null"] },
+        "trackerFingerprint": {
+          "type": "string",
+          "description": "Hash of the tracker's facts in canonical form, not of its bytes. Key and array order shift whenever the browser rehydrates, and a fingerprint that moved with them would report unchanged data as new."
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "contracts": {
+      "type": "object",
+      "description": "Where the rules live. codeCommit pins the version of the policy and schema that were in force.",
+      "properties": {
+        "codeRepository": { "type": "string" },
+        "codeCommit": { "type": ["string", "null"] },
+        "protocol": { "type": "string" },
+        "schema": { "type": "string" },
+        "manifestSchema": { "type": "string" },
+        "evidenceSchema": { "type": "string" },
+        "policy": { "type": "string" },
+        "policyReference": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+
+    "personalContext": {
+      "type": "object",
+      "properties": { "path": { "type": "string" } },
+      "additionalProperties": true
+    },
+
+    "evidence": {
+      "type": "object",
+      "required": ["grain", "totals", "shards"],
+      "properties": {
+        "path": { "type": "string" },
+        "grain": { "const": "month" },
+        "note": { "type": "string" },
+        "coverage": {
+          "type": ["object", "null"],
+          "properties": { "from": { "type": "string" }, "to": { "type": "string" } },
+          "additionalProperties": false
+        },
+        "totals": {
+          "type": "object",
+          "properties": {
+            "solved": { "type": "integer" },
+            "revised": { "type": "integer" },
+            "failed": { "type": "integer" },
+            "graded": { "type": "integer" },
+            "eligibleColdTests": {
+              "type": "integer",
+              "description": "Graded attempts that are cold, unaided and not a same-day repeat. Zero here means retention debt is not calculable at all, which is the one number worth knowing before fetching anything."
+            }
+          },
+          "additionalProperties": true
+        },
+        "shards": {
+          "type": "array",
+          "description": "One entry per calendar month, in ascending order. Read the entries covering the window you need and fetch only those files.",
+          "items": {
+            "type": "object",
+            "required": ["file", "month", "fingerprint"],
+            "properties": {
+              "file": { "type": "string" },
+              "month": { "type": "string", "pattern": "^\\d{4}-\\d{2}$" },
+              "from": { "type": ["string", "null"] },
+              "to": { "type": ["string", "null"] },
+              "solved": { "type": "integer" },
+              "revised": { "type": "integer" },
+              "failed": { "type": "integer" },
+              "graded": { "type": "integer" },
+              "fingerprint": {
+                "type": "string",
+                "description": "Changes only when the month's facts change, so a reader holding this month can skip fetching it."
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "coaching": {
+      "type": "object",
+      "properties": {
+        "decision": { "type": "string" },
+        "current": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

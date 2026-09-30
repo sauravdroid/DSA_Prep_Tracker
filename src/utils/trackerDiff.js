@@ -8,7 +8,7 @@
  */
 
 /** Order-insensitive rendering of a value, so reordering is not a difference. */
-function canonical(value) {
+export function canonical(value) {
   if (Array.isArray(value)) return `[${value.map(canonical).sort().join(',')}]`
   if (value && typeof value === 'object') {
     return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${canonical(value[k])}`).join(',')}}`

@@ -28,9 +28,12 @@ If you are an assistant asked to produce a coaching plan, start here:
 | [docs/retention-policy.reference.json](docs/retention-policy.reference.json) | The **agreed target** policy, annotated with implementation status |
 | [schemas/coaching-decision.schema.json](schemas/coaching-decision.schema.json) | Output contract |
 | [fixtures/](fixtures/) | Synthetic worked examples, structured and legacy |
+| [schemas/manifest.schema.json](schemas/manifest.schema.json) | The data repository's inventory, which is where to start reading |
+| [schemas/evidence-shard.schema.json](schemas/evidence-shard.schema.json) | One month of practice facts, and the counting rules that are easy to get wrong |
 
 Personal context — interview target, availability, rest days — lives in the
-private data repository, not here.
+private data repository, not here. So does the evidence: read `manifest.json`
+there first, then only the monthly shards your review actually covers.
 
 ## Two rules the design rests on
 

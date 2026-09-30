@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sauravdroid/DSA_Prep_Tracker/schemas/evidence-shard.schema.json",
+  "title": "Evidence shard",
+  "description": "One calendar month of practice facts, derived from tracker-data.json. A shard carries the problems it touches so it can be read on its own, without the full 70 KB catalogue. Shards are rebuilt from the tracker on every publish rather than appended to, because a correction can rewrite a past month: collapsing duplicate records or deleting an attempt both do.",
+  "type": "object",
+  "required": ["shardVersion", "month", "counts", "problems", "solved", "revised", "failed", "graded"],
+  "properties": {
+    "shardVersion": { "const": 1 },
+    "month": { "type": "string", "pattern": "^\\d{4}-\\d{2}$" },
+    "from": { "type": ["string", "null"], "description": "Earliest date present in this shard." },
+    "to": { "type": ["string", "null"] },
+
+    "counts": {
+      "type": "object",
+      "description": "Lengths of the four lists below. `failed` counts submissions, not problems.",
+      "properties": {
+        "solved": { "type": "integer" },
+        "revised": { "type": "integer" },
+        "failed": { "type": "integer" },
+        "graded": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+
+    "problems": {
+      "type": "object",
+      "description": "Every slug this month touches, described once. A problem first solved in an earlier month still appears here if it was revised, failed or graded in this one, so `firstSolved` may fall outside the shard's range.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "title": { "type": ["string", "null"] },
+          "difficulty": { "type": ["string", "null"] },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "firstSolved": { "type": ["string", "null"] }
+        },
+        "additionalProperties": true
+      }
+    },
+
+    "solved": {
+      "type": "array",
+      "description": "Problems whose first solve falls in this month. Sorted by date then slug.",
+      "items": {
+        "type": "object",
+        "required": ["slug", "date"],
+        "properties": { "slug": { "type": "string" }, "date": { "type": "string" } },
+        "additionalProperties": true
+      }
+    },
+
+    "revised": {
+      "type": "array",
+      "description": "Re-solves of a problem first solved earlier. Activity, not retention evidence.",
+      "items": {
+        "type": "object",
+        "required": ["slug", "date"],
+        "properties": { "slug": { "type": "string" }, "date": { "type": "string" } },
+        "additionalProperties": true
+      }
+    },
+
+    "failed": {
+      "type": "array",
+      "description": "One entry per failed submission, so the same slug and date repeat as often as it failed. That repetition is the count — do not deduplicate it.",
+      "items": {
+        "type": "object",
+        "required": ["slug", "date"],
+        "properties": { "slug": { "type": "string" }, "date": { "type": "string" } },
+        "additionalProperties": true
+      }
+    },
+
+    "graded": {
+      "type": "array",
+      "description": "Recorded attempts, carried whole. This is the only retention evidence: an attempt counts as a cold test when mode is cold, help is none, and sessionRepeat is false. At most one record exists per problem per day; firstRecordedAt differing from at means the grade was corrected.",
+      "items": {
+        "type": "object",
+        "required": ["slug", "date", "mode", "result"],
+        "properties": {
+          "id": { "type": "string" },
+          "slug": { "type": "string" },
+          "date": { "type": "string" },
+          "at": { "type": "string" },
+          "firstRecordedAt": { "type": "string" },
+          "mode": { "type": "string", "enum": ["cold", "warm", "repair", "learn"] },
+          "result": { "type": "string", "enum": ["green", "yellow", "red"] },
+          "timeMinutes": { "type": ["number", "null"] },
+          "help": { "type": "string", "enum": ["none", "hint", "solution"] },
+          "sessionRepeat": { "type": "boolean" },
+          "notes": { "type": "object" },
+          "freeNote": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

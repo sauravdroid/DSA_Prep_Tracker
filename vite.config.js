@@ -4,8 +4,10 @@ import tailwindcss from '@tailwindcss/vite'
 import https from 'https'
 import fs from 'fs'
 import path from 'path'
+import crypto from 'crypto'
 import { validateDecision, outOfScopeFiles } from './src/utils/validateDecision.js'
 import { unpublishedKeys } from './src/utils/trackerDiff.js'
+import { publishSet } from './src/utils/publishSet.js'
 
 const DATA_DIR = 'data'
 const DATA_FILE = 'tracker-data.json'
@@ -165,6 +167,7 @@ function githubSync() {
   let dataFile = ''
   const REPO_RE = /^[\w.-]+\/[\w.-]+$/
   const REMOTE_PATH = 'tracker-data.json'
+  const BRANCH = 'main'
   // Coaching advice lives on its own path so a tracker push can never carry a
   // stale decision, and a coaching pull can never touch practice facts.
   const COACHING_PATH = 'coaching/decision.json'
@@ -392,21 +395,71 @@ function githubSync() {
       if (url === '/push') {
         if (!fs.existsSync(dataFile)) return send(res, 400, { error: 'No local data file to push' })
         const local = fs.readFileSync(dataFile, 'utf8')
+        const parsedLocal = JSON.parse(local)
 
-        const existing = await gh(token, 'GET', contentsPath)
-        const sha = existing.status === 200 ? existing.body.sha : undefined
-
-        const r = await gh(token, 'PUT', contentsPath, {
-          message: `tracker sync ${new Date().toISOString()}`,
-          content: Buffer.from(local, 'utf8').toString('base64'),
-          ...(sha ? { sha } : {}),
+        // The tracker and everything derived from it go in one commit. Written
+        // separately, a failure between them leaves the manifest describing
+        // shards that are not there.
+        const derived = publishSet({
+          data: parsedLocal.data || {},
+          savedAt: parsedLocal.savedAt || null,
+          repo,
+          codeCommit: body.codeCommit || null,
         })
-        if (r.status !== 200 && r.status !== 201) {
-          return send(res, r.status, { error: r.body?.message || `GitHub returned ${r.status}` })
+
+        const files = new Map([[REMOTE_PATH, local], ...derived])
+
+        const head = await gh(token, 'GET', `/repos/${repo}/git/ref/heads/${BRANCH}`)
+        if (head.status !== 200) {
+          return send(res, head.status, { error: head.body?.message || `Cannot read ${BRANCH}` })
         }
+        const parentSha = head.body.object.sha
+
+        // Only write what actually differs, so an unchanged month is not
+        // rewritten on every publish.
+        const existing = await gh(token, 'GET', `/repos/${repo}/git/trees/${parentSha}?recursive=1`)
+        const bySha = new Map(
+          (existing.status === 200 ? existing.body.tree : [])
+            .filter(t => t.type === 'blob')
+            .map(t => [t.path, t.sha])
+        )
+        const blobSha = content =>
+          crypto.createHash('sha1')
+            .update(`blob ${Buffer.byteLength(content)}\0`)
+            .update(content)
+            .digest('hex')
+
+        const changed = [...files].filter(([p, c]) => bySha.get(p) !== blobSha(c))
+        if (changed.length === 0) {
+          return send(res, 200, { committed: null, unchanged: true, bytes: Buffer.byteLength(local), files: [] })
+        }
+
+        const tree = await gh(token, 'POST', `/repos/${repo}/git/trees`, {
+          base_tree: parentSha,
+          tree: changed.map(([p, content]) => ({ path: p, mode: '100644', type: 'blob', content })),
+        })
+        if (tree.status !== 201) {
+          return send(res, tree.status, { error: tree.body?.message || 'Could not build the tree' })
+        }
+
+        const commit = await gh(token, 'POST', `/repos/${repo}/git/commits`, {
+          message: `tracker sync ${parsedLocal.savedAt || new Date().toISOString()}`,
+          tree: tree.body.sha,
+          parents: [parentSha],
+        })
+        if (commit.status !== 201) {
+          return send(res, commit.status, { error: commit.body?.message || 'Could not create the commit' })
+        }
+
+        const moved = await gh(token, 'PATCH', `/repos/${repo}/git/refs/heads/${BRANCH}`, { sha: commit.body.sha })
+        if (moved.status !== 200) {
+          return send(res, moved.status, { error: moved.body?.message || `Could not move ${BRANCH}` })
+        }
+
         return send(res, 200, {
-          committed: r.body.commit?.sha?.slice(0, 7) || null,
+          committed: commit.body.sha.slice(0, 7),
           bytes: Buffer.byteLength(local),
+          files: changed.map(([p]) => p),
         })
       }
     } catch (e) {

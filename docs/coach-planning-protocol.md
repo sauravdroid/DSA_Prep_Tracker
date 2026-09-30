@@ -24,8 +24,26 @@ handoff when they are missing and could change the plan.
 
 ## Files to read
 
+Start at `manifest.json` in the data repository. It is one small read that
+names every other file, the dates each one covers and a fingerprint for each,
+so the rest of this table can be consulted selectively rather than in full.
+
+Read evidence through the monthly shards, not the whole tracker. A two-month
+window is roughly 22 KB across two files; `tracker-data.json` is 140 KB and
+growing, and reaching for it means downloading seven months to use two.
+
+The manifest is an inventory. It reports what exists and how much, never what
+it means: mode, retention debt and topic health are conclusions and must come
+from the evidence, in the assessment being written. `eligibleColdTests` is the
+one exception worth acting on directly, because zero there means retention
+debt is not calculable at all.
+
 | Repository | Path | Purpose and when needed |
 | --- | --- | --- |
+| dsa-leetcode-storage, private | `manifest.json` | **Read first.** Inventory of the data repository: evidence coverage, per-month counts and fingerprints, contract locations, current decision |
+| dsa-leetcode-storage, private | `evidence/<YYYY-MM>.json` | One month of practice facts, carrying the problems it touches so it reads on its own. Fetch only the months the review covers |
+| DSA_Prep_Tracker | `schemas/manifest.schema.json` | What the manifest guarantees |
+| DSA_Prep_Tracker | `schemas/evidence-shard.schema.json` | What a shard guarantees, including the counting rules that are easy to get wrong |
 | DSA_Prep_Tracker | `docs/coaching-workflow.md` | Read at every fresh coaching session; ownership and review rules |
 | DSA_Prep_Tracker | `docs/retention-policy.md` | The **implemented** policy, its version and known discrepancies |
 | DSA_Prep_Tracker | `docs/retention-policy.reference.json` | The **agreed** policy, parts of which are still pending implementation |
@@ -33,10 +51,30 @@ handoff when they are missing and could change the plan.
 | DSA_Prep_Tracker | `fixtures/coaching-decision.structured.example.json` | Authoring example, synthetic evidence only |
 | DSA_Prep_Tracker | `docs/coach-planning-protocol.md` | This document |
 | dsa-leetcode-storage, private | `context/coaching-context.json` | Interview target, timezone, time ceilings and rest preferences |
-| dsa-leetcode-storage, private | `tracker-data.json` | Latest complete practice snapshot, including attempts, roles and anchors where present |
+| dsa-leetcode-storage, private | `tracker-data.json` | The complete snapshot. Needed for roles, anchors and anything the shards do not carry, and as the fallback when a month is missing |
 | dsa-leetcode-storage, private | `coaching/decision.json` | Current recommendation and its evidence basis; advice is not a source of practice facts |
 | dsa-leetcode-storage, private | `coaching/handoffs/` | Durable reasoning and note summaries with source references; **proposed, not yet created** |
 | dsa-leetcode-storage, private | `reports/` | Daily, weekly, monthly or overall snapshots when the tracker cannot answer the review; **proposed, not yet created** |
+
+### Reading a date range
+
+1. Fetch `manifest.json`.
+2. Select the `evidence.shards` entries overlapping the window; each carries
+   `from`, `to` and counts, so an empty month can be skipped without fetching.
+3. Fetch those files. A shard whose `fingerprint` matches one already held has
+   not changed and does not need fetching again.
+4. Record in `provenance.readFiles` which files the assessment was actually
+   built from, so the claim can be checked rather than assumed.
+
+Counting rules that are easy to get wrong, and are stated in the shard schema:
+
+- `failed` holds one entry per failed submission, so a slug and date repeat as
+  often as it failed. Deduplicating it changes the meaning.
+- `revised` is activity, never retention evidence.
+- `graded` is the only retention evidence, and only where `mode` is `cold`,
+  `help` is `none` and `sessionRepeat` is false.
+- `problems` in a shard includes anything the month touched, so `firstSolved`
+  can predate the shard's range.
 
 Only `tracker-data.json` currently exists in the private repository. The
 remaining private paths are proposals pending Tasks 3 and 4.
