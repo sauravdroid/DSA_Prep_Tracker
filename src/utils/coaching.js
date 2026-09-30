@@ -22,7 +22,11 @@ export async function saveDecision(decision) {
     body: JSON.stringify(decision),
   })
   const body = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+  if (!res.ok) {
+    // Carry the reasons through: "failed validation" alone is unactionable.
+    const detail = (body.errors || []).slice(0, 5).join('; ')
+    throw new Error([body.error || `HTTP ${res.status}`, detail].filter(Boolean).join(' — '))
+  }
   return body
 }
 

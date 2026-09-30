@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { computeRetention, daysBetween, HEALTH, ROLES, suggestAnchors } from '../utils/retention'
 import { loadDecision, saveDecision, decisionStaleness, forecastValidity, trackerSnapshot } from '../utils/coaching'
@@ -654,12 +654,13 @@ function AnchorRow({ anchor, today, onGrade, onOpenProblem, onRemove }) {
  * trustworthy: it is checked against the published schema, and the commit that
  * produced it must have stayed inside `coaching/`.
  */
-function CoachingSource({ decisionPath, onReload }) {
+function CoachingSource({ decision, decisionPath, onReload }) {
   const [busy, setBusy] = useState(false)
   const [candidate, setCandidate] = useState(null)
   const [error, setError] = useState(null)
   const [adopted, setAdopted] = useState(null)
   const [history, setHistory] = useState(null)
+  const fileInput = useRef(null)
 
   const run = async (fn) => {
     setBusy(true); setError(null); setAdopted(null)
@@ -674,6 +675,32 @@ function CoachingSource({ decisionPath, onReload }) {
   const adopt = () => run(async () => {
     await saveDecision(candidate.decision)
     setAdopted(candidate.commit?.shortSha || 'local')
+    setCandidate(null)
+    onReload()
+  })
+
+  const download = () => {
+    const blob = new Blob([JSON.stringify(decision, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `coaching-decision-${decision?.assessmentDate || todayStr()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Manual route for when publishing is unavailable. Goes through the same
+  // validated save as everything else.
+  const importFile = (file) => run(async () => {
+    const text = await file.text()
+    let parsed
+    try {
+      parsed = JSON.parse(text)
+    } catch (e) {
+      throw new Error(`${file.name} is not valid JSON: ${e.message}`)
+    }
+    await saveDecision(parsed)
+    setAdopted(file.name)
     setCandidate(null)
     onReload()
   })
@@ -703,16 +730,45 @@ function CoachingSource({ decisionPath, onReload }) {
           {busy ? 'Checking…' : 'Fetch from GitHub'}
         </button>
         <button
-          onClick={onReload}
-          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
-        >
-          Reload local file
-        </button>
-        <button
           onClick={() => run(async () => setHistory((await coachingHistory()).revisions))}
           className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
         >
           Revisions
+        </button>
+
+        <span className="mx-1 w-px bg-slate-200" aria-hidden="true" />
+
+        <button
+          onClick={() => fileInput.current?.click()}
+          disabled={busy}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+        >
+          Import file…
+        </button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={e => {
+            const f = e.target.files?.[0]
+            e.target.value = ''
+            if (f) importFile(f)
+          }}
+        />
+        <button
+          onClick={download}
+          disabled={!decision}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
+        >
+          Download
+        </button>
+        <button
+          onClick={onReload}
+          title="Re-read the file from disk. Only needed if something edited it outside the app."
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+        >
+          Re-read from disk
         </button>
       </div>
 
@@ -1224,6 +1280,7 @@ export default function DebtPage({ problems, revisions, onChanged }) {
           </div>
 
           <CoachingSource
+            decision={decision}
             decisionPath={decisionPath}
             onReload={() => loadDecision().then(r => { setDecision(r.decision); setDecisionPath(r.path) })}
           />
