@@ -44,8 +44,10 @@ test('the index summary says how a forecast turned out without the file', () => 
   assert.equal(s.file, 'coaching/outcomes/20260930T115548Z.json')
   assert.equal(s.sealedBecause, 'superseded')
   assert.equal(s.supersededBy, '20260930T135500Z')
-  assert.equal(s.days, 1)
-  assert.equal(s.daysResolved, 1)
+  // The assessment's own day plus its one forecast day.
+  assert.equal(s.days, 2)
+  assert.equal(s.daysResolved, 2)
+  // Only conditional days have a branch, so today is not listed here.
   assert.deepEqual(s.branches, { '2026-10-01': 'green-path' })
   assert.ok(s.evidenceFingerprint)
 })
@@ -68,7 +70,7 @@ test('the index counts how many assessments are sealed', () => {
   assert.equal(index.count, 2)
   assert.equal(index.sealed, 1)
   assert.equal(index.assessments[0].outcome, null, 'newest is still live')
-  assert.equal(index.assessments[1].outcome.daysResolved, 1)
+  assert.equal(index.assessments[1].outcome.daysResolved, 2)
 })
 
 test('summarising nothing yields nothing rather than an empty verdict', () => {

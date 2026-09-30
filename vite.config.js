@@ -9,7 +9,7 @@ import { validateDecision, outOfScopeFiles } from './src/utils/validateDecision.
 import { unpublishedKeys } from './src/utils/trackerDiff.js'
 import { publishSet } from './src/utils/publishSet.js'
 import { assessmentId, assessmentPath, summarise, buildIndex, INDEX_PATH, coveredDates } from './src/utils/assessments.js'
-import { sealReason, sealOutcome, outcomePath, summariseOutcome } from './src/utils/outcomes.js'
+import { sealReason, sealOutcome, outcomePath, summariseOutcome, OUTCOME_VERSION, outcomeDrift } from './src/utils/outcomes.js'
 
 const DATA_DIR = 'data'
 const DATA_FILE = 'tracker-data.json'
@@ -462,19 +462,43 @@ function githubSync() {
         const latestId = seen[0]?.id ?? null
         const outcomes = new Map(priorOutcomes)
         let sealed = 0
+        let resealed = 0
         for (const { id, decision } of seen) {
-          if (outcomes.has(id)) continue
-
           if (present.has(outcomePath(id))) {
-            // Sealed by an earlier run that predates the index carrying them.
             const existing = await gh(token, 'GET', `/repos/${repo}/contents/${outcomePath(id)}`)
-            if (existing.status === 200) {
-              try {
-                outcomes.set(id, summariseOutcome(decodeContent(existing)))
-              } catch { /* leave unsummarised rather than guess */ }
+            if (existing.status !== 200) continue
+            let parsed
+            try {
+              parsed = decodeContent(existing)
+            } catch {
+              continue
+            }
+
+            // An older format can be rewritten, but only while the evidence
+            // behind it is unchanged. Otherwise the rewrite would quietly
+            // restate the verdict against evidence the original never saw,
+            // which is what sealing exists to prevent.
+            const stale = (parsed.outcomeVersion ?? 1) < OUTCOME_VERSION
+            const { drifted } = outcomeDrift(parsed, practiceLog)
+            if (stale && !drifted) {
+              const reSealed = sealOutcome({
+                decision,
+                assessmentId: id,
+                practiceLog,
+                sealedAt: parsed.sealedAt,
+                sealedBecause: parsed.sealedBecause,
+                supersededBy: parsed.supersededBy ?? null,
+              })
+              toWrite.set(outcomePath(id), JSON.stringify(reSealed, null, 2))
+              outcomes.set(id, summariseOutcome(reSealed))
+              resealed++
+            } else if (!outcomes.has(id)) {
+              outcomes.set(id, summariseOutcome(parsed))
             }
             continue
           }
+
+          if (outcomes.has(id)) continue
 
           const because = sealReason({
             decision,
@@ -508,7 +532,7 @@ function githubSync() {
         if (indexChanged) toWrite.set(INDEX_PATH, indexContent)
 
         if (toWrite.size === 0) {
-          return send(res, 200, { committed: null, unchanged: true, archived: 0, sealed: 0, count: index.count })
+          return send(res, 200, { committed: null, unchanged: true, archived: 0, sealed: 0, resealed: 0, count: index.count })
         }
 
         const newTree = await gh(token, 'POST', `/repos/${repo}/git/trees`, {
@@ -535,6 +559,7 @@ function githubSync() {
           committed: commit.body.sha.slice(0, 7),
           archived: [...toWrite.keys()].filter(p => p.startsWith('coaching/assessments/')).length,
           sealed,
+          resealed,
           count: index.count,
           files: [...toWrite.keys()],
         })

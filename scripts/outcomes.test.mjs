@@ -101,6 +101,53 @@ test('reordering the log is not drift, since the facts are the same', () => {
   assert.equal(outcomeDrift(o, [b, a]).drifted, false)
 })
 
+test('the assessment day is recorded, not only the forecast', () => {
+  const withToday = {
+    ...decision,
+    today: { doNow: { slug: 'next-greater-element-ii', mode: 'cold' }, then: { action: 'Stop for today' } },
+  }
+  const o = sealOutcome({
+    decision: withToday, assessmentId: 'x', practiceLog: [attempt()],
+    sealedAt: '2026-10-02T09:00:00Z', sealedBecause: 'superseded',
+  })
+  const own = o.days[0]
+  assert.equal(own.date, '2026-09-30')
+  assert.equal(own.kind, 'today')
+  assert.equal(own.elapsed, true)
+  // Stated outright, so there is nothing for evidence to settle.
+  assert.equal(own.resolved, true)
+  assert.equal(own.branch, null)
+  assert.deepEqual(own.items, [{
+    slug: 'next-greater-element-ii', type: 'problem', role: 'doNow',
+    done: true, askedMode: 'cold', recordedMode: 'cold', recordedResult: 'green',
+  }])
+})
+
+test('a grade in a different mode than asked is visible, not just done', () => {
+  const withToday = {
+    ...decision,
+    today: { doNow: { slug: 'next-greater-element-ii', mode: 'cold' } },
+  }
+  const o = sealOutcome({
+    decision: withToday, assessmentId: 'x', practiceLog: [attempt({ mode: 'warm' })],
+    sealedAt: '2026-10-02T09:00:00Z', sealedBecause: 'superseded',
+  })
+  const item = o.days[0].items[0]
+  assert.equal(item.done, true)
+  assert.equal(item.askedMode, 'cold')
+  assert.equal(item.recordedMode, 'warm')
+})
+
+test('a step never recorded is not done', () => {
+  const withToday = { ...decision, today: { doNow: { slug: 'gas-station', mode: 'cold' } } }
+  const o = sealOutcome({
+    decision: withToday, assessmentId: 'x', practiceLog: [attempt()],
+    sealedAt: '2026-10-02T09:00:00Z', sealedBecause: 'superseded',
+  })
+  assert.equal(o.days[0].items[0].done, false)
+  assert.equal(o.days[0].items[0].recordedMode, null)
+})
+
 test('the outcome path is derived from the assessment id', () => {
   assert.equal(outcomePath('20260930T115548Z'), 'coaching/outcomes/20260930T115548Z.json')
 })

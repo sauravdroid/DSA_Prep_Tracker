@@ -6,7 +6,7 @@
   "type": "object",
   "required": ["outcomeVersion", "assessmentId", "sealedAt", "sealedBecause", "evidence", "days"],
   "properties": {
-    "outcomeVersion": { "const": 1 },
+    "outcomeVersion": { "const": 2 },
     "assessmentId": { "type": "string" },
     "assessedAt": { "type": ["string", "null"] },
     "sealedAt": { "type": "string", "format": "date-time" },
@@ -39,12 +39,17 @@
 
     "days": {
       "type": "array",
-      "description": "One entry per forecast day, in the order the assessment issued them.",
+      "description": "The assessment's own day first, then each forecast day in the order it issued them. The assessment day carries no branches, so it is never conditional: `resolved` is always true there and follow-through is read from `items[].done`.",
       "items": {
         "type": "object",
         "required": ["date", "elapsed", "resolved"],
         "properties": {
           "date": { "type": "string" },
+          "kind": {
+            "type": "string",
+            "enum": ["today", "forecast"],
+            "description": "`today` is the assessment's own day, stated outright. `forecast` days are conditional and resolve against evidence. Do not compare their `resolved` values as though they mean the same thing."
+          },
           "elapsed": {
             "type": "boolean",
             "description": "False means the day had not arrived when this was sealed. It is not a plan that went unfollowed and must not be scored as one."
@@ -75,13 +80,17 @@
           },
           "items": {
             "type": "array",
-            "description": "What the selected branch asked for, and whether it was done. Empty where no branch was selected.",
+            "description": "What the day asked for, and whether it was done. Empty on a forecast day where no branch was selected. On the assessment's own day each item also records the mode that was asked for against the one actually recorded: a warm grade where a cold test was asked for is not the same as having done it.",
             "items": {
               "type": "object",
               "properties": {
                 "slug": { "type": ["string", "null"] },
                 "type": { "type": ["string", "null"] },
-                "done": { "type": "boolean" }
+                "role": { "type": "string", "enum": ["doNow", "then"] },
+                "done": { "type": "boolean" },
+                "askedMode": { "type": ["string", "null"] },
+                "recordedMode": { "type": ["string", "null"] },
+                "recordedResult": { "type": ["string", "null"] }
               },
               "additionalProperties": true
             }
