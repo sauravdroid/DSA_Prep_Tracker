@@ -101,7 +101,7 @@ function BackupNote({ backup, onDismiss }) {
   )
 }
 function TodayHeadline({ retention, decision, staleness, validity, practiceLog, today, onGrade, onOpenSetup, onOpenProblem, onOpenCoaching }) {
-  const { mode, modeProvisional, plan, totalDebt, debtCalculable, agenda, doneToday, focusTopics, maintenanceTopics, trackedCount } = retention
+  const { mode, modeProvisional, plan, totalDebt, debtCalculable, agenda, doneToday, trackedCount } = retention
   const roleOf = name => retention.topics.find(t => t.name === name)?.role
   const ms = MODE_STYLE[mode.key]
   const d = decision
@@ -127,10 +127,6 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
 
   const headline = d?.mode?.headline
     || (trackedCount === 0 ? 'Set up your topics' : `${mode.label}${modeProvisional ? ' (provisional)' : ''} — ${plan.retentionCount > 0 ? 'baseline validation' : 'keep learning'}`)
-  const why = d?.mode?.why || plan.caveat
-    || (trackedCount === 0
-      ? 'No topics have a role yet, so nothing is being scheduled.'
-      : 'Derived from the anchors below.')
 
   return (
     <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5">
@@ -142,7 +138,6 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
               Today · {today}
             </span>
             <h2 className={`mt-0.5 text-2xl font-bold tracking-tight ${ms.text}`}>{headline}</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">{why}</p>
           </div>
 
           <div className="shrink-0 text-right">
@@ -186,12 +181,12 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
         )}
 
         {coached ? (
-          <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
+          <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(21rem,27rem)]">
             {/* Keyed so moving between branches animates rather than snapping. */}
             <div key={selectedId} className="panel-in min-w-0">
               <NodePlan node={selectedNode} today={today} onOpenProblem={onOpenProblem} onGrade={onGrade} />
             </div>
-            <div className="min-w-0 xl:border-l xl:border-slate-100 xl:pl-5">
+            <div className="min-w-0 2xl:border-l 2xl:border-slate-100 2xl:pl-5">
               <DecisionTree tree={tree} selectedId={selectedId} onSelect={setPickedId} today={today} />
             </div>
           </div>
@@ -315,27 +310,6 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
             </div>
           )}
         </section>
-
-        {/* Covering */}
-        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-100 pt-4 text-sm">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Covering</span>
-          <span className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs text-slate-500">learning</span>
-            {focusTopics.length === 0
-              ? <span className="text-xs text-slate-400">none</span>
-              : focusTopics.map(t => <Chip key={t.name} className={ROLE_STYLE.focus}>{t.name}</Chip>)}
-          </span>
-          <span className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs text-slate-500">maintaining</span>
-            {maintenanceTopics.length === 0
-              ? <span className="text-xs text-slate-400">none</span>
-              : maintenanceTopics.map(t => <Chip key={t.name} className={ROLE_STYLE.maintenance}>{t.name}</Chip>)}
-          </span>
-          <button onClick={onOpenSetup}
-            className="ml-auto rounded-lg border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50">
-            Edit setup
-          </button>
-        </div>
 
         {/* Decision provenance */}
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
@@ -1010,7 +984,7 @@ export default function DebtPage({ problems, revisions, onChanged }) {
         />
       )}
 
-      <div className="space-y-4">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <div className="space-y-4">
           <TodayHeadline
             retention={retention}
