@@ -211,7 +211,7 @@ function Row({ row, selectedId, onSelect, collapsed, onToggle, today, doneOn, on
   const arrived = node.date <= today
   const done = arrived ? doneOn?.(node.date) || [] : []
   const outcomes = arrived ? dayOutcomes(done) : []
-  const progress = nodeProgress(node)
+  const progress = nodeProgress(node, today)
   const open = !collapsed.has(node.id)
   const selected = node.id === selectedId
 

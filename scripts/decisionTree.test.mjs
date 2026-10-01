@@ -237,7 +237,7 @@ test('work with no grade is not a verdict, and absence is not a skip', () => {
 test('a node reports how much of its own plan is recorded', () => {
   const log = [attempt({ slug: 'cousins-in-binary-tree' })]
   const root = buildDecisionTree(decision, { practiceLog: log }).roots[0]
-  assert.deepEqual(nodeProgress(root), { done: 1, total: 2, complete: false })
+  assert.deepEqual(nodeProgress(root, '2026-10-01'), { done: 1, total: 2, complete: false })
 })
 
 test('a day is complete once every problem it planned is recorded', () => {
@@ -246,14 +246,17 @@ test('a day is complete once every problem it planned is recorded', () => {
     attempt({ slug: 'jump-game-ii' }),
   ]
   const root = buildDecisionTree(decision, { practiceLog: log }).roots[0]
-  assert.deepEqual(nodeProgress(root), { done: 2, total: 2, complete: true })
+  assert.deepEqual(nodeProgress(root, '2026-10-01'), { done: 2, total: 2, complete: true })
 })
 
-test('a day planning no problems is never complete, having nothing to finish', () => {
-  assert.deepEqual(
-    nodeProgress({ items: [{ type: 'action', title: 'Stop for today' }] }),
-    { done: 0, total: 0, complete: false }
-  )
+test('a past day that planned no problems is settled, having nothing left to record', () => {
+  const node = { date: '2026-09-30', items: [{ type: 'action', title: 'Stop for today' }] }
+  assert.deepEqual(nodeProgress(node, '2026-10-01'), { done: 0, total: 0, complete: true })
+})
+
+test('today is not settled by planning nothing, because it can still be worked', () => {
+  const node = { date: '2026-10-01', items: [{ type: 'action', title: 'Stop for today' }] }
+  assert.equal(nodeProgress(node, '2026-10-01').complete, false)
 })
 
 test('a plan adopted today gets a node for today, which the forecast does not cover', () => {
