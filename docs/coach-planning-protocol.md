@@ -1,8 +1,13 @@
-# Entry point: create today's DSA plan and the next three days
+# Entry point: create today's DSA plan and the days ahead
 
-Repository-owned copy, published September 30, 2026. This is the coaching
-entry point; the app does not execute it. Several acceptance requirements
-below describe a pipeline that is not implemented yet and are marked as such.
+Repository-owned copy, revised October 1, 2026. This is the coaching entry
+point; the app does not execute it. Several acceptance requirements below
+describe a pipeline that is not implemented yet and are marked as such.
+
+**A plan is one file per date.** `coaching/days/<date>.json`, written by the run
+that planned it. Writing a day no longer rewrites the others, so a settled day
+never has to be restated to survive — see "A day is a file" below before
+authoring anything.
 
 ## Purpose and authority
 
@@ -47,39 +52,81 @@ debt is not calculable at all.
 | DSA_Prep_Tracker | `docs/coaching-workflow.md` | Read at every fresh coaching session; ownership and review rules |
 | DSA_Prep_Tracker | `docs/retention-policy.md` | The **implemented** policy, its version and known discrepancies |
 | DSA_Prep_Tracker | `docs/retention-policy.reference.json` | The **agreed** policy, parts of which are still pending implementation |
-| DSA_Prep_Tracker | `schemas/coaching-decision.schema.json` | Output contract |
+| DSA_Prep_Tracker | `schemas/coaching-decision.schema.json` | Contract for the assessment document |
+| DSA_Prep_Tracker | `schemas/coaching-day.schema.json` | **Output contract for a day.** One file per date |
 | DSA_Prep_Tracker | `fixtures/coaching-decision.structured.example.json` | Authoring example, synthetic evidence only |
 | DSA_Prep_Tracker | `docs/coach-planning-protocol.md` | This document |
 | dsa-leetcode-storage, private | `context/coaching-context.json` | Interview target, timezone, time ceilings and rest preferences |
 | dsa-leetcode-storage, private | `tracker-data.json` | The complete snapshot. Needed for roles, anchors and anything the shards do not carry, and as the fallback when a month is missing |
-| dsa-leetcode-storage, private | `coaching/decision.json` | Current recommendation and its evidence basis; advice is not a source of practice facts |
-| dsa-leetcode-storage, private | `coaching/index.json` | Every assessment ever published, newest first, summarised. **Read this for prior advice** rather than walking commits |
-| dsa-leetcode-storage, private | `coaching/assessments/<id>.json` | A past assessment in full. Fetch only when the index summary is not enough |
-| dsa-leetcode-storage, private | `coaching/outcomes/<id>.json` | How that assessment's forecast resolved, sealed once it could no longer change |
+| dsa-leetcode-storage, private | `coaching/index.json` | **Read this to orient.** Every day planned and every assessment published, summarised, with the links between days |
+| dsa-leetcode-storage, private | `coaching/days/<date>.json` | One day's plan. Fetch the dates you are revising and the ones they depend on |
+| dsa-leetcode-storage, private | `coaching/assessments/<id>.json` | The reasoning behind a run: mode, debt, tracker snapshot, provenance. Fetch when the index summary is not enough |
+| dsa-leetcode-storage, private | `coaching/outcomes/<id>.json` | How a past forecast resolved, sealed once it could no longer change |
+| dsa-leetcode-storage, private | `coaching/decision.json` | The former single-file plan. Still read by older tooling; superseded by `coaching/days/` |
 | dsa-leetcode-storage, private | `coaching/handoffs/` | Durable reasoning and note summaries with source references; **proposed, not yet created** |
 | dsa-leetcode-storage, private | `reports/` | Daily, weekly, monthly or overall snapshots when the tracker cannot answer the review; **proposed, not yet created** |
 
-### Using previous assessments
+### A day is a file
 
-`coaching/decision.json` holds only the current plan and is overwritten on every
-revision, so it cannot answer what was advised before. The archive can.
+One file per date, at `coaching/days/<date>.json`. A run writes the days it has
+something to say about and leaves the rest alone.
 
-Each index entry carries `assessedAt`, the dates it `covers`, its headline,
-mode, debt and `doNow`, which is usually enough to judge follow-through without
-fetching anything. Fetch the full assessment only when the reasoning matters.
+This is why: a single document holding every day meant revising tomorrow
+rewrote yesterday, so a settled day had to be restated to survive. It stopped
+surviving once, and the day vanished from view. **Never restate a settled day.**
+The app reads completion from the tracker, so a plan does not need to — and
+cannot — assert what was finished.
 
-Two questions the index answers differently, and conflating them rewrites
-history:
+The reasoning stays in the assessment: `mode`, `debt`, `trackerSnapshot` and
+`provenance` belong to the run, and the day schema rejects them. A day names
+the run that wrote it in `authoredBy`, and that is the whole link.
 
-- **What governs a date now?** The first entry in `byDate[date]`, which is the
-  newest assessment covering it.
-- **What was in force on that date?** The newest entry covering it whose
-  `assessedAt` falls on or before the end of that date. An assessment written
-  later may also cover the date, but the user never saw it then.
+#### What you may write
 
-When reviewing whether advice was followed, use the second. Judging a past day
-against a plan written after it is not a review, and the recorded outcome
-cannot be evidence about advice that did not yet exist.
+- **A date in the future, or today.** Freely.
+- **A date before today.** Never. It is history, and the record of what
+  happened is the tracker's, not yours to revise.
+- **Today, when work is already recorded against it.** You may add, and you may
+  change anything not yet done. You may not drop a problem that already has a
+  grade for that date — the day would then report a different workload than the
+  one it was measured on. The app rejects this.
+
+#### Revising a day obliges revising what depends on it
+
+`index.days.entries[date].requiredBy` lists the dates whose conditions wait on
+this one. **Revise that closure in the same commit, transitively.**
+
+A dependency names a measurement — slug, local date, practice mode — and
+resolves from the practice log, never from another day's file. So rewriting a
+day cannot corrupt the days that wait on it. What it can do is leave one
+reasoning about a version that no longer exists.
+
+That is **drift**, and it is read from authorship: a day whose dependency was
+written by a *later* assessment than itself. The index reports it. A commit
+that leaves a day drifted is incomplete.
+
+### Using previous days and assessments
+
+`coaching/index.json` answers both questions in one read.
+
+`days.entries[date]` gives the plan for a date: which run wrote it, how many
+branches, the problem range, what it depends on, what depends on it, and
+whether it has drifted. Fetch the day file only when the branches matter.
+
+`assessments` gives the runs, newest first, each with `assessedAt`, the dates it
+`covers`, its headline, mode, debt and `doNow`.
+
+Two questions that conflating rewrites history:
+
+- **What is the plan for a date?** `days.entries[date]`. There is one.
+- **What was in force on that date?** The same file — unless it has been
+  revised since, in which case its git history holds the version the user saw.
+  A past day cannot be revised, so for any date before today these are the same
+  answer.
+
+When reviewing whether advice was followed, judge a day against the plan that
+existed then. Judging a past day against a plan written after it is not a
+review.
 
 Note also that the archive records what was **published**, not what was
 followed. The tracker pins the revision it adopted in `adoptedFrom.commit`;
@@ -217,9 +264,9 @@ of failure merely because the subsequent solution was assisted.
 
 ## Build today's recommendation and the outlook
 
-1. Use the user's local calendar day, not the authoring timestamp. Produce today
-   plus the next three calendar dates. Keep Sunday as rest even when it falls
-   inside the outlook.
+1. Use the user's local calendar day, not the authoring timestamp. Write today
+   and the days ahead you have something to say about. Keep Sunday as rest even
+   when it falls inside the outlook. **Do not write a date before today.**
 2. Reconcile completed sessions before assigning work. Count a solve, revision
    and attempt for the same session once. Availability is a ceiling, not a quota.
    Normally use at most two distinct problem sessions on a heavier day, one on
@@ -235,15 +282,20 @@ of failure merely because the subsequent solution was assisted.
 5. Make today's do-now action explicit. If missing evidence blocks selection,
    show Awaiting result/Needs review and the evidence needed. Do not default to
    Green. Forecast future days with mutually exclusive typed scenarios.
-6. Author decision-document version 1 with `outlookSchemaVersion` 2. Use the
-   structured fixture and supported predicate operators. Match dependencies by
-   explicit problem slug, local date and mode; resolve Red before other branches.
+6. Author each day as `dayVersion` 1 against `schemas/coaching-day.schema.json`,
+   and the run's reasoning as an assessment. Use the supported predicate
+   operators. Match dependencies by explicit problem slug, local date and mode;
+   resolve Red before other branches.
    An unknown higher-priority condition blocks lower branches. Prose is
    explanation, not executable branching.
 7. Count only problem items in the selected scenario, deduplicate problem steps,
    and separate actions and follow-ups. Show the selected count and expected time.
    Missing time is an incomplete estimate. Previewing another result must not
    record a grade or replace the effective plan.
+   An `action` item is guidance. It is never counted as workload and can never
+   be marked done, because nothing records it — work you want tracked must be a
+   `problem` item with a slug. Two problems written as one prose action cannot
+   be followed.
 8. Record inspected source references, source periods, uncertainties, requested
    evidence, policy status and review horizon. Include weekly/monthly assessments
    when due, clearly distinguishing proposed metadata from fields the app renders.
@@ -253,10 +305,16 @@ of failure merely because the subsequent solution was assisted.
 These are acceptance requirements for the proposed pipeline. Several are **not
 implemented yet** — do not report them as performed without evidence.
 
-- Validate against the JSON Schema plus additional semantics: today plus exactly
-  three distinct consecutive local outlook dates, resolvable slugs/dependencies,
-  supported predicates, exclusive priorities, truthful debt/coverage, capacity,
-  rest days, and all Green/Yellow/Red/unknown/not-completed branches.
+- Validate each day against `schemas/coaching-day.schema.json` plus the
+  semantics a schema cannot state: resolvable slugs and dependencies, supported
+  predicates, exclusive priorities, a real calendar date, and no dependency
+  dated later than the day that waits on it. Cover all Green/Yellow/Red/
+  unknown/not-completed branches, and keep truthful debt, coverage, capacity
+  and rest days.
+- **Write no date before today**, and drop no problem from today that already
+  has a grade for today. The app rejects both.
+- **Leave no day drifted.** After writing, every date in the `requiredBy`
+  closure of what you changed must have been rewritten in the same commit.
 - Verify that schema version, outlook version and implemented policy version are
   independent. Reject unsupported versions. Do not relabel a legacy prose file
   as structured or raise the decision version to 2.
@@ -285,13 +343,15 @@ claim automatic access, validation, import or a background schedule.
 ## New-chat request
 
 Read the repository-owned coaching workflow, planning protocol, implemented
-retention policy and decision schema. Read my private coaching context, latest
-complete tracker, current decision and relevant learning handoffs. Inspect this
+retention policy and day schema. Read my private coaching context, the coaching
+index, the day files for the dates you intend to touch and the ones they depend
+on, and the evidence shards covering the review window. Inspect this
 conversation and available note images. Choose or derive the daily, weekly,
 monthly or overall review needed; ask for specific missing evidence only when
-it could change the decision. Create today's recommendation and the next three
-local calendar days using the agreed rules while identifying implementation
-differences. Preserve unknowns, capacity and rest days. Validate the structured
-decision, recheck source freshness, and publish only through a verified,
-authorised coaching write route; otherwise return the file for import. Report
-the evidence basis and publication status.
+it could change the decision. Write today and the days ahead as day files,
+never a date already past, and never restate a day that is settled. Revise
+everything in the `requiredBy` closure of what you change, in the same commit.
+Preserve unknowns, capacity and rest days. Validate each day, recheck source
+freshness, and publish only through a verified, authorised coaching write
+route; otherwise return the files for import. Report the evidence basis,
+which days you wrote and publication status.
