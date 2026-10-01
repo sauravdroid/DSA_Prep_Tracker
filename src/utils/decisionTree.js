@@ -46,6 +46,13 @@ export function dayOutcomes(done = []) {
   return OUTCOME_ORDER.filter(r => found.has(r))
 }
 
+/** How much of a node's planned problem work has been recorded against it. */
+export function nodeProgress(node) {
+  const problems = (node?.items || []).filter(i => i.type === 'problem')
+  const done = problems.filter(i => i.done).length
+  return { done, total: problems.length, complete: problems.length > 0 && done === problems.length }
+}
+
 /** Order-independent key, so two conditions that mean the same thing compare equal. */
 export function conditionKey(pred) {
   if (pred === null || pred === undefined) return 'null'

@@ -115,7 +115,9 @@ export default function NodePlan({ node, today, doneOn, onOpenProblem, onGrade }
   const unresolved = node.state === 'taken' ? view.unresolved : null
   // A day that has been and gone is answered by the tracker, not by its plan.
   const done = past ? doneOn?.(node.date) || [] : []
-  const outcomes = past ? dayOutcomes(done) : []
+  // Today's record is already listed below the plan, so only the verdict is
+  // repeated here; a past day has no such list and gets the whole record.
+  const outcomes = node.date <= today ? dayOutcomes(doneOn?.(node.date) || []) : []
 
   return (
     <div>

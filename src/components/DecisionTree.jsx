@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { treeRows, defaultCollapsed, dayOutcomes, RESULT_LABEL, RESULT_TONE } from '../utils/decisionTree'
+import { treeRows, defaultCollapsed, dayOutcomes, nodeProgress, RESULT_LABEL, RESULT_TONE } from '../utils/decisionTree'
 
 const LINE = {
   red: 'border-rose-400',
@@ -18,6 +18,7 @@ const PILL = {
 
 const DOT = {
   taken: 'bg-slate-900',
+  complete: 'bg-emerald-500',
   open: 'bg-white ring-1 ring-slate-300',
   'ruled-out': 'bg-slate-200',
 }
@@ -103,10 +104,11 @@ function Outcomes({ outcomes, className = '' }) {
   ))
 }
 
-function PeekLine({ slug, title, meta, metaClass = 'text-slate-400', onOpen }) {
+function PeekLine({ slug, title, meta, metaClass = 'text-slate-400', done, onOpen }) {
   const body = (
     <>
-      <span className="min-w-0 flex-1 truncate">{title}</span>
+      <span className={`shrink-0 text-emerald-600 ${done ? '' : 'invisible'}`} aria-hidden="true">✓</span>
+      <span className={`min-w-0 flex-1 truncate ${done ? 'text-slate-400 line-through decoration-slate-300' : ''}`}>{title}</span>
       <span className={`shrink-0 text-[10px] uppercase tracking-wide ${metaClass}`}>{meta}</span>
     </>
   )
@@ -125,9 +127,9 @@ function PeekLine({ slug, title, meta, metaClass = 'text-slate-400', onOpen }) {
 }
 
 /** What a node holds, shown beside it so the tree reads without being clicked. */
-function Peek({ node, done, past, at, onOpenProblem, onEnter, onLeave }) {
+function Peek({ node, done, arrived, at, onOpenProblem, onEnter, onLeave }) {
   const problems = node.items.filter(i => i.type === 'problem')
-  const outcomes = past ? dayOutcomes(done) : []
+  const outcomes = arrived ? dayOutcomes(done) : []
 
   return createPortal(
     <div
@@ -141,7 +143,7 @@ function Peek({ node, done, past, at, onOpenProblem, onEnter, onLeave }) {
         {node.weekday} {node.date} · {STATE_NOTE[node.state]}
       </p>
 
-      {past && (
+      {arrived && (
         <>
           <div className="mt-2 flex flex-wrap items-center gap-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Recorded</span>
@@ -151,7 +153,7 @@ function Peek({ node, done, past, at, onOpenProblem, onEnter, onLeave }) {
             )}
           </div>
           {done.length === 0 ? (
-            <p className="mt-0.5 px-1 text-xs text-slate-400">Nothing recorded that day.</p>
+            <p className="mt-0.5 px-1 text-xs text-slate-400">Nothing recorded yet.</p>
           ) : (
             <ul className="mt-0.5 list-none space-y-0.5 pl-0">
               {done.map(e => (
@@ -169,16 +171,17 @@ function Peek({ node, done, past, at, onOpenProblem, onEnter, onLeave }) {
         </>
       )}
 
-      {past && <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Planned</p>}
+      {arrived && <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Planned</p>}
       {problems.length === 0 ? (
-        <p className={`${past ? 'mt-0.5' : 'mt-2'} px-1 text-xs text-slate-400`}>No problem work planned.</p>
+        <p className={`${arrived ? 'mt-0.5' : 'mt-2'} px-1 text-xs text-slate-400`}>No problem work planned.</p>
       ) : (
-        <ul className={`${past ? 'mt-0.5' : 'mt-2'} list-none space-y-0.5 pl-0`}>
+        <ul className={`${arrived ? 'mt-0.5' : 'mt-2'} list-none space-y-0.5 pl-0`}>
           {problems.map(i => (
             <PeekLine
               key={i.key}
               slug={i.slug}
               title={i.title}
+              done={i.done}
               meta={[i.kind, i.minutes != null ? `${i.minutes}m` : null].filter(Boolean).join(' · ')}
               onOpen={onOpenProblem}
             />
@@ -198,11 +201,12 @@ function Row({ row, selectedId, onSelect, collapsed, onToggle, today, doneOn, on
   const { node, guides, last, hasChildren, children } = row
   const out = node.state === 'ruled-out'
   const isToday = node.date === today
-  // A day that has been and gone is described by what was recorded, not by
-  // what was once planned for it.
-  const past = node.date < today
-  const done = past ? doneOn?.(node.date) || [] : []
-  const outcomes = past ? dayOutcomes(done) : []
+  // A day that has arrived is described by what it recorded; one still ahead
+  // can only be described by what it plans.
+  const arrived = node.date <= today
+  const done = arrived ? doneOn?.(node.date) || [] : []
+  const outcomes = arrived ? dayOutcomes(done) : []
+  const progress = nodeProgress(node)
   const open = !collapsed.has(node.id)
   const selected = node.id === selectedId
 
@@ -269,7 +273,9 @@ function Row({ row, selectedId, onSelect, collapsed, onToggle, today, doneOn, on
             } ${out ? 'opacity-45' : ''}`}
           >
             <span className="flex items-center gap-2">
-              <span className={`size-2 shrink-0 rounded-full ${DOT[node.state]}`} aria-hidden="true" />
+              <span className={`size-2 shrink-0 rounded-full ${
+                arrived && progress.complete && node.state === 'taken' ? DOT.complete : DOT[node.state]
+              }`} aria-hidden="true" />
               {node.edge && (
                 <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${PILL[node.edge.tone] || PILL.slate}`}>
                   {node.edge.label}
@@ -288,9 +294,11 @@ function Row({ row, selectedId, onSelect, collapsed, onToggle, today, doneOn, on
               </span>
               <Outcomes outcomes={outcomes} />
               <span className="tabular-nums">
-                {past
-                  ? (done.length === 0 ? 'nothing recorded' : `${done.length} recorded`)
-                  : <Workload workload={node.workload} />}
+                {!arrived
+                  ? <Workload workload={node.workload} />
+                  : progress.total > 0
+                    ? `${progress.done} of ${progress.total} done`
+                    : done.length === 0 ? 'nothing recorded' : `${done.length} recorded`}
               </span>
             </span>
           </button>
@@ -300,7 +308,7 @@ function Row({ row, selectedId, onSelect, collapsed, onToggle, today, doneOn, on
           <Peek
             node={node}
             done={done}
-            past={past}
+            arrived={arrived}
             at={at}
             onOpenProblem={(slug, title) => { setAt(null); onOpenProblem?.(slug, title) }}
             onEnter={hold}
