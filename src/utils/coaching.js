@@ -1,4 +1,5 @@
 import { todayStr } from './dateUtils.js'
+import { coveredDates } from './assessments.js'
 
 const ENDPOINT = '/api/coaching'
 
@@ -48,11 +49,13 @@ function plannedAttempts(decision) {
 }
 
 /**
- * A decision goes stale when the day rolls over, when evidence appears that it
- * never accounted for, or when attempts it was based on have vanished.
+ * A decision goes stale when it no longer speaks to today, when evidence
+ * appears that it never accounted for, or when attempts it was based on have
+ * vanished.
  *
  * Carrying out the plan is not a reason to discard the plan, so the attempt it
- * asked for is expected rather than invalidating.
+ * asked for is expected rather than invalidating. Nor is the day rolling over:
+ * a three-day forecast exists precisely so that tomorrow is already planned.
  */
 export function decisionStaleness(decision, { practiceLog, today = todayStr() } = {}) {
   if (!decision) return { stale: true, reasons: ['No recommendation loaded yet.'] }
@@ -60,8 +63,8 @@ export function decisionStaleness(decision, { practiceLog, today = todayStr() } 
   const reasons = []
   const assessed = (decision.assessedAt || '').slice(0, 10)
 
-  if (assessed && assessed < today) {
-    reasons.push(`Written for ${assessed}; today is ${today}.`)
+  if (assessed && assessed < today && !coveredDates(decision).includes(today)) {
+    reasons.push(`Written for ${assessed} and does not cover ${today}.`)
   }
 
   const planned = plannedAttempts(decision)

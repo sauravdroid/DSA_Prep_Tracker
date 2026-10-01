@@ -5,6 +5,7 @@ import { loadDecision, saveDecision, decisionStaleness, forecastValidity, tracke
 import { pullCoaching, coachingHistory, backupIfConnected, getRepo } from '../utils/github'
 import { getSyncState } from '../utils/dataFile'
 import { todayStr } from '../utils/dateUtils'
+import { resolveOutlookDay } from '../utils/outlook'
 import ColdTestModal from './ColdTestModal'
 import ProblemDrawer from './ProblemDrawer'
 import Outlook, { DayBreadcrumb } from './Outlook'
@@ -103,7 +104,24 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
   const ms = MODE_STYLE[mode.key]
   const d = decision
   // A stale decision stops driving the day; fall back to the live derivation.
-  const decisionSteps = d && !staleness.stale ? d.today : null
+  const live = d && !staleness.stale
+
+  // Written today, so `today` is the plan. Written earlier, the forecast day
+  // for today is — which is the whole point of issuing three days ahead.
+  const forecastForToday = useMemo(
+    () => (live && d.assessmentDate !== today
+      ? (d.nextThreeDays || []).find(x => x.date === today)
+      : null),
+    [live, d, today]
+  )
+  const forecastView = useMemo(
+    () => (forecastForToday
+      ? resolveOutlookDay(forecastForToday, { practiceLog, anchors: retention.anchorList, today })
+      : null),
+    [forecastForToday, practiceLog, retention.anchorList, today]
+  )
+
+  const decisionSteps = live && d.assessmentDate === today ? d.today : null
   // A graded step is finished, and the Done section already carries it.
   const recorded = slug => !!slug && practiceLog.some(e => e.slug === slug && e.date === today)
   const doNowRecorded = recorded(decisionSteps?.doNow?.slug)
@@ -112,6 +130,9 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
   const thenRecorded = decisionSteps?.then
     ? (decisionSteps.then.slug ? recorded(decisionSteps.then.slug) : doNowRecorded)
     : false
+
+  // Either shape can drive the day; only one of them is ever present.
+  const coached = !!decisionSteps || !!forecastView?.selected
 
   const headline = d?.mode?.headline
     || (trackedCount === 0 ? 'Set up your topics' : `${mode.label}${modeProvisional ? ' (provisional)' : ''} — ${plan.retentionCount > 0 ? 'baseline validation' : 'keep learning'}`)
@@ -206,7 +227,7 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
         <section className="mt-5">
           <SectionHeading label="Do now" />
           <div className="mt-2 space-y-2">
-          {!decisionSteps && (
+          {!coached && (
             <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 px-4 py-2.5 text-xs ring-1 ring-slate-200">
               <span className="min-w-0 flex-1 text-slate-600">
                 {d
@@ -223,6 +244,58 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
               )}
             </div>
           )}
+          {forecastView?.selected && (
+            <>
+              {forecastView.note && (
+                <p className="rounded-xl bg-slate-50 px-4 py-2.5 text-xs text-slate-600 ring-1 ring-slate-200">
+                  Planned yesterday for today. {forecastView.note}
+                </p>
+              )}
+              {forecastView.items.map((item, i) => (
+                <div
+                  key={item.key}
+                  className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 ${
+                    item.done ? 'border-slate-200 bg-slate-50' : 'border-slate-200'
+                  }`}
+                >
+                  <span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                    item.done ? 'bg-emerald-100 text-emerald-700'
+                      : i === 0 ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {item.done ? 'Done' : i === 0 ? 'First' : i === 1 ? 'Then' : 'After that'}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {item.slug
+                        ? <ProblemLink slug={item.slug} title={item.title} onOpen={onOpenProblem} className="font-medium text-slate-900" />
+                        : <span className="font-medium text-slate-900">{item.title}</span>}
+                      {item.kind && <Chip className="bg-slate-100 text-slate-600">{item.kind}</Chip>}
+                      {item.topic && <Chip className={ROLE_STYLE[roleOf(item.topic)]}>{item.topic}</Chip>}
+                    </div>
+                    {(item.purpose || item.why) && (
+                      <p className="mt-0.5 text-sm text-slate-500">{item.purpose || item.why}</p>
+                    )}
+                  </div>
+                  {item.minutes && (
+                    <span className="shrink-0 text-xs font-medium text-slate-400">≤{item.minutes} min</span>
+                  )}
+                  {item.slug && !item.done && (
+                    <>
+                      <a href={`https://leetcode.com/problems/${item.slug}/`} target="_blank" rel="noopener noreferrer"
+                        className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50">
+                        Open
+                      </a>
+                      <button onClick={() => onGrade(item.slug, item.kind === 'cold' ? 'cold' : item.mode || 'cold')}
+                        className="shrink-0 rounded-lg bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700">
+                        Record attempt
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </>
+          )}
+
           {decisionSteps
             ? (
               <>
@@ -303,7 +376,7 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
                 )}
               </>
             )
-            : agenda.map(a => (
+            : coached ? null : agenda.map(a => (
               <div key={a.slug} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 px-4 py-3">
                 <span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${
                   a.order === 'Do now' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
@@ -337,13 +410,13 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
               </div>
             ))}
 
-          {!decisionSteps && trackedCount > 0 && agenda.length === 0 && (
+          {!coached && trackedCount > 0 && agenda.length === 0 && (
             <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200/60">
               Nothing due. Every anchor is inside its interval — spend the day on new material.
             </p>
           )}
 
-          {trackedCount === 0 && !decisionSteps && (
+          {trackedCount === 0 && !coached && (
             <button onClick={onOpenSetup}
               className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700">
               Choose what you are learning and maintaining

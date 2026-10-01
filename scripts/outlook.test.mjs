@@ -345,7 +345,35 @@ test('attempts disappearing is still reported, since the log no longer matches',
 test('a rolled-over day is stale however clean the evidence is', () => {
   const s = decisionStaleness(example, { practiceLog: [], today: '2026-10-05' })
   assert.equal(s.stale, true)
-  assert.match(s.reasons.join(' '), /today is 2026-10-05/)
+  assert.match(s.reasons.join(' '), /does not cover 2026-10-05/)
+})
+
+test('yesterday\'s plan still governs today when its forecast covers today', () => {
+  // Written 2026-09-30 with a forecast running to 2026-10-03. Rolling into
+  // 2026-10-01 is exactly what the forecast was issued for.
+  const decision = {
+    ...example,
+    assessedAt: '2026-09-30T11:55:48Z',
+    assessmentDate: '2026-09-30',
+    trackerSnapshot: { ...example.trackerSnapshot, attempts: 0, lastAttemptAt: null },
+  }
+  const covered = (decision.nextThreeDays || []).map(d => d.date)
+  assert.ok(covered.includes('2026-10-01'), 'fixture must cover the day under test')
+
+  const s = decisionStaleness(decision, { practiceLog: [], today: '2026-10-01' })
+  assert.equal(s.stale, false, s.reasons.join(' '))
+})
+
+test('a plan is stale once the day it was written for falls outside its forecast', () => {
+  const decision = {
+    ...example,
+    assessedAt: '2026-09-30T11:55:48Z',
+    assessmentDate: '2026-09-30',
+    trackerSnapshot: { ...example.trackerSnapshot, attempts: 0, lastAttemptAt: null },
+  }
+  const s = decisionStaleness(decision, { practiceLog: [], today: '2026-10-09' })
+  assert.equal(s.stale, true)
+  assert.match(s.reasons.join(' '), /does not cover 2026-10-09/)
 })
 
 /* ---------- Dates ---------- */
