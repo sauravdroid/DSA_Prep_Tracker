@@ -122,8 +122,43 @@ test('a branch waiting on two problems keeps their conditions apart', () => {
   assert.deepEqual(jumpRed.clauses.map(c => `${c.title}: ${c.label}`),
     ['Jump Game II: red', 'Diameter of Binary Tree: green / yellow'])
   assert.deepEqual(treeRed.clauses.map(c => `${c.title}: ${c.label}`),
-    ['Diameter of Binary Tree: red', 'Jump Game II: green / yellow'])
-  assert.notDeepEqual(jumpRed.clauses, treeRed.clauses)
+    ['Jump Game II: green / yellow', 'Diameter of Binary Tree: red'])
+})
+
+test('clauses follow the day\'s dependencies, so a position always means one problem', () => {
+  // The second branch names the Tree check first. Read in that order the two
+  // branches would both show "red, green / yellow" and be indistinguishable.
+  const deps = [
+    { id: 'jump', slug: 'jump-game-ii', title: 'Jump Game II' },
+    { id: 'tree', slug: 'diameter-of-binary-tree', title: 'Diameter of Binary Tree' },
+  ]
+  const jumpRed = describeEdge(
+    { op: 'all', of: [resultIs('jump', ['red']), resultIs('tree', ['green', 'yellow'])] }, deps)
+  const treeRed = describeEdge(
+    { op: 'all', of: [resultIs('tree', ['red']), resultIs('jump', ['green', 'yellow'])] }, deps)
+
+  assert.deepEqual(jumpRed.clauses.map(c => c.label), ['red', 'green / yellow'])
+  assert.deepEqual(treeRed.clauses.map(c => c.label), ['green / yellow', 'red'])
+  assert.deepEqual(jumpRed.clauses.map(c => c.dependency), ['jump', 'tree'])
+  assert.deepEqual(treeRed.clauses.map(c => c.dependency), ['jump', 'tree'])
+})
+
+test('every branch of a day is told apart by its clauses alone', () => {
+  const deps = [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }]
+  const outcomes = [['red'], ['green', 'yellow'], ['not_completed']]
+  const seen = new Set()
+  for (const x of outcomes) {
+    for (const y of outcomes) {
+      // Written either way round, as a real forecast does.
+      for (const when of [
+        { op: 'all', of: [resultIs('a', x), resultIs('b', y)] },
+        { op: 'all', of: [resultIs('b', y), resultIs('a', x)] },
+      ]) {
+        seen.add(describeEdge(when, deps).clauses.map(c => c.label).join('|'))
+      }
+    }
+  }
+  assert.equal(seen.size, outcomes.length * outcomes.length)
 })
 
 test('a branch takes the graver colour of the results it waits on', () => {

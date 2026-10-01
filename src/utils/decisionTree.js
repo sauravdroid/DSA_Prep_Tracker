@@ -108,7 +108,11 @@ function toneOf(found) {
  * A branch can turn on two different problems, and merging their results into
  * one set describes neither: "Jump Game II Red, Diameter Green" and "Diameter
  * Red, Jump Game II Green" are opposite branches that would read identically.
- * Clauses stay separate, in the order the condition names them.
+ *
+ * Clauses are ordered by the day's dependencies rather than by the order the
+ * condition happens to list them, so the same position always means the same
+ * problem across every branch of that day — which is what lets the two be told
+ * apart at a glance.
  *
  * Read from the structured condition, never from the scenario's prose label.
  */
@@ -139,6 +143,13 @@ export function describeEdge(pred, deps = []) {
   }
 
   if (clauses.length === 0) return null
+
+  const rank = c => {
+    const i = deps.findIndex(d => d.id === c.dependency)
+    return i < 0 ? deps.length : i
+  }
+  clauses.sort((a, b) => rank(a) - rank(b))
+
   return {
     tone: TONE_ORDER.find(t => clauses.some(c => c.tone === t)) || 'slate',
     clauses,
