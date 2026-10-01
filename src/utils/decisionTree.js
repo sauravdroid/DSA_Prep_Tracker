@@ -12,11 +12,38 @@ import { resolveOutlookDay } from './outlook.js'
 /** Reading order for branch labels: best outcome first. */
 const RESULT_ORDER = ['green', 'yellow', 'red', 'not_completed']
 
-const RESULT_LABEL = {
+/** Reading order for a day's verdict: the outcome that matters most, first. */
+const OUTCOME_ORDER = ['red', 'not_completed', 'yellow', 'green']
+
+export const RESULT_LABEL = {
   green: 'green',
   yellow: 'yellow',
   red: 'red',
   not_completed: 'not completed',
+}
+
+export const RESULT_TONE = {
+  green: 'emerald',
+  yellow: 'amber',
+  red: 'red',
+  not_completed: 'slate',
+}
+
+/**
+ * The outcomes a day actually recorded, worst first.
+ *
+ * Only an explicit skip counts as not completed. A day with no grade recorded
+ * is a day with no grade recorded — that is not evidence the work was skipped,
+ * and must never be displayed as though it were.
+ */
+export function dayOutcomes(done = []) {
+  const found = new Set()
+  for (const entry of done) {
+    if (entry.kind !== 'attempt') continue
+    if (entry.skipped || entry.result === 'skipped' || entry.result === 'not_completed') found.add('not_completed')
+    else if (entry.result) found.add(entry.result)
+  }
+  return OUTCOME_ORDER.filter(r => found.has(r))
 }
 
 /** Order-independent key, so two conditions that mean the same thing compare equal. */

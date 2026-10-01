@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-import { buildDecisionTree, treeRows, defaultCollapsed, describeEdge } from '../src/utils/decisionTree.js'
+import { buildDecisionTree, treeRows, defaultCollapsed, describeEdge, dayOutcomes } from '../src/utils/decisionTree.js'
 
 const fixture = name => JSON.parse(readFileSync(new URL(`../fixtures/${name}`, import.meta.url)))
 
@@ -206,6 +206,27 @@ test('not completed reads as its own outcome rather than a failure', () => {
 
 test('an empty forecast is an empty tree rather than an error', () => {
   assert.deepEqual(buildDecisionTree(null, {}), { roots: [], nodes: [], dates: [] })
+})
+
+test("a day's verdict is the grades it recorded, worst first", () => {
+  const day = [
+    { kind: 'attempt', result: 'green' },
+    { kind: 'attempt', result: 'red' },
+    { kind: 'attempt', result: 'green' },
+  ]
+  assert.deepEqual(dayOutcomes(day), ['red', 'green'])
+})
+
+test('an explicit skip is the only thing that reads as not completed', () => {
+  assert.deepEqual(dayOutcomes([{ kind: 'attempt', result: 'skipped' }]), ['not_completed'])
+  assert.deepEqual(dayOutcomes([{ kind: 'attempt', skipped: true, result: null }]), ['not_completed'])
+})
+
+test('work with no grade is not a verdict, and absence is not a skip', () => {
+  // Solving and revising are activity. Neither grades anything, and a day with
+  // none of either proves nothing about whether the work was skipped.
+  assert.deepEqual(dayOutcomes([{ kind: 'solved' }, { kind: 'revised' }]), [])
+  assert.deepEqual(dayOutcomes([]), [])
 })
 
 test('a plan adopted today gets a node for today, which the forecast does not cover', () => {

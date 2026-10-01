@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { dayOutcomes, RESULT_LABEL, RESULT_TONE } from '../utils/decisionTree'
 import { Chip, ProblemLink } from './ui'
 
 const KIND_STYLE = {
@@ -27,6 +28,13 @@ const RESULT_DOT = {
   green: 'bg-emerald-500 text-white',
   yellow: 'bg-amber-400 text-amber-950',
   red: 'bg-rose-500 text-white',
+}
+
+const OUTCOME_CHIP = {
+  emerald: 'bg-emerald-100 text-emerald-700',
+  amber: 'bg-amber-100 text-amber-800',
+  red: 'bg-rose-100 text-rose-700',
+  slate: 'bg-slate-200 text-slate-600',
 }
 
 /** Practice modes and plan kinds share a vocabulary, bar first exposure. */
@@ -107,6 +115,7 @@ export default function NodePlan({ node, today, doneOn, onOpenProblem, onGrade }
   const unresolved = node.state === 'taken' ? view.unresolved : null
   // A day that has been and gone is answered by the tracker, not by its plan.
   const done = past ? doneOn?.(node.date) || [] : []
+  const outcomes = past ? dayOutcomes(done) : []
 
   return (
     <div>
@@ -114,6 +123,9 @@ export default function NodePlan({ node, today, doneOn, onOpenProblem, onGrade }
         <span className="text-sm font-semibold text-slate-900">{node.weekday}</span>
         <span className="text-xs tabular-nums text-slate-400">{node.date}</span>
         {isToday && <Chip className="bg-slate-900 text-white">today</Chip>}
+        {outcomes.map(r => (
+          <Chip key={r} className={OUTCOME_CHIP[RESULT_TONE[r]]}>{RESULT_LABEL[r]}</Chip>
+        ))}
         <Chip className={STATE_CHIP[node.state]}>{STATE_LABEL[node.state]}</Chip>
       </div>
 
@@ -141,6 +153,9 @@ export default function NodePlan({ node, today, doneOn, onOpenProblem, onGrade }
           <div className="flex items-center gap-2">
             <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Recorded that day</h4>
             <span className="text-[11px] tabular-nums text-slate-400">{done.length}</span>
+            {done.length > 0 && outcomes.length === 0 && (
+              <span className="text-[11px] text-slate-400">no grade recorded</span>
+            )}
             <span className="h-px flex-1 bg-slate-100" aria-hidden="true" />
           </div>
           {done.length === 0 ? (

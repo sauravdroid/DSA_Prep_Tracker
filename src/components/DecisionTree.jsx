@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { treeRows, defaultCollapsed } from '../utils/decisionTree'
+import { treeRows, defaultCollapsed, dayOutcomes, RESULT_LABEL, RESULT_TONE } from '../utils/decisionTree'
 
 const LINE = {
   red: 'border-rose-400',
@@ -93,6 +93,16 @@ function Workload({ workload }) {
   )
 }
 
+/** How the day turned out, in the same colours the branches use. */
+function Outcomes({ outcomes, className = '' }) {
+  if (outcomes.length === 0) return null
+  return outcomes.map(r => (
+    <span key={r} className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${PILL[RESULT_TONE[r]]} ${className}`}>
+      {RESULT_LABEL[r]}
+    </span>
+  ))
+}
+
 function PeekLine({ slug, title, meta, metaClass = 'text-slate-400', onOpen }) {
   const body = (
     <>
@@ -117,6 +127,7 @@ function PeekLine({ slug, title, meta, metaClass = 'text-slate-400', onOpen }) {
 /** What a node holds, shown beside it so the tree reads without being clicked. */
 function Peek({ node, done, past, at, onOpenProblem, onEnter, onLeave }) {
   const problems = node.items.filter(i => i.type === 'problem')
+  const outcomes = past ? dayOutcomes(done) : []
 
   return createPortal(
     <div
@@ -132,7 +143,13 @@ function Peek({ node, done, past, at, onOpenProblem, onEnter, onLeave }) {
 
       {past && (
         <>
-          <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Recorded</p>
+          <div className="mt-2 flex flex-wrap items-center gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Recorded</span>
+            <Outcomes outcomes={outcomes} />
+            {outcomes.length === 0 && done.length > 0 && (
+              <span className="text-[10px] text-slate-400">no grade</span>
+            )}
+          </div>
           {done.length === 0 ? (
             <p className="mt-0.5 px-1 text-xs text-slate-400">Nothing recorded that day.</p>
           ) : (
@@ -185,6 +202,7 @@ function Row({ row, selectedId, onSelect, collapsed, onToggle, today, doneOn, on
   // what was once planned for it.
   const past = node.date < today
   const done = past ? doneOn?.(node.date) || [] : []
+  const outcomes = past ? dayOutcomes(done) : []
   const open = !collapsed.has(node.id)
   const selected = node.id === selectedId
 
@@ -264,10 +282,11 @@ function Row({ row, selectedId, onSelect, collapsed, onToggle, today, doneOn, on
               </span>
             </span>
 
-            <span className="mt-0.5 flex items-center gap-1.5 pl-4 text-[10px] text-slate-400">
+            <span className="mt-0.5 flex flex-wrap items-center gap-1.5 pl-4 text-[10px] text-slate-400">
               <span className={`font-semibold uppercase tracking-wider ${isToday ? 'text-slate-900' : ''}`}>
                 {node.weekdayShort} {node.date.slice(5)}{isToday && ' · today'}
               </span>
+              <Outcomes outcomes={outcomes} />
               <span className="tabular-nums">
                 {past
                   ? (done.length === 0 ? 'nothing recorded' : `${done.length} recorded`)
