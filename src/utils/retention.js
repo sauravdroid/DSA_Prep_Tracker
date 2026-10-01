@@ -388,7 +388,7 @@ export function computeRetention({ problems, revisions, log, anchorOverrides, to
     suggestedMode: a.needsRepair ? 'repair' : 'cold',
   }))
 
-  // What actually happened today, straight from the tracker — never from the
+  // What actually happened on a day, straight from the tracker — never from the
   // coaching file, which must not be able to claim work that did not happen.
   const trackedNames = new Set(scheduledList.map(t => t.name))
   // Which of your tracked topics a problem belongs to, so the day reads at a glance.
@@ -398,9 +398,9 @@ export function computeRetention({ problems, revisions, log, anchorOverrides, to
     return { tracked: all.filter(p => trackedNames.has(p)), all }
   }
 
-  const doneToday = [
+  const doneOn = date => [
     ...practiceLog
-      .filter(e => e.date === today)
+      .filter(e => e.date === date)
       .map(e => ({
         key: `attempt:${e.id}`,
         kind: 'attempt',
@@ -414,10 +414,10 @@ export function computeRetention({ problems, revisions, log, anchorOverrides, to
         sessionRepeat: e.sessionRepeat,
       })),
     ...problemList
-      .filter(p => p.dateSolved === today)
+      .filter(p => p.dateSolved === date)
       .map(p => ({ key: `solved:${p.slug}`, kind: 'solved', slug: p.slug, problem: p, ...topicsFor(p) })),
     ...revisions
-      .filter(r => r.date === today)
+      .filter(r => r.date === date)
       .map(r => ({
         key: `revised:${r.slug}`,
         kind: 'revised',
@@ -426,6 +426,8 @@ export function computeRetention({ problems, revisions, log, anchorOverrides, to
         ...topicsFor(problems[r.slug]),
       })),
   ]
+
+  const doneToday = doneOn(today)
 
   // Mutually exclusive anchor states across tracked topics — what is left to prove.
   const byState = { scheduled: 0, 'due for validation': 0, 'failed cold test': 0, unmeasured: 0 }
@@ -466,6 +468,7 @@ export function computeRetention({ problems, revisions, log, anchorOverrides, to
     dueToday: dueAnchors,
     agenda,
     doneToday,
+    doneOn,
     anchorSummary,
     anchorList,
     unmeasuredTotal,

@@ -184,10 +184,10 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
           <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(21rem,27rem)]">
             {/* Keyed so moving between branches animates rather than snapping. */}
             <div key={selectedId} className="panel-in min-w-0">
-              <NodePlan node={selectedNode} today={today} onOpenProblem={onOpenProblem} onGrade={onGrade} />
+              <NodePlan node={selectedNode} today={today} doneOn={retention.doneOn} onOpenProblem={onOpenProblem} onGrade={onGrade} />
             </div>
             <div className="min-w-0 2xl:border-l 2xl:border-slate-100 2xl:pl-5">
-              <DecisionTree tree={tree} selectedId={selectedId} onSelect={setPickedId} today={today} />
+              <DecisionTree tree={tree} selectedId={selectedId} onSelect={setPickedId} today={today} doneOn={retention.doneOn} />
             </div>
           </div>
         ) : (

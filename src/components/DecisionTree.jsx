@@ -66,7 +66,7 @@ function Workload({ workload }) {
 }
 
 /** The node's own plan, shown on hover so the tree can be read without clicking. */
-function Peek({ node }) {
+function Peek({ node, done, past }) {
   const problems = node.items.filter(i => i.type === 'problem')
   return (
     <div className="pointer-events-none absolute left-0 right-0 top-full z-20 mt-1 rounded-xl bg-slate-900 px-3 py-2 text-left shadow-lg">
@@ -74,10 +74,32 @@ function Peek({ node }) {
       <p className="mt-0.5 text-[10px] uppercase tracking-wider text-slate-400">
         {node.weekday} {node.date} · {STATE_NOTE[node.state]}
       </p>
+
+      {past && (
+        <>
+          <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Recorded</p>
+          {done.length === 0 ? (
+            <p className="text-[11px] text-slate-400">Nothing recorded that day.</p>
+          ) : (
+            <ul className="mt-0.5 list-none space-y-1 pl-0">
+              {done.map(e => (
+                <li key={e.key} className="flex items-baseline gap-2 text-[11px] text-slate-200">
+                  <span className="min-w-0 flex-1 truncate">{e.problem?.title || e.slug}</span>
+                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-500">
+                    {e.kind === 'attempt' ? `${e.mode} · ${e.result}` : e.kind}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+
+      {past && <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Planned</p>}
       {problems.length === 0 ? (
-        <p className="mt-1.5 text-[11px] text-slate-400">No problem work planned.</p>
+        <p className={`${past ? '' : 'mt-1.5'} text-[11px] text-slate-400`}>No problem work planned.</p>
       ) : (
-        <ul className="mt-1.5 list-none space-y-1 pl-0">
+        <ul className={`${past ? 'mt-0.5' : 'mt-1.5'} list-none space-y-1 pl-0`}>
           {problems.map(i => (
             <li key={i.key} className="flex items-baseline gap-2 text-[11px] text-slate-200">
               <span className="min-w-0 flex-1 truncate">{i.title}</span>
@@ -91,11 +113,15 @@ function Peek({ node }) {
   )
 }
 
-function Row({ row, selected, onSelect, expanded, onToggle, today }) {
+function Row({ row, selected, onSelect, expanded, onToggle, today, doneOn }) {
   const [peek, setPeek] = useState(false)
   const { node, guides, last, hasChildren } = row
   const out = node.state === 'ruled-out'
   const isToday = node.date === today
+  // A day that has been and gone is described by what was recorded, not by
+  // what was once planned for it.
+  const past = node.date < today
+  const done = past ? doneOn?.(node.date) || [] : []
 
   return (
     <li>
@@ -149,12 +175,16 @@ function Row({ row, selected, onSelect, expanded, onToggle, today }) {
               <span className={`font-semibold uppercase tracking-wider ${isToday ? 'text-slate-900' : ''}`}>
                 {node.weekdayShort} {node.date.slice(5)}{isToday && ' · today'}
               </span>
-              <span className="tabular-nums"><Workload workload={node.workload} /></span>
+              <span className="tabular-nums">
+                {past
+                  ? (done.length === 0 ? 'nothing recorded' : `${done.length} recorded`)
+                  : <Workload workload={node.workload} />}
+              </span>
             </span>
           </button>
         </div>
 
-        {peek && <Peek node={node} />}
+        {peek && <Peek node={node} done={done} past={past} />}
       </div>
     </li>
   )
@@ -164,7 +194,7 @@ function Row({ row, selected, onSelect, expanded, onToggle, today }) {
  * The forecast as the branching structure it already is: one node per scenario,
  * one branch per result that would select it.
  */
-export default function DecisionTree({ tree, selectedId, onSelect, today }) {
+export default function DecisionTree({ tree, selectedId, onSelect, today, doneOn }) {
   const [collapsed, setCollapsed] = useState(() => defaultCollapsed(tree.roots))
 
   // A newly adopted plan gets its own folds rather than inheriting the last one's.
@@ -240,6 +270,7 @@ export default function DecisionTree({ tree, selectedId, onSelect, today }) {
             key={row.node.id}
             row={row}
             today={today}
+            doneOn={doneOn}
             selected={row.node.id === selectedId}
             onSelect={onSelect}
             expanded={!collapsed.has(row.node.id)}
