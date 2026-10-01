@@ -371,3 +371,48 @@ test('the assessment day is not repeated when the forecast already covers it', (
   const tree = buildDecisionTree(overlapping, { practiceLog: [] })
   assert.deepEqual(tree.dates.map(d => d.date), ['2026-10-01', '2026-10-02', '2026-10-03'])
 })
+
+const withToday = then => ({
+  assessmentDate: '2026-09-30',
+  today: { doNow: { slug: 'cousins-in-binary-tree', title: 'Cousins', mode: 'cold' }, then },
+  ...decision,
+})
+
+test('a follow-up with no target of its own finishes with the step before it', () => {
+  // The schema promises this: without a slug there is nothing else it could be
+  // waiting on, so leaving it open reports finished work as still to do.
+  const log = [attempt({ slug: 'cousins-in-binary-tree', date: '2026-09-30' })]
+  const root = buildDecisionTree(withToday({ action: 'Record the result' }), { practiceLog: log }).roots[0]
+  assert.deepEqual(root.items.map(i => i.done), [true, true])
+})
+
+test('a follow-up stays open while the step before it is unrecorded', () => {
+  const root = buildDecisionTree(withToday({ action: 'Record the result' }), { practiceLog: [] }).roots[0]
+  assert.deepEqual(root.items.map(i => i.done), [false, false])
+})
+
+test('a follow-up with a target of its own waits for that target', () => {
+  const log = [attempt({ slug: 'cousins-in-binary-tree', date: '2026-09-30' })]
+  const then = { slug: 'decode-string', title: 'Decode String' }
+  const root = buildDecisionTree(withToday(then), { practiceLog: log }).roots[0]
+  assert.deepEqual(root.items.map(i => i.done), [true, false], 'Decode String was never recorded')
+})
+
+test('a forecast day does not carry doneness onto its actions', () => {
+  // Only `today.then` has the schema's promise behind it. A day that plans an
+  // action after a problem is planning two separate things.
+  const day = {
+    date: '2026-10-01',
+    scenarios: [{
+      id: 'main',
+      when: { op: 'always' },
+      items: [
+        { type: 'problem', slug: 'cousins-in-binary-tree', title: 'Cousins', kind: 'cold' },
+        { type: 'action', title: 'Refresh coaching' },
+      ],
+    }],
+  }
+  const log = [attempt({ slug: 'cousins-in-binary-tree', date: '2026-10-01' })]
+  const root = buildDecisionTree({ nextThreeDays: [day] }, { practiceLog: log }).roots[0]
+  assert.deepEqual(root.items.map(i => i.done), [true, false])
+})

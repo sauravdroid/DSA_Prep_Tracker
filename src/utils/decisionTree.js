@@ -259,6 +259,19 @@ function assessmentDay(decision) {
 }
 
 /**
+ * `today.then` without a target of its own is finished once the step before it
+ * is recorded. The schema says so: there is nothing else it could be waiting on,
+ * and leaving it outstanding reports completed work as still to do.
+ */
+function carryFollowUp(items) {
+  const last = items.length - 1
+  if (last < 1) return items
+  const tail = items[last]
+  if (tail.slug || tail.type === 'problem' || !items[last - 1].done) return items
+  return [...items.slice(0, last), { ...tail, done: true }]
+}
+
+/**
  * @param {object} decision  a saved coaching decision
  * @param {object} ctx       { practiceLog, anchors, today } — passed through to the resolver
  * @returns {{ roots, nodes, dates }}
@@ -294,6 +307,7 @@ export function buildDecisionTree(decision, ctx = {}) {
       const when = rawById.get(branch.id)?.when || null
       const taken = view.selected?.id === branch.id || (branches.length === 1 && !!view.selected)
       const { parent, rest, exact } = findParent(when, day.dependencies || [], earlier)
+      const items = taken ? view.items : branch.items
 
       const node = {
         id: `${day.date}:${branch.id}`,
@@ -308,7 +322,7 @@ export function buildDecisionTree(decision, ctx = {}) {
         parentId: parent?.id || null,
         children: [],
         state: taken ? 'taken' : branch.outcome === false ? 'ruled-out' : 'open',
-        items: taken ? view.items : branch.items,
+        items: day === head ? carryFollowUp(items) : items,
         workload: taken ? view.workload : branch.workload,
         followUps: branch.followUps || [],
         basis: branch.basis || null,
