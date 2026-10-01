@@ -1,6 +1,17 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { treeRows, defaultCollapsed, dayOutcomes, nodeProgress, holdsOpen, RESULT_LABEL, RESULT_TONE } from '../utils/decisionTree'
+import { treeRows, defaultCollapsed, dayOutcomes, nodeProgress, holdsOpen, windowTree, RESULT_LABEL, RESULT_TONE } from '../utils/decisionTree'
+import { windowSlice, indexContaining, datesWithin } from '../utils/days'
+
+const WINDOW_SIZE = 4
+const DEFAULT_RANGE_DAYS = 30
+
+/** Plain date arithmetic: these are local dates, never instants. */
+function shiftDate(date, days) {
+  const d = new Date(`${date}T12:00:00`)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
 
 const LINE = {
   red: 'border-rose-400',
@@ -362,7 +373,24 @@ function Row({ row, selectedId, onSelect, collapsed, onToggle, today, doneOn, on
  * The forecast as the branching structure it already is: one node per scenario,
  * one branch per result that would select it.
  */
-export default function DecisionTree({ tree, selectedId, onSelect, today, doneOn, onOpenProblem }) {
+export default function DecisionTree({ tree: full, selectedId, onSelect, today, doneOn, onOpenProblem }) {
+  const allDates = useMemo(() => (full.dates || []).map(d => d.date), [full])
+
+  const [range, setRange] = useState(() => ({
+    from: shiftDate(today, -DEFAULT_RANGE_DAYS),
+    to: '',
+  }))
+  const inRange = useMemo(() => datesWithin(allDates, range), [allDates, range])
+
+  const [at, setAt] = useState(null)
+  // A changed range moves the window rather than leaving it where it was,
+  // which could be nowhere.
+  const index = at ?? indexContaining(inRange, today, WINDOW_SIZE)
+  useEffect(() => setAt(null), [range.from, range.to, allDates.length])
+
+  const shown = useMemo(() => windowSlice(inRange, index, WINDOW_SIZE), [inRange, index])
+  const tree = useMemo(() => windowTree(full, shown), [full, shown])
+
   const [collapsed, setCollapsed] = useState(() => defaultCollapsed(tree.roots, today))
 
   // A newly adopted plan gets its own folds rather than inheriting the last one's.
@@ -391,10 +419,10 @@ export default function DecisionTree({ tree, selectedId, onSelect, today, doneOn
   // otherwise hang off a parent that is no longer on screen.
   const toggleDate = depth => setCollapsed(prev => {
     const next = new Set(prev)
-    const shown = visibleDepths.has(depth)
+    const shownDepth = visibleDepths.has(depth)
     for (const node of tree.nodes) {
-      if (shown && node.depth === depth - 1) next.add(node.id)
-      else if (!shown && node.depth < depth) next.delete(node.id)
+      if (shownDepth && node.depth === depth - 1) next.add(node.id)
+      else if (!shownDepth && node.depth < depth) next.delete(node.id)
     }
     return next
   })
@@ -403,10 +431,73 @@ export default function DecisionTree({ tree, selectedId, onSelect, today, doneOn
     value ? new Set(tree.nodes.filter(n => !holdsOpen(n, today)).map(n => n.id)) : new Set()
   )
 
-  if (tree.roots.length === 0) return null
+  const lastIndex = Math.max(0, inRange.length - WINDOW_SIZE)
+  const slide = delta => setAt(Math.min(Math.max(0, index + delta), lastIndex))
+
+  if (full.roots.length === 0) return null
 
   return (
     <div>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pb-2 text-[11px] text-slate-500">
+        <span className="font-semibold uppercase tracking-wider text-slate-400">Range</span>
+        <input
+          type="date"
+          value={range.from}
+          max={range.to || undefined}
+          onChange={e => setRange(r => ({ ...r, from: e.target.value }))}
+          aria-label="Earliest day to show"
+          className="rounded-md border border-slate-200 px-1.5 py-0.5 text-[11px] tabular-nums text-slate-600"
+        />
+        <span className="text-slate-300">–</span>
+        <input
+          type="date"
+          value={range.to}
+          min={range.from || undefined}
+          onChange={e => setRange(r => ({ ...r, to: e.target.value }))}
+          aria-label="Latest day to show"
+          className="rounded-md border border-slate-200 px-1.5 py-0.5 text-[11px] tabular-nums text-slate-600"
+        />
+        <span className="tabular-nums text-slate-400">
+          {inRange.length} day{inRange.length === 1 ? '' : 's'}
+        </span>
+        <button
+          onClick={() => setRange({ from: shiftDate(today, -DEFAULT_RANGE_DAYS), to: '' })}
+          className="rounded-md border-0 bg-transparent px-1.5 py-0.5 font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+        >
+          Last month
+        </button>
+      </div>
+
+      {inRange.length > WINDOW_SIZE && (
+        <div className="flex items-center gap-2 pb-2">
+          <button
+            onClick={() => slide(-1)}
+            disabled={index <= 0}
+            aria-label="Earlier days"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-slate-400 transition enabled:hover:bg-slate-100 enabled:hover:text-slate-700 disabled:text-slate-200"
+          >
+            <span className="rotate-180"><Chevron open={false} /></span>
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={lastIndex}
+            value={index}
+            onChange={e => setAt(Number(e.target.value))}
+            aria-label={`Days shown: ${shown[0]} to ${shown[shown.length - 1]}`}
+            className="h-1 min-w-0 flex-1 cursor-pointer accent-slate-700"
+          />
+          <button
+            onClick={() => slide(1)}
+            disabled={index >= lastIndex}
+            aria-label="Later days"
+            className="flex size-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-slate-400 transition enabled:hover:bg-slate-100 enabled:hover:text-slate-700 disabled:text-slate-200"
+          >
+            <Chevron open={false} />
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-1 border-b border-slate-100 pb-2">
         {tree.dates.map(d => {
           const shown = visibleDepths.has(d.depth)

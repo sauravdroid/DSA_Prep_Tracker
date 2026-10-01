@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-import { buildDayTree, treeRows, defaultCollapsed, describeEdge, dayOutcomes, nodeProgress, holdsOpen } from '../src/utils/decisionTree.js'
+import { buildDayTree, windowTree, treeRows, defaultCollapsed, describeEdge, dayOutcomes, nodeProgress, holdsOpen } from '../src/utils/decisionTree.js'
 import { decisionToDays } from '../src/utils/days.js'
 
 const fixture = name => JSON.parse(readFileSync(new URL(`../fixtures/${name}`, import.meta.url)))
@@ -392,4 +392,73 @@ test('an action never counts as done, having nothing that could record it', () =
   assert.deepEqual(root.items.map(i => i.done), [true, false])
   assert.deepEqual(nodeProgress(root, '2026-10-02'), { done: 1, total: 1, complete: true },
     'and it is not outstanding work holding the day open')
+})
+
+/* ---------- The window ---------- */
+
+test('a branch repeating the day headline is named by what it asks for', () => {
+  // The headline is already shown beside the node, so echoing it there costs a
+  // line and says nothing about the branch.
+  const echoed = day({
+    date: '2026-10-01',
+    headline: 'Mixed — Greedy focus and Tree sampling',
+    scenarios: [{
+      id: 'main',
+      when: { op: 'always' },
+      label: 'Mixed — Greedy focus and Tree sampling',
+      items: [
+        { type: 'problem', slug: 'cousins-in-binary-tree', title: 'Cousins in Binary Tree' },
+        { type: 'action', title: 'Stop for today' },
+      ],
+    }],
+  })
+  const root = buildDayTree([echoed], { practiceLog: [] }).roots[0]
+  assert.equal(root.label, 'Cousins in Binary Tree')
+})
+
+test('a branch with a label of its own keeps it', () => {
+  const tree = buildDayTree(days, { practiceLog: [] })
+  assert.equal(tree.roots[0].label, 'Cousins + Jump Game II')
+})
+
+test('a branch planning only actions is named by them, having nothing else', () => {
+  const resting = day({
+    date: '2026-10-04',
+    headline: 'Rest',
+    scenarios: [{ id: 'rest', when: { op: 'always' }, label: 'Rest', items: [{ type: 'action', title: 'Rest day' }] }],
+  })
+  assert.equal(buildDayTree([resting], { practiceLog: [] }).roots[0].label, 'Rest day')
+})
+test('a window shows the days it covers and drops the rest', () => {
+  const tree = buildDayTree(days, { practiceLog: [] })
+  const view = windowTree(tree, ['2026-10-02', '2026-10-03'])
+  assert.deepEqual([...new Set(view.nodes.map(n => n.date))], ['2026-10-02', '2026-10-03'])
+  assert.deepEqual(view.dates.map(d => d.date), ['2026-10-02', '2026-10-03'])
+})
+
+test('a node whose parent fell outside the window becomes a root', () => {
+  const tree = buildDayTree(days, { practiceLog: [] })
+  const view = windowTree(tree, ['2026-10-02', '2026-10-03'])
+  assert.deepEqual(view.roots.map(n => n.id), ['2026-10-02:cousins-red', '2026-10-02:diameter'])
+  assert.deepEqual(view.roots[0].children.map(n => n.id), ['2026-10-03:recovery-test'])
+})
+
+test('indentation restarts at the window, not at the tree', () => {
+  const tree = buildDayTree(days, { practiceLog: [] })
+  const view = windowTree(tree, ['2026-10-02', '2026-10-03'])
+  assert.deepEqual(view.nodes.map(n => n.depth), [0, 0, 1, 1])
+})
+
+test('a branch keeps its condition and state through the window', () => {
+  const tree = buildDayTree(days, { practiceLog: [attempt({ result: 'green' })] })
+  const view = windowTree(tree, ['2026-10-02', '2026-10-03'])
+  const [red, pass] = view.roots
+  assert.equal(red.state, 'ruled-out')
+  assert.equal(pass.state, 'taken')
+  assert.deepEqual(pass.edge.clauses.map(c => c.label), ['green / yellow'])
+})
+
+test('a window covering nothing is empty rather than everything', () => {
+  const tree = buildDayTree(days, { practiceLog: [] })
+  assert.deepEqual(windowTree(tree, []), { roots: [], nodes: [], dates: [] })
 })

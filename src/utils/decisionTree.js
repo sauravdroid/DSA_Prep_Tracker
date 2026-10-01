@@ -215,6 +215,22 @@ function findParent(when, deps, candidates) {
 }
 
 /**
+ * What to call a branch.
+ *
+ * A label repeating the day's own headline says nothing the headline has not
+ * already said, and the headline is shown beside it. The problems it asks for
+ * are at least about this branch rather than about the day.
+ */
+function labelOf(branch, day) {
+  const named = branch.label && branch.label !== day.headline ? branch.label : null
+  if (named) return named
+  const problems = (branch.items || []).filter(i => i.type === 'problem' || i.slug)
+  const fromItems = (problems.length > 0 ? problems : branch.items || [])
+    .map(i => i.title).filter(Boolean).join(' + ')
+  return fromItems || branch.label || branch.id
+}
+
+/**
  * @param {object[]} days  day documents, any order
  * @param {object} ctx     { practiceLog, anchors, today } — passed through to the resolver
  * @returns {{ roots, nodes, dates }}
@@ -257,7 +273,7 @@ export function buildDayTree(days = [], ctx = {}) {
         weekday: view.weekday,
         weekdayShort: view.weekdayShort,
         depth,
-        label: branch.label || branch.id,
+        label: labelOf(branch, day),
         when,
         edge: describeEdge(restCondition(rest), day.dependencies || []),
         edgeApproximate: !!when && !exact,
@@ -279,6 +295,40 @@ export function buildDayTree(days = [], ctx = {}) {
 
     dates.push({ date: day.date, depth, weekday: view.weekday, weekdayShort: view.weekdayShort, count: made.length })
   })
+
+  return { roots, nodes, dates }
+}
+
+/**
+ * The same tree seen through a window of dates.
+ *
+ * A node whose parent falls outside becomes a root. The window is a view of
+ * one tree rather than a different tree, so a branch keeps its condition, its
+ * colour and its state — it just starts further in.
+ */
+export function windowTree(tree, visible = []) {
+  const show = new Set(visible)
+  const depths = new Map([...show].sort().map((d, i) => [d, i]))
+
+  const kept = new Map()
+  for (const node of tree?.nodes || []) {
+    if (show.has(node.date)) kept.set(node.id, { ...node, depth: depths.get(node.date), children: [] })
+  }
+
+  const roots = []
+  const nodes = []
+  for (const node of tree?.nodes || []) {
+    const copy = kept.get(node.id)
+    if (!copy) continue
+    nodes.push(copy)
+    const parent = node.parentId ? kept.get(node.parentId) : null
+    if (parent) parent.children.push(copy)
+    else roots.push(copy)
+  }
+
+  const dates = (tree?.dates || [])
+    .filter(d => show.has(d.date))
+    .map(d => ({ ...d, depth: depths.get(d.date) }))
 
   return { roots, nodes, dates }
 }

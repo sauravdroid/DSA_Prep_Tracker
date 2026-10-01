@@ -7,7 +7,7 @@ import addFormats from 'ajv-formats'
 import {
   dayPath, authoredKey, dependsOn, driftedFrom, plannedSlugs,
   rewriteKeepsRecordedWork, buildDayIndex, dayEntry, linkDays,
-  decisionToDays, daysFromDecisions,
+  decisionToDays, daysFromDecisions, windowSlice, indexContaining, datesWithin,
 } from '../src/utils/days.js'
 
 const load = p => JSON.parse(readFileSync(new URL(p, import.meta.url)))
@@ -307,6 +307,56 @@ test('a date no later run touched keeps the day that did write it', () => {
 })
 
 test('converted days are in date order, whatever order the runs arrived in', () => {
-  const days = daysFromDecisions([structured])
-  assert.deepEqual(days.map(d => d.date), [...days.map(d => d.date)].sort())
+  const converted = daysFromDecisions([structured])
+  assert.deepEqual(converted.map(d => d.date), [...converted.map(d => d.date)].sort())
+})
+
+/* ---------- The window ---------- */
+
+const week = ['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03']
+
+test('a window is four planned days, not four days of calendar', () => {
+  // 09-28 to 10-01 spans four entries; a calendar window would have to decide
+  // what to do about dates nothing planned.
+  const sparse = ['2026-09-28', '2026-10-01', '2026-10-02', '2026-10-03']
+  assert.deepEqual(windowSlice(sparse, 0, 4), sparse)
+})
+
+test('a window never runs off either end', () => {
+  assert.deepEqual(windowSlice(week, 99, 4), ['2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03'])
+  assert.deepEqual(windowSlice(week, -5, 4), ['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01'])
+})
+
+test('a window shorter than its size is all there is', () => {
+  assert.deepEqual(windowSlice(['2026-10-01'], 0, 4), ['2026-10-01'])
+  assert.deepEqual(windowSlice([], 0, 4), [])
+})
+
+test('the window opens on today, with the day before it in view', () => {
+  const month = Array.from({ length: 10 }, (_, i) => `2026-10-${String(i + 1).padStart(2, '0')}`)
+  const i = indexContaining(month, '2026-10-05', 4)
+  assert.deepEqual(windowSlice(month, i, 4), ['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07'])
+})
+
+test('a window near the end slides back rather than running short', () => {
+  const i = indexContaining(week, '2026-10-03', 4)
+  assert.deepEqual(windowSlice(week, i, 4), ['2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03'])
+})
+
+test('a date nothing planned opens on the next day that was', () => {
+  const sparse = ['2026-09-28', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05']
+  const i = indexContaining(sparse, '2026-09-30', 4)
+  assert.ok(windowSlice(sparse, i, 4).includes('2026-10-02'))
+})
+
+test('a date past everything planned opens on the end', () => {
+  const i = indexContaining(week, '2026-12-25', 4)
+  assert.deepEqual(windowSlice(week, i, 4), ['2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03'])
+})
+
+test('a range keeps both ends, and neither is required', () => {
+  assert.deepEqual(datesWithin(week, { from: '2026-09-30', to: '2026-10-02' }),
+    ['2026-09-30', '2026-10-01', '2026-10-02'])
+  assert.deepEqual(datesWithin(week, { from: '2026-10-02' }), ['2026-10-02', '2026-10-03'])
+  assert.deepEqual(datesWithin(week, {}), week)
 })

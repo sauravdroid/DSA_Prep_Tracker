@@ -254,6 +254,32 @@ export function linkDays(entries = []) {
 }
 
 /**
+ * A window of consecutive planned days.
+ *
+ * Over the days that exist rather than over the calendar: four planned days is
+ * four days of plan, where four calendar days might be two and two gaps.
+ */
+export function windowSlice(dates = [], index = 0, size = 4) {
+  const last = Math.max(0, dates.length - size)
+  return dates.slice(Math.min(Math.max(0, index), last), Math.min(Math.max(0, index), last) + size)
+}
+
+/** Where to open the window so a date is in it, with the day before it visible. */
+export function indexContaining(dates = [], date, size = 4) {
+  const last = Math.max(0, dates.length - size)
+  if (!date || dates.length === 0) return last
+  let i = dates.indexOf(date)
+  if (i < 0) i = dates.findIndex(d => d >= date)
+  if (i < 0) return last
+  return Math.min(Math.max(0, i - 1), last)
+}
+
+/** Dates falling inside a range, either end optional. */
+export function datesWithin(dates = [], { from, to } = {}) {
+  return dates.filter(d => (!from || d >= from) && (!to || d <= to))
+}
+
+/**
  * What the index says about each day: enough to decide whether the file is
  * worth fetching, and enough to see which days hang off which.
  */
