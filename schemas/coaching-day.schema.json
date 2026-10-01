@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sauravdroid/DSA_Prep_Tracker/schemas/coaching-day.schema.json",
+  "title": "Coaching day",
+  "description": "One day's plan, as its own document. Promotes the `structuredDay` shape out of a decision's `nextThreeDays` so that revising one day cannot overwrite another. The reasoning behind a day — mode, debt, tracker snapshot, provenance — stays in the assessment named by `authoredBy`, and is never repeated here.",
+  "type": "object",
+  "required": ["dayVersion", "date", "authoredBy", "scenarios"],
+  "properties": {
+    "dayVersion": {
+      "const": 1,
+      "description": "Day-document format version. Unrelated to the decision document's `version` or `outlookSchemaVersion`."
+    },
+    "date": { "$ref": "coaching-decision.schema.json#/$defs/localDate" },
+    "authoredBy": {
+      "type": "object",
+      "required": ["assessment"],
+      "description": "The coaching run that wrote this day. Comparing these across days is how drift is detected: a day whose dependency was authored by a LATER assessment than itself was reasoned against a version that no longer exists, and must be revised before it can be trusted.",
+      "properties": {
+        "assessment": {
+          "type": "string",
+          "pattern": "^\\d{8}T\\d{6}Z$",
+          "description": "Assessment id, which is its `assessedAt` stripped of punctuation. Sorts chronologically."
+        },
+        "at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "headline": { "type": "string" },
+    "note": { "type": "string" },
+    "dependencies": {
+      "type": "array",
+      "description": "Measurements this day waits on. A dependency names a grade — slug, local date and practice mode — not another day's file, so it resolves from the practice log alone.",
+      "items": { "$ref": "coaching-decision.schema.json#/$defs/dependency" }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "coaching-decision.schema.json#/$defs/scenario" }
+    },
+    "unresolved": {
+      "type": "object",
+      "description": "Shown while a required result is still unknown.",
+      "properties": {
+        "dependency": { "type": "string" },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}
