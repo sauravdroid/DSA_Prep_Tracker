@@ -35,6 +35,10 @@ export async function saveDecision(decision) {
  * The attempts a decision already anticipates, as `slug|date`. Today's step
  * counts alongside the forecast's dependencies: a plan that asks for a result
  * must not treat that result as a surprise.
+ *
+ * So does every problem a forecast day schedules, on any of its branches. The
+ * plan named that work for that date, so doing it is the plan being carried
+ * out — only the branch it belongs to was still open at the time.
  */
 function plannedAttempts(decision) {
   const keys = new Set()
@@ -44,6 +48,13 @@ function plannedAttempts(decision) {
   }
   for (const day of decision.nextThreeDays || []) {
     for (const dep of day.dependencies || []) keys.add(`${dep.slug}|${dep.date}`)
+    if (!day.date) continue
+    const groups = [day.items, ...(day.scenarios || []).map(s => s.items), ...(day.conditional || []).map(b => b.items)]
+    for (const items of groups) {
+      for (const item of items || []) {
+        if (item?.slug) keys.add(`${item.slug}|${day.date}`)
+      }
+    }
   }
   return keys
 }

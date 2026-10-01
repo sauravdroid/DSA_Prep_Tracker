@@ -330,6 +330,48 @@ test('evidence today never asked for still marks it stale', () => {
   assert.match(s.reasons.join(' '), /two-sum/)
 })
 
+test('doing a problem the forecast scheduled does not make the forecast stale', () => {
+  // Jump Game II is an item of Thursday's plan rather than a dependency it
+  // waits on, so nothing else in the file names it.
+  const s = decisionStaleness(example, {
+    practiceLog: [attempt({
+      slug: 'jump-game-ii',
+      date: '2026-10-01',
+      at: '2026-10-01T09:00:00.000Z',
+      result: 'red',
+      help: 'hint',
+    })],
+    today: '2026-10-01',
+  })
+  assert.equal(s.stale, false, s.reasons.join(' '))
+})
+
+test('a scheduled problem counts whichever branch planned it', () => {
+  // largest-rectangle-in-histogram only appears on Friday's "broaden" branch.
+  const s = decisionStaleness(example, {
+    practiceLog: [attempt({
+      slug: 'largest-rectangle-in-histogram',
+      date: '2026-10-02',
+      at: '2026-10-02T09:00:00.000Z',
+    })],
+    today: '2026-10-02',
+  })
+  assert.equal(s.stale, false, s.reasons.join(' '))
+})
+
+test('a scheduled problem on the wrong day is still unaccounted for', () => {
+  const s = decisionStaleness(example, {
+    practiceLog: [attempt({
+      slug: 'jump-game-ii',
+      date: '2026-10-02',
+      at: '2026-10-02T09:00:00.000Z',
+    })],
+    today: '2026-10-02',
+  })
+  assert.equal(s.stale, true)
+  assert.match(s.reasons.join(' '), /jump-game-ii/)
+})
+
 test('attempts disappearing is still reported, since the log no longer matches', () => {
   const decision = {
     ...example,
