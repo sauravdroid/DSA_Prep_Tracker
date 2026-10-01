@@ -9,6 +9,7 @@ import { validateDecision, outOfScopeFiles } from './src/utils/validateDecision.
 import { unpublishedKeys } from './src/utils/trackerDiff.js'
 import { publishSet } from './src/utils/publishSet.js'
 import { assessmentId, assessmentPath, summarise, buildIndex, INDEX_PATH, coveredDates } from './src/utils/assessments.js'
+import { dayPath, dayEntry, linkDays, daysFromDecisions } from './src/utils/days.js'
 import { sealReason, sealOutcome, outcomePath, summariseOutcome, OUTCOME_VERSION, outcomeDrift } from './src/utils/outcomes.js'
 
 const DATA_DIR = 'data'
@@ -272,6 +273,42 @@ function githubSync() {
     const decodeContent = r => JSON.parse(Buffer.from(r.body.content || '', 'base64').toString('utf8'))
 
     try {
+      // The index, and whichever days are asked for. One request rather than
+      // one per day: a window of four costs the same as a window of thirty.
+      if (url === '/coaching/days') {
+        const idx = await gh(token, 'GET', `/repos/${repo}/contents/${INDEX_PATH}`)
+        if (idx.status === 404) return send(res, 200, { empty: true, index: null, days: {} })
+        if (idx.status !== 200) {
+          return send(res, idx.status, { error: idx.body?.message || `GitHub returned ${idx.status}` })
+        }
+
+        let index
+        try {
+          index = decodeContent(idx)
+        } catch (e) {
+          return send(res, 422, { error: `The index is not valid JSON: ${e.message}` })
+        }
+
+        const available = Object.keys(index.days?.entries || {})
+        const asked = Array.isArray(body.dates) && body.dates.length > 0
+          ? body.dates.filter(d => available.includes(d))
+          : available
+
+        const days = {}
+        const missing = []
+        for (const date of asked) {
+          const r = await gh(token, 'GET', `/repos/${repo}/contents/${dayPath(date)}`)
+          if (r.status !== 200) { missing.push(date); continue }
+          try {
+            days[date] = decodeContent(r)
+          } catch {
+            missing.push(date)
+          }
+        }
+
+        return send(res, 200, { empty: false, index, days, missing })
+      }
+
       // --- Coaching advice. Read-only here: the app never publishes advice,
       // and this path never writes practice facts.
       if (url === '/coaching/pull' || url === '/coaching/at') {
@@ -420,14 +457,24 @@ function githubSync() {
           ? await gh(token, 'GET', `/repos/${repo}/contents/${INDEX_PATH}`)
           : null
         let priorByCommit = new Map()
+        let priorDays = []
         if (priorIndex?.status === 200) {
           try {
             const parsed = JSON.parse(Buffer.from(priorIndex.body.content || '', 'base64').toString('utf8'))
             priorByCommit = new Map((parsed.assessments || []).filter(a => a.sourceCommit).map(a => [a.sourceCommit, a]))
+            priorDays = Object.values(parsed.days?.entries || {})
           } catch {
             priorByCommit = new Map()
           }
         }
+
+        // Day files are the exception to reusing the index: until it describes
+        // some, they have to be built from every revision, so the first run
+        // after they were introduced reads the whole history once and later
+        // runs go back to a handful. Keying this off the index rather than off
+        // the files means a day section lost to a bad run is rebuilt rather
+        // than left stuck at empty.
+        const backfillingDays = priorDays.length === 0
 
         const today = new Date().toISOString().slice(0, 10)
         let practiceLog = []
@@ -441,6 +488,9 @@ function githubSync() {
 
         const toWrite = new Map()
         const summaries = []
+        // Newest first, which is also precedence: the latest run to write a
+        // date governs it.
+        const fetchedDecisions = []
         let sealed = 0
         let resealed = 0
         let fetched = 0
@@ -463,13 +513,13 @@ function githubSync() {
           const known = prior && prior.id && present.has(assessmentPath(prior.id))
 
           // Already archived and already sealed: nothing can change it.
-          if (known && prior.outcome) {
+          if (known && prior.outcome && !backfillingDays) {
             summaries.push(prior)
             continue
           }
 
           // Already archived and not yet sealable: the index alone answers that.
-          if (known && !sealReason({ covers: prior.covers || [], isLatest, today })) {
+          if (known && !backfillingDays && !sealReason({ covers: prior.covers || [], isLatest, today })) {
             summaries.push({ ...prior, outcome: null })
             continue
           }
@@ -479,6 +529,7 @@ function githubSync() {
             if (prior) summaries.push(prior)
             continue
           }
+          fetchedDecisions.push(decision)
           const id = assessmentId(decision.assessedAt)
           if (!id) continue
 
@@ -534,14 +585,36 @@ function githubSync() {
           summaries.push(summarise(decision, { commit: short, bytes: Buffer.byteLength(content), outcome }))
         }
 
-        const index = buildIndex(summaries)
+        // A day is written once by the run that planned it. Only a date no
+        // published day covers is added here, so a day the coach has since
+        // revised directly is never overwritten by the decision it came from.
+        const converted = daysFromDecisions(fetchedDecisions)
+        let written = 0
+        for (const day of converted) {
+          const path = dayPath(day.date)
+          if (present.has(path)) continue
+          toWrite.set(path, JSON.stringify(day, null, 2))
+          written++
+        }
+
+        // Days this run converted, plus whatever the last index already knew
+        // about. Without the second half a run that fetched nothing would
+        // publish an empty day section over a populated one.
+        const freshEntries = converted.map(dayEntry)
+        const freshDates = new Set(freshEntries.map(e => e.date))
+        const dayIndex = linkDays([
+          ...freshEntries,
+          ...priorDays.filter(e => e?.date && !freshDates.has(e.date)),
+        ])
+
+        const index = { ...buildIndex(summaries), days: dayIndex }
         const indexContent = JSON.stringify(index, null, 2)
         const indexChanged = !priorIndex || priorIndex.status !== 200 ||
           Buffer.from(priorIndex.body.content || '', 'base64').toString('utf8') !== indexContent
         if (indexChanged) toWrite.set(INDEX_PATH, indexContent)
 
         if (toWrite.size === 0) {
-          return send(res, 200, { committed: null, unchanged: true, archived: 0, sealed: 0, resealed: 0, fetched, count: index.count })
+          return send(res, 200, { committed: null, unchanged: true, archived: 0, sealed: 0, resealed: 0, days: 0, fetched, count: index.count })
         }
 
         const newTree = await gh(token, 'POST', `/repos/${repo}/git/trees`, {
@@ -552,7 +625,9 @@ function githubSync() {
           return send(res, newTree.status, { error: newTree.body?.message || 'Could not build the tree' })
         }
         const commit = await gh(token, 'POST', `/repos/${repo}/git/commits`, {
-          message: `archive coaching assessments (${index.count})`,
+          message: written > 0
+            ? `archive coaching assessments (${index.count}) and days (${written})`
+            : `archive coaching assessments (${index.count})`,
           tree: newTree.body.sha,
           parents: [parentSha],
         })
@@ -569,6 +644,7 @@ function githubSync() {
           archived: [...toWrite.keys()].filter(p => p.startsWith('coaching/assessments/')).length,
           sealed,
           resealed,
+          days: written,
           fetched,
           count: index.count,
           files: [...toWrite.keys()],

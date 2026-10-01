@@ -44,13 +44,17 @@ export function dependsOn(day) {
 /**
  * The dates this day was reasoned against that have since been re-authored.
  *
+ * Takes a day or an index entry: a day names its dependencies, an entry has
+ * already reduced them to dates, and the comparison is the same either way.
+ *
  * Drift is a statement about intent, not mechanism: the dependency may still
  * resolve perfectly. It says a human should look, because the plan it was
  * answering has changed underneath it.
  */
-export function driftedFrom(day, byDate = {}) {
-  const mine = authoredKey(day)
-  return dependsOn(day).filter(date => {
+export function driftedFrom(node, byDate = {}) {
+  const mine = authoredKey(node)
+  const sources = Array.isArray(node?.dependsOn) ? node.dependsOn : dependsOn(node)
+  return sources.filter(date => {
     const other = byDate[date]
     return other && authoredKey(other) > mine
   })
@@ -93,46 +97,162 @@ export function rewriteKeepsRecordedWork(previous, next, practiceLog = []) {
 }
 
 /**
- * What the index says about each day: enough to decide whether the file is
- * worth fetching, and enough to see which days hang off which.
+ * A decision's days, as documents.
  *
- * `requiredBy` is the reverse of `dependsOn`, derived rather than authored. It
- * is what makes "revise this day and everything that depends on it" something
- * the coach can look up instead of work out.
+ * The two shapes a decision used for a day collapse into one here. `today` was
+ * a `doNow` and a `then`, with no conditions attached — an unconditional
+ * scenario, written differently because it was the only day the app could act
+ * on. `nextThreeDays` entries are already the day shape and carry across whole.
+ *
+ * A legacy prose day keeps whatever unconditional list it had; its `conditional`
+ * branches are dropped, because the app could never tell which applied and a
+ * converted day that claimed otherwise would be inventing certainty.
  */
-export function buildDayIndex(days = []) {
-  const present = days.filter(d => d?.date)
-  const byDate = Object.fromEntries(present.map(d => [d.date, d]))
+export function decisionToDays(decision = {}) {
+  const assessment = { assessment: assessmentIdOf(decision), at: decision.assessedAt ?? null }
+  if (!assessment.assessment) return []
 
-  const entries = {}
-  for (const day of [...present].sort((a, b) => a.date.localeCompare(b.date))) {
-    const drifted = driftedFrom(day, byDate)
-    entries[day.date] = {
-      file: dayPath(day.date),
+  const days = []
+
+  const steps = [decision.today?.doNow, decision.today?.then]
+    .filter(Boolean)
+    .map(raw => ({
+      type: raw.slug ? 'problem' : 'action',
+      ...(raw.slug ? { slug: raw.slug } : {}),
+      title: raw.title || raw.action || raw.slug || 'Untitled step',
+      ...(raw.mode ? { kind: raw.mode } : {}),
+      ...(typeof raw.minutes === 'number' ? { minutes: raw.minutes } : {}),
+      ...(raw.why ? { why: raw.why } : {}),
+    }))
+
+  if (decision.assessmentDate && steps.length > 0) {
+    days.push({
+      dayVersion: DAY_VERSION,
+      date: decision.assessmentDate,
+      authoredBy: assessment,
+      ...(decision.mode?.headline ? { headline: decision.mode.headline } : {}),
+      scenarios: [{
+        id: 'today',
+        priority: 0,
+        label: decision.mode?.headline || "Today's plan",
+        basis: 'Written for this day, with no condition attached.',
+        when: { op: 'always' },
+        items: steps,
+      }],
+    })
+  }
+
+  for (const day of decision.nextThreeDays || []) {
+    if (!day?.date) continue
+    const base = {
+      dayVersion: DAY_VERSION,
       date: day.date,
-      authoredBy: day.authoredBy ?? null,
-      headline: day.headline ?? null,
-      scenarios: (day.scenarios || []).length,
-      problems: problemRange(day),
-      dependsOn: dependsOn(day),
-      requiredBy: [],
-      drifted: drifted.length > 0,
-      driftedFrom: drifted,
+      authoredBy: assessment,
+      ...(day.headline ? { headline: day.headline } : {}),
+      ...(day.note ? { note: day.note } : {}),
+      ...(day.dependencies ? { dependencies: day.dependencies } : {}),
+      ...(day.unresolved ? { unresolved: day.unresolved } : {}),
+    }
+
+    if (day.scenarios?.length) {
+      days.push({ ...base, scenarios: day.scenarios })
+      continue
+    }
+    if (day.items?.length) {
+      days.push({
+        ...base,
+        scenarios: [{
+          id: 'saved',
+          priority: 0,
+          label: day.headline || 'Saved plan',
+          basis: 'Saved plan with no conditions attached.',
+          when: { op: 'always' },
+          items: day.items,
+        }],
+      })
     }
   }
 
-  for (const date of Object.keys(entries)) {
-    for (const source of entries[date].dependsOn) {
-      if (entries[source]) entries[source].requiredBy.push(date)
+  return days
+}
+
+function assessmentIdOf(decision) {
+  if (!decision.assessedAt) return null
+  return new Date(decision.assessedAt).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+}
+
+/**
+ * One day per date from a run of decisions, newest wins.
+ *
+ * Decisions arrive newest first, which is also precedence order: the latest
+ * run to write a date is the one that governs it.
+ */
+export function daysFromDecisions(decisions = []) {
+  const byDate = new Map()
+  for (const decision of decisions) {
+    for (const day of decisionToDays(decision)) {
+      if (!byDate.has(day.date)) byDate.set(day.date, day)
+    }
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
+}
+
+/** What the index says about one day, before the links between days are known. */
+export function dayEntry(day) {
+  return {
+    file: dayPath(day.date),
+    date: day.date,
+    authoredBy: day.authoredBy ?? null,
+    headline: day.headline ?? null,
+    scenarios: (day.scenarios || []).length,
+    problems: problemRange(day),
+    dependsOn: dependsOn(day),
+    requiredBy: [],
+    drifted: false,
+    driftedFrom: [],
+  }
+}
+
+/**
+ * The links between days, filled in over whatever set of entries is given.
+ *
+ * Entries rather than whole days, because a run that fetched nothing still has
+ * to be able to rebuild this from the index it already published — reading
+ * every day file back just to restate what the last run worked out would make
+ * a cheap run expensive, and leaving the section empty would lose it.
+ *
+ * `requiredBy` is the reverse of `dependsOn`. It is what makes "revise this day
+ * and everything that depends on it" something the coach can look up instead
+ * of work out.
+ */
+export function linkDays(entries = []) {
+  const byDate = {}
+  for (const e of entries) if (e?.date) byDate[e.date] = { ...e, requiredBy: [], drifted: false, driftedFrom: [] }
+
+  for (const entry of Object.values(byDate)) {
+    entry.driftedFrom = driftedFrom(entry, byDate)
+    entry.drifted = entry.driftedFrom.length > 0
+    for (const source of entry.dependsOn || []) {
+      if (byDate[source]) byDate[source].requiredBy.push(entry.date)
     }
   }
 
-  const dates = Object.keys(entries).sort()
+  const dates = Object.keys(byDate).sort()
+  for (const d of dates) byDate[d].requiredBy.sort()
+
   return {
     count: dates.length,
     from: dates[0] ?? null,
     to: dates[dates.length - 1] ?? null,
-    drifted: dates.filter(d => entries[d].drifted),
-    entries,
+    drifted: dates.filter(d => byDate[d].drifted),
+    entries: Object.fromEntries(dates.map(d => [d, byDate[d]])),
   }
+}
+
+/**
+ * What the index says about each day: enough to decide whether the file is
+ * worth fetching, and enough to see which days hang off which.
+ */
+export function buildDayIndex(days = []) {
+  return linkDays(days.filter(d => d?.date).map(dayEntry))
 }
