@@ -215,75 +215,17 @@ function findParent(when, deps, candidates) {
 }
 
 /**
- * The assessment's own day as a forecast day, so a plan adopted today has a node.
- *
- * `today` is written in a different shape from a forecast day but means the same
- * thing: one unconditional plan. Returns null once `nextThreeDays` covers the
- * date itself, which is how a plan written yesterday already reaches today.
- */
-function assessmentDay(decision) {
-  const date = decision?.assessmentDate
-  const steps = decision?.today
-  if (!date || !steps) return null
-  if ((decision.nextThreeDays || []).some(d => d.date === date)) return null
-
-  const step = (raw, fallbackKind) => raw && {
-    type: raw.slug ? 'problem' : 'action',
-    slug: raw.slug || null,
-    title: raw.title || raw.action || raw.slug || null,
-    kind: raw.mode || (raw.slug ? fallbackKind : null),
-    topic: raw.topic || null,
-    minutes: typeof raw.minutes === 'number' ? raw.minutes : null,
-    why: raw.why || null,
-  }
-
-  const items = [step(steps.doNow, 'cold'), step(steps.then, 'warm')].filter(Boolean)
-  if (items.length === 0) return null
-
-  // Named by what it asks for, so it does not just repeat the card's headline.
-  const problems = items.filter(i => i.type === 'problem')
-  const label = (problems.length > 0 ? problems : items).map(i => i.title).filter(Boolean).join(' + ')
-
-  return {
-    date,
-    headline: decision.mode?.headline || null,
-    scenarios: [{
-      id: 'today',
-      priority: 0,
-      label: label || "Today's plan",
-      when: { op: 'always' },
-      basis: 'Written for this day, with no condition attached.',
-      items,
-    }],
-  }
-}
-
-/**
- * `today.then` without a target of its own is finished once the step before it
- * is recorded. The schema says so: there is nothing else it could be waiting on,
- * and leaving it outstanding reports completed work as still to do.
- */
-function carryFollowUp(items) {
-  const last = items.length - 1
-  if (last < 1) return items
-  const tail = items[last]
-  if (tail.slug || tail.type === 'problem' || !items[last - 1].done) return items
-  return [...items.slice(0, last), { ...tail, done: true }]
-}
-
-/**
- * @param {object} decision  a saved coaching decision
- * @param {object} ctx       { practiceLog, anchors, today } — passed through to the resolver
+ * @param {object[]} days  day documents, any order
+ * @param {object} ctx     { practiceLog, anchors, today } — passed through to the resolver
  * @returns {{ roots, nodes, dates }}
  */
-export function buildDecisionTree(decision, ctx = {}) {
-  const head = assessmentDay(decision)
-  const days = [...(head ? [head] : []), ...(decision?.nextThreeDays || [])]
+export function buildDayTree(days = [], ctx = {}) {
+  const ordered = [...days].filter(d => d?.date).sort((a, b) => a.date.localeCompare(b.date))
   const nodes = []
   const roots = []
   const dates = []
 
-  days.forEach((day, depth) => {
+  ordered.forEach((day, depth) => {
     const view = resolveOutlookDay(day, ctx)
     const rawById = new Map((day.scenarios || []).map(s => [s.id, s]))
     const earlier = nodes.filter(n => n.depth < depth)
@@ -322,7 +264,7 @@ export function buildDecisionTree(decision, ctx = {}) {
         parentId: parent?.id || null,
         children: [],
         state: taken ? 'taken' : branch.outcome === false ? 'ruled-out' : 'open',
-        items: day === head ? carryFollowUp(items) : items,
+        items,
         workload: taken ? view.workload : branch.workload,
         followUps: branch.followUps || [],
         basis: branch.basis || null,

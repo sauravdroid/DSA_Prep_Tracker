@@ -126,6 +126,10 @@ export function decisionToDays(decision = {}) {
     }))
 
   if (decision.assessmentDate && steps.length > 0) {
+    // Named by what it asks for. The mode headline belongs to the run, and a
+    // day labelled with it would only repeat what the card above already says.
+    const problems = steps.filter(i => i.type === 'problem')
+    const label = (problems.length > 0 ? problems : steps).map(i => i.title).filter(Boolean).join(' + ')
     days.push({
       dayVersion: DAY_VERSION,
       date: decision.assessmentDate,
@@ -134,7 +138,7 @@ export function decisionToDays(decision = {}) {
       scenarios: [{
         id: 'today',
         priority: 0,
-        label: decision.mode?.headline || "Today's plan",
+        label: label || "Today's plan",
         basis: 'Written for this day, with no condition attached.',
         when: { op: 'always' },
         items: steps,

@@ -2,76 +2,78 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-import { buildDecisionTree, treeRows, defaultCollapsed, describeEdge, dayOutcomes, nodeProgress, holdsOpen } from '../src/utils/decisionTree.js'
+import { buildDayTree, treeRows, defaultCollapsed, describeEdge, dayOutcomes, nodeProgress, holdsOpen } from '../src/utils/decisionTree.js'
+import { decisionToDays } from '../src/utils/days.js'
 
 const fixture = name => JSON.parse(readFileSync(new URL(`../fixtures/${name}`, import.meta.url)))
 
 const resultIs = (dependency, values) => ({ op: 'result_is', dependency, values })
 
+const authored = { assessment: '20260930T120000Z', at: '2026-09-30T12:00:00.000Z' }
+const day = over => ({ dayVersion: 1, authoredBy: authored, ...over })
+
 /**
  * Synthetic, and shaped like a real forecast: an unconditional first day, a
  * second day branching on its grade, a third branching on both.
  */
-const decision = {
-  nextThreeDays: [
-    {
-      date: '2026-10-01',
-      scenarios: [{
-        id: 'main',
+const days = [
+  day({
+    date: '2026-10-01',
+    scenarios: [{
+      id: 'main',
+      priority: 0,
+      label: 'Cousins + Jump Game II',
+      when: { op: 'always' },
+      items: [
+        { type: 'problem', slug: 'cousins-in-binary-tree', title: 'Cousins in Binary Tree', kind: 'cold', minutes: 25 },
+        { type: 'problem', slug: 'jump-game-ii', title: 'Jump Game II', kind: 'learn', minutes: 30 },
+      ],
+    }],
+  }),
+  day({
+    date: '2026-10-02',
+    dependencies: [{ id: 'cousins-oct1', slug: 'cousins-in-binary-tree', title: 'Cousins in Binary Tree', date: '2026-10-01', mode: 'cold' }],
+    scenarios: [
+      {
+        id: 'cousins-red',
         priority: 0,
-        label: 'Cousins + Jump Game II',
-        when: { op: 'always' },
-        items: [
-          { type: 'problem', slug: 'cousins-in-binary-tree', title: 'Cousins in Binary Tree', kind: 'cold', minutes: 25 },
-          { type: 'problem', slug: 'jump-game-ii', title: 'Jump Game II', kind: 'learn', minutes: 30 },
-        ],
-      }],
-    },
-    {
-      date: '2026-10-02',
-      dependencies: [{ id: 'cousins-oct1', slug: 'cousins-in-binary-tree', title: 'Cousins in Binary Tree', date: '2026-10-01', mode: 'cold' }],
-      scenarios: [
-        {
-          id: 'cousins-red',
-          priority: 0,
-          label: 'Repair',
-          when: resultIs('cousins-oct1', ['red']),
-          items: [{ type: 'problem', slug: 'cousins-in-binary-tree', title: 'Cousins', kind: 'repair', minutes: 25 }],
-        },
-        {
-          id: 'diameter',
-          priority: 1,
-          label: 'Diameter baseline',
-          when: resultIs('cousins-oct1', ['green', 'yellow']),
-          items: [{ type: 'problem', slug: 'diameter-of-binary-tree', title: 'Diameter', kind: 'cold', minutes: 20 }],
-        },
-      ],
-    },
-    {
-      date: '2026-10-03',
-      dependencies: [
-        { id: 'cousins-oct1', slug: 'cousins-in-binary-tree', title: 'Cousins in Binary Tree', date: '2026-10-01', mode: 'cold' },
-        { id: 'diameter-oct2', slug: 'diameter-of-binary-tree', title: 'Diameter', date: '2026-10-02', mode: 'cold' },
-      ],
-      scenarios: [
-        {
-          id: 'recovery-test',
-          priority: 0,
-          label: 'Retest Cousins',
-          when: { op: 'all', of: [resultIs('cousins-oct1', ['red']), resultIs('diameter-oct2', ['green'])] },
-          items: [{ type: 'problem', slug: 'cousins-in-binary-tree', title: 'Cousins', kind: 'cold', minutes: 25 }],
-        },
-        {
-          id: 'clean',
-          priority: 1,
-          label: 'Clean',
-          when: { op: 'all', of: [resultIs('cousins-oct1', ['green', 'yellow']), resultIs('diameter-oct2', ['green', 'yellow'])] },
-          items: [{ type: 'problem', slug: 'largest-rectangle-in-histogram', title: 'Histogram', kind: 'cold', minutes: 35 }],
-        },
-      ],
-    },
-  ],
-}
+        label: 'Repair',
+        when: resultIs('cousins-oct1', ['red']),
+        items: [{ type: 'problem', slug: 'cousins-in-binary-tree', title: 'Cousins', kind: 'repair', minutes: 25 }],
+      },
+      {
+        id: 'diameter',
+        priority: 1,
+        label: 'Diameter baseline',
+        when: resultIs('cousins-oct1', ['green', 'yellow']),
+        items: [{ type: 'problem', slug: 'diameter-of-binary-tree', title: 'Diameter', kind: 'cold', minutes: 20 }],
+      },
+    ],
+  }),
+  day({
+    date: '2026-10-03',
+    dependencies: [
+      { id: 'cousins-oct1', slug: 'cousins-in-binary-tree', title: 'Cousins in Binary Tree', date: '2026-10-01', mode: 'cold' },
+      { id: 'diameter-oct2', slug: 'diameter-of-binary-tree', title: 'Diameter', date: '2026-10-02', mode: 'cold' },
+    ],
+    scenarios: [
+      {
+        id: 'recovery-test',
+        priority: 0,
+        label: 'Retest Cousins',
+        when: { op: 'all', of: [resultIs('cousins-oct1', ['red']), resultIs('diameter-oct2', ['green'])] },
+        items: [{ type: 'problem', slug: 'cousins-in-binary-tree', title: 'Cousins', kind: 'cold', minutes: 25 }],
+      },
+      {
+        id: 'clean',
+        priority: 1,
+        label: 'Clean',
+        when: { op: 'all', of: [resultIs('cousins-oct1', ['green', 'yellow']), resultIs('diameter-oct2', ['green', 'yellow'])] },
+        items: [{ type: 'problem', slug: 'largest-rectangle-in-histogram', title: 'Histogram', kind: 'cold', minutes: 35 }],
+      },
+    ],
+  }),
+]
 
 const attempt = (over = {}) => ({
   slug: 'cousins-in-binary-tree',
@@ -86,21 +88,27 @@ const attempt = (over = {}) => ({
 const byId = tree => Object.fromEntries(tree.nodes.map(n => [n.id, n]))
 
 test('a day written as always is the root', () => {
-  const tree = buildDecisionTree(decision, { practiceLog: [] })
+  const tree = buildDayTree(days, { practiceLog: [] })
   assert.equal(tree.roots.length, 1)
   assert.equal(tree.roots[0].id, '2026-10-01:main')
   assert.equal(tree.roots[0].edge, null, 'an unconditional day is reached by no branch')
 })
 
+test('days are read in date order, however they arrive', () => {
+  const tree = buildDayTree([...days].reverse(), { practiceLog: [] })
+  assert.deepEqual(tree.dates.map(d => d.date), ['2026-10-01', '2026-10-02', '2026-10-03'])
+  assert.equal(tree.roots[0].id, '2026-10-01:main')
+})
+
 test('a day branching on the root grade hangs off the problem it grades', () => {
-  const tree = buildDecisionTree(decision, { practiceLog: [] })
+  const tree = buildDayTree(days, { practiceLog: [] })
   const root = tree.roots[0]
   assert.deepEqual(root.children.map(c => c.id), ['2026-10-02:cousins-red', '2026-10-02:diameter'])
   assert.equal(root.children[0].edgeApproximate, false)
 })
 
 test('the branch label and colour come from the condition, not the prose label', () => {
-  const tree = buildDecisionTree(decision, { practiceLog: [] })
+  const tree = buildDayTree(days, { practiceLog: [] })
   const [red, pass] = tree.roots[0].children
   assert.equal(red.edge.tone, 'red')
   assert.deepEqual(red.edge.clauses.map(c => c.label), ['red'])
@@ -169,26 +177,26 @@ test('a branch takes the graver colour of the results it waits on', () => {
 })
 
 test('a third day attaches to the second whose condition it repeats', () => {
-  const nodes = byId(buildDecisionTree(decision, { practiceLog: [] }))
+  const nodes = byId(buildDayTree(days, { practiceLog: [] }))
   assert.equal(nodes['2026-10-03:recovery-test'].parentId, '2026-10-02:cousins-red')
   assert.equal(nodes['2026-10-03:clean'].parentId, '2026-10-02:diameter')
 })
 
 test('only the term the child adds becomes its branch', () => {
-  const nodes = byId(buildDecisionTree(decision, { practiceLog: [] }))
-  // Its own condition also names Monday's Cousins, but that is the parent's.
+  const nodes = byId(buildDayTree(days, { practiceLog: [] }))
+  // Its own condition also names Thursday's Cousins, but that is the parent's.
   assert.deepEqual(nodes['2026-10-03:clean'].edge.clauses.map(c => c.label), ['green / yellow'])
   assert.deepEqual(nodes['2026-10-03:recovery-test'].edge.clauses.map(c => c.label), ['green'])
 })
 
 test('with nothing recorded every branch is open and none is ruled out', () => {
-  const tree = buildDecisionTree(decision, { practiceLog: [] })
+  const tree = buildDayTree(days, { practiceLog: [] })
   assert.equal(tree.roots[0].state, 'taken')
   assert.deepEqual(tree.nodes.filter(n => n.depth > 0).map(n => n.state), ['open', 'open', 'open', 'open'])
 })
 
 test('a recorded grade takes one branch and rules out its sibling', () => {
-  const nodes = byId(buildDecisionTree(decision, { practiceLog: [attempt({ result: 'green' })] }))
+  const nodes = byId(buildDayTree(days, { practiceLog: [attempt({ result: 'green' })] }))
   assert.equal(nodes['2026-10-02:diameter'].state, 'taken')
   assert.equal(nodes['2026-10-02:cousins-red'].state, 'ruled-out')
   assert.equal(nodes['2026-10-03:recovery-test'].state, 'ruled-out', 'a branch under a ruled-out parent cannot be reached')
@@ -196,20 +204,20 @@ test('a recorded grade takes one branch and rules out its sibling', () => {
 
 test('state is the resolver\'s, so the tree cannot disagree with the day panel', () => {
   const log = [attempt({ result: 'red' })]
-  const nodes = byId(buildDecisionTree(decision, { practiceLog: log }))
+  const nodes = byId(buildDayTree(days, { practiceLog: log }))
   assert.equal(nodes['2026-10-02:cousins-red'].state, 'taken')
   assert.equal(nodes['2026-10-02:cousins-red'].dayView.selected.id, 'cousins-red')
 })
 
 test('a prose day is one node, because its alternatives are not checkable', () => {
-  const legacy = fixture('coaching-decision.legacy-prose.example.json')
-  const tree = buildDecisionTree(legacy, { practiceLog: [] })
+  const legacy = decisionToDays(fixture('coaching-decision.legacy-prose.example.json'))
+  const tree = buildDayTree(legacy, { practiceLog: [] })
   assert.ok(tree.nodes.length > 0)
   assert.deepEqual(tree.dates.map(d => d.count), tree.dates.map(() => 1))
 })
 
 test('rows nest children inside their parent, with the guides to draw them', () => {
-  const tree = buildDecisionTree(decision, { practiceLog: [] })
+  const tree = buildDayTree(days, { practiceLog: [] })
   const rows = treeRows(tree.roots)
 
   assert.deepEqual(rows.map(r => r.node.id), ['2026-10-01:main'])
@@ -229,13 +237,13 @@ test('rows nest children inside their parent, with the guides to draw them', () 
 })
 
 test('every node is present whatever is folded, so a subtree can animate shut', () => {
-  const tree = buildDecisionTree(decision, { practiceLog: [] })
+  const tree = buildDayTree(days, { practiceLog: [] })
   const count = rows => rows.reduce((n, r) => n + 1 + count(r.children), 0)
   assert.equal(count(treeRows(tree.roots)), tree.nodes.length)
 })
 
 test('by default the taken path is open and the alternatives are folded shut', () => {
-  const tree = buildDecisionTree(decision, { practiceLog: [] })
+  const tree = buildDayTree(days, { practiceLog: [] })
   const collapsed = defaultCollapsed(tree.roots)
 
   const visible = rows => rows.flatMap(r =>
@@ -251,21 +259,21 @@ test('by default the taken path is open and the alternatives are folded shut', (
 test('the days up to today are held open, whatever branch they sit on', () => {
   // Nothing is recorded, so no Friday branch is taken. Thursday still has to
   // show them: it is the day itself, not the branch, that cannot be hidden.
-  const tree = buildDecisionTree(decision, { practiceLog: [] })
+  const tree = buildDayTree(days, { practiceLog: [] })
   const root = tree.roots[0]
   assert.equal(holdsOpen(root, '2026-10-02'), true)
   assert.equal(defaultCollapsed(tree.roots, '2026-10-02').has(root.id), false)
 })
 
 test('a day still ahead stays foldable', () => {
-  const tree = buildDecisionTree(decision, { practiceLog: [] })
+  const tree = buildDayTree(days, { practiceLog: [] })
   const root = tree.roots[0]
   assert.equal(holdsOpen(root, '2026-10-01'), false, 'Friday has not arrived yet')
   assert.equal(holdsOpen(root.children[0], '2026-10-02'), false, 'nor has Saturday')
 })
 
 test('a leaf holds nothing open, having nothing below it', () => {
-  const tree = buildDecisionTree(decision, { practiceLog: [] })
+  const tree = buildDayTree(days, { practiceLog: [] })
   const leaf = tree.roots[0].children[0].children[0]
   assert.equal(holdsOpen(leaf, '2026-10-09'), false)
 })
@@ -288,22 +296,27 @@ test('not completed reads as its own outcome rather than a failure', () => {
   assert.equal(edge.tone, 'slate')
 })
 
-test('an empty forecast is an empty tree rather than an error', () => {
-  assert.deepEqual(buildDecisionTree(null, {}), { roots: [], nodes: [], dates: [] })
+test('no days is an empty tree rather than an error', () => {
+  assert.deepEqual(buildDayTree([], {}), { roots: [], nodes: [], dates: [] })
+  assert.deepEqual(buildDayTree(undefined, {}), { roots: [], nodes: [], dates: [] })
+})
+
+test('a day with no date is skipped rather than given one', () => {
+  assert.deepEqual(buildDayTree([{ scenarios: [] }], {}).nodes, [])
 })
 
 test("a day's verdict is the grades it recorded, worst first", () => {
-  const day = [
+  const recorded = [
     { slug: 'a', attempts: [{ result: 'green' }] },
     { slug: 'b', attempts: [{ result: 'red' }] },
     { slug: 'c', attempts: [{ result: 'green' }] },
   ]
-  assert.deepEqual(dayOutcomes(day), ['red', 'green'])
+  assert.deepEqual(dayOutcomes(recorded), ['red', 'green'])
 })
 
 test('a problem attempted twice in a day contributes both grades', () => {
-  const day = [{ slug: 'a', attempts: [{ result: 'red' }, { result: 'green', sessionRepeat: true }] }]
-  assert.deepEqual(dayOutcomes(day), ['red', 'green'])
+  const recorded = [{ slug: 'a', attempts: [{ result: 'red' }, { result: 'green', sessionRepeat: true }] }]
+  assert.deepEqual(dayOutcomes(recorded), ['red', 'green'])
 })
 
 test('an explicit skip is the only thing that reads as not completed', () => {
@@ -320,7 +333,7 @@ test('work with no grade is not a verdict, and absence is not a skip', () => {
 
 test('a node reports how much of its own plan is recorded', () => {
   const log = [attempt({ slug: 'cousins-in-binary-tree' })]
-  const root = buildDecisionTree(decision, { practiceLog: log }).roots[0]
+  const root = buildDayTree(days, { practiceLog: log }).roots[0]
   assert.deepEqual(nodeProgress(root, '2026-10-01'), { done: 1, total: 2, complete: false })
 })
 
@@ -329,7 +342,7 @@ test('a day is complete once every problem it planned is recorded', () => {
     attempt({ slug: 'cousins-in-binary-tree' }),
     attempt({ slug: 'jump-game-ii' }),
   ]
-  const root = buildDecisionTree(decision, { practiceLog: log }).roots[0]
+  const root = buildDayTree(days, { practiceLog: log }).roots[0]
   assert.deepEqual(nodeProgress(root, '2026-10-01'), { done: 2, total: 2, complete: true })
 })
 
@@ -343,76 +356,40 @@ test('today is not settled by planning nothing, because it can still be worked',
   assert.equal(nodeProgress(node, '2026-10-01').complete, false)
 })
 
-test('a plan adopted today gets a node for today, which the forecast does not cover', () => {
-  const adopted = {
-    assessmentDate: '2026-09-30',
-    mode: { headline: 'Mixed — one Stack baseline' },
-    today: {
-      doNow: { slug: 'cousins-in-binary-tree', title: 'Cousins in Binary Tree', mode: 'cold', minutes: 25 },
-      then: { action: 'Record the result' },
-    },
-    ...decision,
-  }
-  const tree = buildDecisionTree(adopted, { practiceLog: [] })
+test('an earlier day is a root that the days branching on it hang from', () => {
+  // What used to be the assessment's own day is now just the first day there
+  // is. Nothing special marks it, and nothing has to bridge two shapes.
+  const earlier = day({
+    date: '2026-09-30',
+    scenarios: [{
+      id: 'main',
+      when: { op: 'always' },
+      items: [{ type: 'problem', slug: 'next-greater-element-ii', title: 'NGE II', kind: 'cold' }],
+    }],
+  })
+  const tree = buildDayTree([earlier, ...days], { practiceLog: [] })
   assert.equal(tree.roots.length, 1)
-  assert.equal(tree.roots[0].id, '2026-09-30:today')
-  assert.equal(tree.roots[0].state, 'taken')
-  assert.deepEqual(tree.roots[0].items.map(i => i.type), ['problem', 'action'])
-  // The first forecast day grades that problem, so it branches off it.
+  assert.equal(tree.roots[0].id, '2026-09-30:main')
   assert.deepEqual(tree.roots[0].children.map(c => c.id), ['2026-10-01:main'])
 })
 
-test('the assessment day is not repeated when the forecast already covers it', () => {
-  const overlapping = {
-    assessmentDate: '2026-10-01',
-    today: { doNow: { slug: 'cousins-in-binary-tree', title: 'Cousins', mode: 'cold' } },
-    ...decision,
-  }
-  const tree = buildDecisionTree(overlapping, { practiceLog: [] })
-  assert.deepEqual(tree.dates.map(d => d.date), ['2026-10-01', '2026-10-02', '2026-10-03'])
-})
-
-const withToday = then => ({
-  assessmentDate: '2026-09-30',
-  today: { doNow: { slug: 'cousins-in-binary-tree', title: 'Cousins', mode: 'cold' }, then },
-  ...decision,
-})
-
-test('a follow-up with no target of its own finishes with the step before it', () => {
-  // The schema promises this: without a slug there is nothing else it could be
-  // waiting on, so leaving it open reports finished work as still to do.
-  const log = [attempt({ slug: 'cousins-in-binary-tree', date: '2026-09-30' })]
-  const root = buildDecisionTree(withToday({ action: 'Record the result' }), { practiceLog: log }).roots[0]
-  assert.deepEqual(root.items.map(i => i.done), [true, true])
-})
-
-test('a follow-up stays open while the step before it is unrecorded', () => {
-  const root = buildDecisionTree(withToday({ action: 'Record the result' }), { practiceLog: [] }).roots[0]
-  assert.deepEqual(root.items.map(i => i.done), [false, false])
-})
-
-test('a follow-up with a target of its own waits for that target', () => {
-  const log = [attempt({ slug: 'cousins-in-binary-tree', date: '2026-09-30' })]
-  const then = { slug: 'decode-string', title: 'Decode String' }
-  const root = buildDecisionTree(withToday(then), { practiceLog: log }).roots[0]
-  assert.deepEqual(root.items.map(i => i.done), [true, false], 'Decode String was never recorded')
-})
-
-test('a forecast day does not carry doneness onto its actions', () => {
-  // Only `today.then` has the schema's promise behind it. A day that plans an
-  // action after a problem is planning two separate things.
-  const day = {
+test('an action never counts as done, having nothing that could record it', () => {
+  // The tracker grades problems. An action is guidance, so claiming either
+  // state for it would be asserting something no evidence can support.
+  const withAction = day({
     date: '2026-10-01',
     scenarios: [{
       id: 'main',
       when: { op: 'always' },
       items: [
         { type: 'problem', slug: 'cousins-in-binary-tree', title: 'Cousins', kind: 'cold' },
-        { type: 'action', title: 'Refresh coaching' },
+        { type: 'action', title: 'Record the result, then stop' },
       ],
     }],
-  }
+  })
   const log = [attempt({ slug: 'cousins-in-binary-tree', date: '2026-10-01' })]
-  const root = buildDecisionTree({ nextThreeDays: [day] }, { practiceLog: log }).roots[0]
+  const root = buildDayTree([withAction], { practiceLog: log }).roots[0]
   assert.deepEqual(root.items.map(i => i.done), [true, false])
+  assert.deepEqual(nodeProgress(root, '2026-10-02'), { done: 1, total: 1, complete: true },
+    'and it is not outstanding work holding the day open')
 })

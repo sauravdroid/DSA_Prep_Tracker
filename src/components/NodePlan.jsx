@@ -43,6 +43,20 @@ const modeOf = kind => (kind === 'new' ? 'learn' : ['cold', 'warm', 'repair', 'l
 function Task({ item, order, canRecord, canOpen, onOpenProblem, onGrade }) {
   const [open, setOpen] = useState(false)
 
+  // An action is guidance. The tracker grades problems, so badging one Done or
+  // outstanding would assert a state nothing can record — and beside a step
+  // marked Done, an ordering label alone reads as one.
+  if (item.type !== 'problem') {
+    return (
+      <li className="rounded-xl bg-slate-50 px-4 py-3">
+        <p className="text-sm font-medium text-slate-700">{item.title}</p>
+        {(item.purpose || item.why) && (
+          <p className="mt-0.5 text-sm text-slate-500">{item.purpose || item.why}</p>
+        )}
+      </li>
+    )
+  }
+
   return (
     <li className={`rounded-xl border px-4 py-3 ${item.done ? 'border-slate-200 bg-slate-50' : 'border-slate-200'}`}>
       <div className="flex flex-wrap items-center gap-2">

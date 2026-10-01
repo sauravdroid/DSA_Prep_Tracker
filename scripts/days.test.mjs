@@ -245,6 +245,14 @@ test("today's two steps become one unconditional day", () => {
   assert.equal(first.scenarios[0].items[0].slug, 'next-greater-element-ii')
 })
 
+test('a converted day is named by what it asks for, not by the run that wrote it', () => {
+  // The mode headline belongs to the assessment and already sits above the
+  // tree; repeating it on the node would say nothing about the day.
+  const [first] = decisionToDays(structured)
+  assert.equal(first.scenarios[0].label, 'Next Greater Element II')
+  assert.equal(first.headline, structured.mode.headline, 'the run still says why, on the day')
+})
+
 test('a forecast day carries across whole, conditions and all', () => {
   const thursday = decisionToDays(structured).find(d => d.date === '2026-10-01')
   const original = structured.nextThreeDays.find(d => d.date === '2026-10-01')

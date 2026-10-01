@@ -5,7 +5,8 @@ import { loadDecision, saveDecision, decisionStaleness, forecastValidity, tracke
 import { pullCoaching, coachingHistory, backupIfConnected, getRepo } from '../utils/github'
 import { getSyncState } from '../utils/dataFile'
 import { todayStr } from '../utils/dateUtils'
-import { buildDecisionTree } from '../utils/decisionTree'
+import { buildDayTree } from '../utils/decisionTree'
+import { decisionToDays } from '../utils/days'
 import ColdTestModal from './ColdTestModal'
 import ProblemDrawer from './ProblemDrawer'
 import DecisionTree from './DecisionTree'
@@ -109,7 +110,9 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
   const live = d && !staleness.stale
 
   const tree = useMemo(
-    () => (live ? buildDecisionTree(d, { practiceLog, anchors: retention.anchorList, today }) : EMPTY_TREE),
+    () => (live
+      ? buildDayTree(decisionToDays(d), { practiceLog, anchors: retention.anchorList, today })
+      : EMPTY_TREE),
     [live, d, practiceLog, retention.anchorList, today]
   )
   const coached = tree.roots.length > 0
