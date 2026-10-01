@@ -167,21 +167,21 @@ test('a grade on another date does not pin this one', () => {
 
 test('the index carries both directions, so either end of a link is findable', () => {
   const index = buildDayIndex([day(), friday()])
-  assert.deepEqual(index.days['2026-10-03'].dependsOn, ['2026-10-02'])
-  assert.deepEqual(index.days['2026-10-02'].requiredBy, ['2026-10-03'])
-  assert.deepEqual(index.days['2026-10-03'].requiredBy, [])
+  assert.deepEqual(index.entries['2026-10-03'].dependsOn, ['2026-10-02'])
+  assert.deepEqual(index.entries['2026-10-02'].requiredBy, ['2026-10-03'])
+  assert.deepEqual(index.entries['2026-10-03'].requiredBy, [])
 })
 
 test('the index reports a day planning a range, since its branches differ', () => {
   const index = buildDayIndex([day()])
-  assert.deepEqual(index.days['2026-10-03'].problems, { min: 1, max: 2 })
+  assert.deepEqual(index.entries['2026-10-03'].problems, { min: 1, max: 2 })
 })
 
 test('the index names the drifted days rather than only counting them', () => {
   const rewritten = friday({ authoredBy: { assessment: '20261002T090000Z' } })
   const index = buildDayIndex([day(), rewritten])
   assert.deepEqual(index.drifted, ['2026-10-03'])
-  assert.deepEqual(index.days['2026-10-03'].driftedFrom, ['2026-10-02'])
+  assert.deepEqual(index.entries['2026-10-03'].driftedFrom, ['2026-10-02'])
 })
 
 test('the index spans the days it holds', () => {
@@ -192,7 +192,7 @@ test('the index spans the days it holds', () => {
 })
 
 test('an empty index is empty rather than an error', () => {
-  assert.deepEqual(buildDayIndex([]), { count: 0, from: null, to: null, drifted: [], days: {} })
+  assert.deepEqual(buildDayIndex([]), { count: 0, from: null, to: null, drifted: [], entries: {} })
 })
 
 test('a run is compared by its id, which sorts chronologically', () => {

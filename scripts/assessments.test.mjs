@@ -78,4 +78,18 @@ test('an empty archive is stated rather than implied', () => {
   assert.equal(index.count, 0)
   assert.equal(index.latest, null)
   assert.deepEqual(index.byDate, {})
+  assert.deepEqual(index.days, { count: 0, from: null, to: null, drifted: [], entries: {} })
+})
+
+test('one index answers both questions, so orienting costs one read', () => {
+  const day = {
+    dayVersion: 1,
+    date: '2026-10-02',
+    authoredBy: { assessment: '20260930T135500Z' },
+    scenarios: [{ id: 'main', when: { op: 'always' }, items: [{ type: 'problem', slug: 'jump-game-ii' }] }],
+  }
+  const index = buildIndex([summarise(afternoon)], [day])
+  assert.equal(index.assessments[0].id, '20260930T135500Z', 'the run that reasoned')
+  assert.equal(index.days.entries['2026-10-02'].file, 'coaching/days/2026-10-02.json', 'the plan it wrote')
+  assert.equal(index.days.entries['2026-10-02'].authoredBy.assessment, '20260930T135500Z')
 })

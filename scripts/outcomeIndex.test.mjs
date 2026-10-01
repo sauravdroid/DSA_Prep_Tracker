@@ -58,7 +58,7 @@ test('a live assessment carries a null outcome, not a failed one', () => {
   ])
   assert.equal(index.assessments[0].outcome, null)
   assert.equal(index.sealed, 0)
-  assert.match(index.note, /still live, not that its forecast failed/)
+  assert.match(index.note, /still live, not that the forecast failed/)
 })
 
 test('the index counts how many assessments are sealed', () => {

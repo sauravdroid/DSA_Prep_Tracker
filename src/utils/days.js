@@ -133,6 +133,6 @@ export function buildDayIndex(days = []) {
     from: dates[0] ?? null,
     to: dates[dates.length - 1] ?? null,
     drifted: dates.filter(d => entries[d].drifted),
-    days: entries,
+    entries,
   }
 }

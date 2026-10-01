@@ -9,9 +9,11 @@
  * later.
  */
 
+import { buildDayIndex } from './days.js'
+
 export const ASSESSMENT_DIR = 'coaching/assessments'
 export const INDEX_PATH = 'coaching/index.json'
-export const INDEX_VERSION = 1
+export const INDEX_VERSION = 2
 
 /**
  * A filename from the assessment's own timestamp. Readable and chronological,
@@ -62,11 +64,20 @@ export function summarise(decision = {}, { commit = null, bytes = null, outcome 
 }
 
 /**
- * Newest first, because the question is almost always about recent advice.
- * `byDate` lists every assessment that spoke to a date, so a reader can also
- * ask what was in force on that date rather than only what governs it now.
+ * One index, two questions. `assessments` is the runs, newest first, because
+ * the question is almost always about recent advice. `days` is the plan per
+ * date, with the links between days in both directions.
+ *
+ * They are kept in one file so that orienting costs one read: the manifest
+ * points here, and a reader that had to fetch a second index to find out what
+ * tomorrow says would be one instruction away from not bothering.
+ *
+ * `byDate` answers from the assessment side which runs spoke to a date. Once
+ * days are populated it is answered better by `days.entries[date].authoredBy`,
+ * and it goes then rather than now — removing it first would leave a window
+ * where neither works.
  */
-export function buildIndex(summaries = []) {
+export function buildIndex(summaries = [], days = []) {
   const assessments = [...summaries]
     .filter(s => s.id)
     .sort((a, b) => String(b.assessedAt).localeCompare(String(a.assessedAt)))
@@ -78,13 +89,14 @@ export function buildIndex(summaries = []) {
 
   return {
     indexVersion: INDEX_VERSION,
-    note: 'Ordered newest first. An assessment governs a date if that date is in its covers. For what was in force on a past date, take the latest whose assessedAt falls on or before the end of that date; the newest entry may have been written afterwards. A null outcome means the assessment is still live, not that its forecast failed.',
+    note: 'Assessments are ordered newest first and hold the reasoning. Days hold the plans, one file per date, and name the run that wrote each. A day is drifted when something it depends on was written by a later run than itself: the dependency may still resolve, but the plan it was answering has changed. A null outcome means still live, not that the forecast failed.',
     count: assessments.length,
     sealed: assessments.filter(a => a.outcome).length,
     latest: assessments[0]?.id ?? null,
     coversThrough: assessments.flatMap(s => s.covers).sort().pop() ?? null,
     assessments,
     byDate: Object.fromEntries(Object.keys(byDate).sort().map(d => [d, byDate[d]])),
+    days: buildDayIndex(days),
   }
 }
 
