@@ -31,6 +31,32 @@ export async function saveDecision(decision) {
   return body
 }
 
+/** Every day plan held locally, with the index that describes them. */
+export async function loadDays() {
+  try {
+    const res = await fetch(`${ENDPOINT}/days`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const body = await res.json()
+    return { index: body.index || null, days: body.days || {}, available: true }
+  } catch (e) {
+    return { index: null, days: {}, available: false, error: e.message }
+  }
+}
+
+export async function saveDays({ index, days }) {
+  const res = await fetch(`${ENDPOINT}/days`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ index, days }),
+  })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const detail = (body.errors || []).slice(0, 5).join('; ')
+    throw new Error([body.error || `HTTP ${res.status}`, detail].filter(Boolean).join(' — '))
+  }
+  return body
+}
+
 /**
  * The attempts a decision already anticipates, as `slug|date`. Today's step
  * counts alongside the forecast's dependencies: a plan that asks for a result

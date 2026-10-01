@@ -1,6 +1,7 @@
 import { syncToday } from '../services/leetcode'
-import { backupIfConnected, pullFromGithub, remoteStatus, coachingHistory, pullCoaching, archiveCoaching, getRepo } from './github'
-import { loadDecision, saveDecision } from './coaching'
+import { backupIfConnected, pullFromGithub, remoteStatus, coachingHistory, pullCoaching, archiveCoaching, pullDays, getRepo } from './github'
+import { loadDecision, saveDecision, loadDays, saveDays } from './coaching'
+import { canonical } from './trackerDiff'
 import * as store from '../store'
 
 export const INTERVAL_MS = 10 * 60 * 1000
@@ -174,6 +175,30 @@ async function archiveStep() {
   }
 }
 
+/**
+ * Brings the published day plans into the local store.
+ *
+ * Runs after archiving, which is what produces them: a revision published
+ * while the app was closed becomes a day file first and is copied here second.
+ */
+async function daysStep(changed) {
+  try {
+    const remote = await withTimeout(pullDays(), 'Fetching day plans')
+    if (remote.empty || !remote.index) return
+
+    const local = await loadDays()
+    const fresh = Object.keys(remote.days || {})
+      .filter(d => canonical(local.days?.[d]) !== canonical(remote.days[d]))
+    if (fresh.length === 0) return
+
+    await withTimeout(saveDays({ index: remote.index, days: remote.days }), 'Storing day plans')
+    note(`Updated ${fresh.length} day plan${fresh.length === 1 ? '' : 's'}`)
+    changed.push(`${fresh.length} day plan${fresh.length === 1 ? '' : 's'}`)
+  } catch (e) {
+    note(`Could not fetch day plans: ${e.message}`)
+  }
+}
+
 /** The published plan, downloaded only when its head differs from the pin. */
 async function planStep(changed) {
   step('plan', 'running')
@@ -190,6 +215,7 @@ async function planStep(changed) {
     // Still archive: a revision published while this app was closed would
     // otherwise never be copied, since the pin already matches.
     await archiveStep()
+    await daysStep(changed)
     step('plan', 'done', `Up to date (${head.shortSha})`)
     return
   }
@@ -222,6 +248,7 @@ async function planStep(changed) {
     },
   }), 'Adopting the plan')
   await archiveStep()
+  await daysStep(changed)
   step('plan', 'done', `Adopted ${head.shortSha}`)
   note(`Adopted a new plan: ${head.shortSha} — ${head.message || 'no message'}`)
   changed.push('new plan')

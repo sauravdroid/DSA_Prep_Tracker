@@ -112,3 +112,8 @@ export function coachingHistory() {
 export function archiveCoaching() {
   return call('/coaching/archive', { repo: getRepo() })
 }
+
+/** The published index and day plans. Omit `dates` for everything it holds. */
+export function pullDays(dates) {
+  return call('/coaching/days', { repo: getRepo(), ...(dates ? { dates } : {}) })
+}

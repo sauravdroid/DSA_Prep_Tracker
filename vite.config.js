@@ -5,7 +5,7 @@ import https from 'https'
 import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
-import { validateDecision, outOfScopeFiles } from './src/utils/validateDecision.js'
+import { validateDecision, validateDay, outOfScopeFiles } from './src/utils/validateDecision.js'
 import { unpublishedKeys } from './src/utils/trackerDiff.js'
 import { publishSet } from './src/utils/publishSet.js'
 import { assessmentId, assessmentPath, summarise, buildIndex, INDEX_PATH, coveredDates } from './src/utils/assessments.js'
@@ -751,6 +751,8 @@ function githubSync() {
 function coachingDecisionStore() {
   let dir = ''
   let file = ''
+  let dayDir = ''
+  let dayIndexFile = ''
 
   const send = (res, code, body) => {
     res.statusCode = code
@@ -758,7 +760,72 @@ function coachingDecisionStore() {
     res.end(JSON.stringify(body))
   }
 
+  const readJson = p => JSON.parse(fs.readFileSync(p, 'utf8'))
+
+  const writeAtomic = (p, value) => {
+    fs.mkdirSync(path.dirname(p), { recursive: true })
+    const tmp = `${p}.tmp`
+    fs.writeFileSync(tmp, JSON.stringify(value, null, 2))
+    fs.renameSync(tmp, p)
+  }
+
+  const days = (req, res) => {
+    if (req.method === 'GET') {
+      try {
+        const index = fs.existsSync(dayIndexFile) ? readJson(dayIndexFile) : null
+        const loaded = {}
+        if (fs.existsSync(dayDir)) {
+          for (const name of fs.readdirSync(dayDir)) {
+            if (!name.endsWith('.json')) continue
+            loaded[name.slice(0, -5)] = readJson(path.join(dayDir, name))
+          }
+        }
+        return send(res, 200, { index, days: loaded, path: dayDir })
+      } catch (e) {
+        return send(res, 500, { error: e.message, path: dayDir })
+      }
+    }
+
+    if (req.method === 'PUT') {
+      let body = ''
+      req.on('data', c => (body += c))
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body)
+          const incoming = payload.days || {}
+
+          // Advice is checked here rather than trusted because it was
+          // committed: a published day still has to satisfy the contract the
+          // coach was asked to author against.
+          const errors = []
+          for (const [date, day] of Object.entries(incoming)) {
+            if (day?.date !== date) errors.push(`${date}: file and date disagree.`)
+            const { errors: dayErrs } = validateDay(day)
+            errors.push(...dayErrs)
+          }
+          if (errors.length > 0) {
+            return send(res, 400, { error: 'Days failed validation', errors: [...new Set(errors)] })
+          }
+
+          for (const [date, day] of Object.entries(incoming)) {
+            writeAtomic(path.join(dayDir, `${date}.json`), day)
+          }
+          if (payload.index) writeAtomic(dayIndexFile, payload.index)
+
+          return send(res, 200, { ok: true, written: Object.keys(incoming).length, path: dayDir })
+        } catch (e) {
+          return send(res, 400, { error: e.message })
+        }
+      })
+      return
+    }
+
+    send(res, 405, { error: 'Method not allowed' })
+  }
+
   const handler = (req, res) => {
+    if ((req.url || '').split('?')[0].replace(/\/$/, '') === '/days') return days(req, res)
+
     if (req.method === 'GET') {
       try {
         if (!fs.existsSync(file)) return send(res, 200, { decision: null, path: file })
@@ -799,6 +866,8 @@ function coachingDecisionStore() {
     configResolved(config) {
       dir = path.join(config.root, DATA_DIR)
       file = path.join(dir, 'coaching-decision.json')
+      dayDir = path.join(dir, 'coaching', 'days')
+      dayIndexFile = path.join(dir, 'coaching', 'index.json')
     },
     configureServer(server) {
       server.middlewares.use('/api/coaching', handler)

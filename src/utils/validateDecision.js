@@ -14,10 +14,15 @@ import addFormats from 'ajv-formats'
 const schema = JSON.parse(
   readFileSync(new URL('../../schemas/coaching-decision.schema.json', import.meta.url), 'utf8')
 )
+const daySchema = JSON.parse(
+  readFileSync(new URL('../../schemas/coaching-day.schema.json', import.meta.url), 'utf8')
+)
 
 const ajv = new Ajv2020({ allErrors: true, strict: false })
 addFormats(ajv)
+ajv.addSchema(schema)
 const validateSchema = ajv.compile(schema)
+const validateDaySchema = ajv.compile(daySchema)
 
 const SUPPORTED_OUTLOOK_VERSIONS = [1, 2]
 
@@ -43,6 +48,55 @@ function isRealDate(value) {
 }
 
 /**
+ * Checks the schema cannot make, for one day. Shared so a day is held to the
+ * same rules whether it arrives inside a decision or as its own document.
+ */
+function dayErrors(day) {
+  const errors = []
+  if (!isRealDate(day.date)) errors.push(`${day.date} is not a real calendar date.`)
+  if (!day.scenarios) return errors
+
+  const deps = day.dependencies || []
+  const ids = new Set(deps.map(d => d.id))
+  const priorities = new Map()
+
+  // A result dated after the day that waits on it cannot arrive in time.
+  for (const dep of deps) {
+    if (dep.date && day.date && dep.date > day.date) {
+      errors.push(`${day.date}: dependency "${dep.id}" waits on ${dep.date}, which is later.`)
+    }
+  }
+
+  for (const s of day.scenarios) {
+    for (const op of collectOps(s.when)) {
+      if (!SUPPORTED_OPS.has(op)) {
+        errors.push(`${day.date}: scenario "${s.id}" uses unknown condition "${op}".`)
+      }
+    }
+
+    // A condition naming a dependency that does not exist can never resolve,
+    // so the day would sit on "Needs review" forever.
+    const named = [s.when, ...(s.when?.of || [])]
+      .map(p => p?.dependency)
+      .filter(Boolean)
+    for (const dep of named) {
+      if (!ids.has(dep)) {
+        errors.push(`${day.date}: scenario "${s.id}" refers to unknown dependency "${dep}".`)
+      }
+    }
+
+    if (s.priority != null) {
+      if (priorities.has(s.priority)) {
+        errors.push(`${day.date}: scenarios "${priorities.get(s.priority)}" and "${s.id}" share priority ${s.priority}.`)
+      }
+      priorities.set(s.priority, s.id)
+    }
+  }
+
+  return errors
+}
+
+/**
  * Checks the schema cannot make: references that must resolve, priorities that
  * must be unambiguous, and dates that must be real and distinct.
  */
@@ -59,43 +113,26 @@ function semanticErrors(decision) {
   for (const day of days) {
     if (seen.has(day.date)) errors.push(`Duplicate outlook date ${day.date}.`)
     seen.add(day.date)
-    if (!isRealDate(day.date)) {
-      errors.push(`${day.date} is not a real calendar date.`)
-    }
-
-    if (!day.scenarios) continue
-
-    const ids = new Set((day.dependencies || []).map(d => d.id))
-    const priorities = new Map()
-
-    for (const s of day.scenarios) {
-      for (const op of collectOps(s.when)) {
-        if (!SUPPORTED_OPS.has(op)) {
-          errors.push(`${day.date}: scenario "${s.id}" uses unknown condition "${op}".`)
-        }
-      }
-
-      // A condition naming a dependency that does not exist can never resolve,
-      // so the day would sit on "Needs review" forever.
-      const named = [s.when, ...(s.when?.of || [])]
-        .map(p => p?.dependency)
-        .filter(Boolean)
-      for (const dep of named) {
-        if (!ids.has(dep)) {
-          errors.push(`${day.date}: scenario "${s.id}" refers to unknown dependency "${dep}".`)
-        }
-      }
-
-      if (s.priority != null) {
-        if (priorities.has(s.priority)) {
-          errors.push(`${day.date}: scenarios "${priorities.get(s.priority)}" and "${s.id}" share priority ${s.priority}.`)
-        }
-        priorities.set(s.priority, s.id)
-      }
-    }
+    errors.push(...dayErrors(day))
   }
 
   return errors
+}
+
+/** @returns {{ valid: boolean, errors: string[] }} */
+export function validateDay(day) {
+  if (!day || typeof day !== 'object' || Array.isArray(day)) {
+    return { valid: false, errors: ['A day must be a JSON object.'] }
+  }
+
+  const errors = [...dayErrors(day)]
+  if (!validateDaySchema(day)) {
+    for (const e of validateDaySchema.errors) {
+      errors.push(`${e.instancePath || '/'} ${e.message}`.trim())
+    }
+  }
+
+  return { valid: errors.length === 0, errors: [...new Set(errors)] }
 }
 
 /** @returns {{ valid: boolean, errors: string[] }} */

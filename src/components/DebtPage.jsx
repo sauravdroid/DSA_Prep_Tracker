@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { computeRetention, daysBetween, HEALTH, ROLES, suggestAnchors } from '../utils/retention'
-import { loadDecision, saveDecision, decisionStaleness, forecastValidity, trackerSnapshot } from '../utils/coaching'
+import { loadDecision, saveDecision, loadDays, decisionStaleness, forecastValidity, trackerSnapshot } from '../utils/coaching'
 import { pullCoaching, coachingHistory, backupIfConnected, getRepo } from '../utils/github'
 import { getSyncState } from '../utils/dataFile'
 import { todayStr } from '../utils/dateUtils'
@@ -33,8 +33,6 @@ const MODE_STYLE = {
   MIXED: { bar: 'bg-amber-500', text: 'text-amber-600' },
   CONSOLIDATION: { bar: 'bg-rose-500', text: 'text-rose-600' },
 }
-
-const EMPTY_TREE = { roots: [], nodes: [], dates: [] }
 
 const RESULT_DOT = {
   green: 'bg-emerald-500 text-white',
@@ -101,19 +99,24 @@ function BackupNote({ backup, onDismiss }) {
     </div>
   )
 }
-function TodayHeadline({ retention, decision, staleness, validity, practiceLog, today, onGrade, onOpenSetup, onOpenProblem, onOpenCoaching }) {
+function TodayHeadline({ retention, decision, dayPlans, staleness, validity, practiceLog, today, onGrade, onOpenSetup, onOpenProblem, onOpenCoaching }) {
   const { mode, modeProvisional, plan, totalDebt, debtCalculable, agenda, doneToday, trackedCount } = retention
   const roleOf = name => retention.topics.find(t => t.name === name)?.role
   const ms = MODE_STYLE[mode.key]
   const d = decision
-  // A stale decision stops driving the day; fall back to the live derivation.
-  const live = d && !staleness.stale
+
+  // Day files are the record of what was planned for each date, so they stand
+  // whatever the latest assessment says. Converting the adopted decision is the
+  // fallback for a store that has not been filled yet.
+  const dayList = useMemo(() => {
+    const stored = Object.values(dayPlans || {})
+    if (stored.length > 0) return stored
+    return d && !staleness.stale ? decisionToDays(d) : []
+  }, [dayPlans, d, staleness.stale])
 
   const tree = useMemo(
-    () => (live
-      ? buildDayTree(decisionToDays(d), { practiceLog, anchors: retention.anchorList, today })
-      : EMPTY_TREE),
-    [live, d, practiceLog, retention.anchorList, today]
+    () => buildDayTree(dayList, { practiceLog, anchors: retention.anchorList, today }),
+    [dayList, practiceLog, retention.anchorList, today]
   )
   const coached = tree.roots.length > 0
 
@@ -899,10 +902,12 @@ export default function DebtPage({ problems, revisions, onChanged }) {
   const [rightTab, setRightTab] = useState('tracked')
   const [decision, setDecision] = useState(null)
   const [decisionPath, setDecisionPath] = useState(null)
+  const [dayPlans, setDayPlans] = useState({})
   const [drawer, setDrawer] = useState(null)
 
   useEffect(() => {
     loadDecision().then(r => { setDecision(r.decision); setDecisionPath(r.path) })
+    loadDays().then(r => setDayPlans(r.days || {}))
   }, [])
 
   const retention = useMemo(
@@ -998,6 +1003,7 @@ export default function DebtPage({ problems, revisions, onChanged }) {
           <TodayHeadline
             retention={retention}
             decision={decision}
+            dayPlans={dayPlans}
             staleness={staleness}
             validity={validity}
             practiceLog={log}
