@@ -398,34 +398,48 @@ export function computeRetention({ problems, revisions, log, anchorOverrides, to
     return { tracked: all.filter(p => trackedNames.has(p)), all }
   }
 
-  const doneOn = date => [
-    ...practiceLog
-      .filter(e => e.date === date)
-      .map(e => ({
-        key: `attempt:${e.id}`,
-        kind: 'attempt',
-        slug: e.slug,
-        problem: problems[e.slug] || null,
-        ...topicsFor(problems[e.slug]),
+  /**
+   * A day's work, one entry per problem. A graded attempt and a resubmission
+   * picked up from LeetCode are separate facts about the same problem, and
+   * listing them apart made a three-problem day read as a six-item one.
+   */
+  const doneOn = date => {
+    const byProblem = new Map()
+    const slot = (slug, problem) => {
+      if (!byProblem.has(slug)) {
+        byProblem.set(slug, {
+          key: `done:${slug}`,
+          slug,
+          problem: problem || null,
+          ...topicsFor(problem),
+          attempts: [],
+          solved: false,
+          revised: false,
+        })
+      }
+      return byProblem.get(slug)
+    }
+
+    for (const e of practiceLog) {
+      if (e.date !== date) continue
+      slot(e.slug, problems[e.slug]).attempts.push({
+        id: e.id,
         result: e.result,
         mode: e.mode,
         timeMinutes: e.timeMinutes,
         help: e.help,
         sessionRepeat: e.sessionRepeat,
-      })),
-    ...problemList
-      .filter(p => p.dateSolved === date)
-      .map(p => ({ key: `solved:${p.slug}`, kind: 'solved', slug: p.slug, problem: p, ...topicsFor(p) })),
-    ...revisions
-      .filter(r => r.date === date)
-      .map(r => ({
-        key: `revised:${r.slug}`,
-        kind: 'revised',
-        slug: r.slug,
-        problem: problems[r.slug] || null,
-        ...topicsFor(problems[r.slug]),
-      })),
-  ]
+        skipped: e.skipped,
+      })
+    }
+    for (const p of problemList) {
+      if (p.dateSolved === date) slot(p.slug, p).solved = true
+    }
+    for (const r of revisions) {
+      if (r.date === date) slot(r.slug, problems[r.slug]).revised = true
+    }
+    return [...byProblem.values()]
+  }
 
   const doneToday = doneOn(today)
 

@@ -166,26 +166,30 @@ export default function NodePlan({ node, today, doneOn, onOpenProblem, onGrade }
             <div className="mt-2 space-y-1.5 rounded-xl bg-slate-50 px-4 py-3">
               {done.map(e => (
                 <div key={e.key} className="flex flex-wrap items-center gap-2 text-sm">
-                  {e.kind === 'attempt' ? (
+                  {e.attempts.map(a => (
                     <span
-                      title={`graded ${e.result}`}
-                      className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${RESULT_DOT[e.result] || 'bg-slate-200 text-slate-500'}`}
+                      key={a.id}
+                      title={`graded ${a.result}`}
+                      className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${RESULT_DOT[a.result] || 'bg-slate-200 text-slate-500'}`}
                     >
-                      {(e.result || '?')[0].toUpperCase()}
+                      {(a.result || '?')[0].toUpperCase()}
                     </span>
-                  ) : (
-                    <Chip className="bg-emerald-100 text-emerald-700">{e.kind}</Chip>
+                  ))}
+                  {e.attempts.length === 0 && (
+                    <Chip className="bg-emerald-100 text-emerald-700">{e.solved ? 'solved' : 'revised'}</Chip>
                   )}
                   <ProblemLink slug={e.slug} title={e.problem?.title} onOpen={onOpenProblem} className="font-medium text-slate-800" />
                   {e.tracked?.map(t => <Chip key={t} className="bg-slate-100 text-slate-600">{t}</Chip>)}
-                  {e.kind === 'attempt' && (
-                    <span className="text-xs text-slate-400">
-                      {e.mode}
-                      {e.timeMinutes != null && ` · ${e.timeMinutes}m`}
-                      {e.help && e.help !== 'none' && ` · ${e.help}`}
-                      {e.sessionRepeat && ' · repeat'}
+                  {e.attempts.map(a => (
+                    <span key={`meta:${a.id}`} className="text-xs text-slate-400">
+                      {a.mode}
+                      {a.timeMinutes != null && ` · ${a.timeMinutes}m`}
+                      {a.help && a.help !== 'none' && ` · ${a.help}`}
+                      {a.sessionRepeat && ' · repeat'}
                     </span>
-                  )}
+                  ))}
+                  {e.attempts.length > 0 && e.solved && <Chip className="bg-slate-100 text-slate-500">solved</Chip>}
+                  {e.attempts.length > 0 && e.revised && <Chip className="bg-slate-100 text-slate-500">revised</Chip>}
                 </div>
               ))}
             </div>

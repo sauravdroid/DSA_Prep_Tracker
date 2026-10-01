@@ -156,16 +156,21 @@ function Peek({ node, done, arrived, at, onOpenProblem, onEnter, onLeave }) {
             <p className="mt-0.5 px-1 text-xs text-slate-400">Nothing recorded yet.</p>
           ) : (
             <ul className="mt-0.5 list-none space-y-0.5 pl-0">
-              {done.map(e => (
-                <PeekLine
-                  key={e.key}
-                  slug={e.slug}
-                  title={e.problem?.title || e.slug}
-                  meta={e.kind === 'attempt' ? `${e.mode} · ${e.result}` : e.kind}
-                  metaClass={e.kind === 'attempt' ? RESULT_TEXT[e.result] || 'text-slate-400' : 'text-slate-400'}
-                  onOpen={onOpenProblem}
-                />
-              ))}
+              {done.map(e => {
+                const graded = e.attempts[e.attempts.length - 1]
+                const activity = [e.solved && 'solved', e.revised && 'revised'].filter(Boolean).join(' · ')
+                return (
+                  <PeekLine
+                    key={e.key}
+                    slug={e.slug}
+                    title={e.problem?.title || e.slug}
+                    done
+                    meta={graded ? `${graded.mode} · ${graded.result}` : activity}
+                    metaClass={graded ? RESULT_TEXT[graded.result] || 'text-slate-400' : 'text-slate-400'}
+                    onOpen={onOpenProblem}
+                  />
+                )
+              })}
             </ul>
           )}
         </>

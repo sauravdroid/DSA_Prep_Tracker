@@ -210,22 +210,27 @@ test('an empty forecast is an empty tree rather than an error', () => {
 
 test("a day's verdict is the grades it recorded, worst first", () => {
   const day = [
-    { kind: 'attempt', result: 'green' },
-    { kind: 'attempt', result: 'red' },
-    { kind: 'attempt', result: 'green' },
+    { slug: 'a', attempts: [{ result: 'green' }] },
+    { slug: 'b', attempts: [{ result: 'red' }] },
+    { slug: 'c', attempts: [{ result: 'green' }] },
   ]
   assert.deepEqual(dayOutcomes(day), ['red', 'green'])
 })
 
+test('a problem attempted twice in a day contributes both grades', () => {
+  const day = [{ slug: 'a', attempts: [{ result: 'red' }, { result: 'green', sessionRepeat: true }] }]
+  assert.deepEqual(dayOutcomes(day), ['red', 'green'])
+})
+
 test('an explicit skip is the only thing that reads as not completed', () => {
-  assert.deepEqual(dayOutcomes([{ kind: 'attempt', result: 'skipped' }]), ['not_completed'])
-  assert.deepEqual(dayOutcomes([{ kind: 'attempt', skipped: true, result: null }]), ['not_completed'])
+  assert.deepEqual(dayOutcomes([{ slug: 'a', attempts: [{ result: 'skipped' }] }]), ['not_completed'])
+  assert.deepEqual(dayOutcomes([{ slug: 'a', attempts: [{ skipped: true, result: null }] }]), ['not_completed'])
 })
 
 test('work with no grade is not a verdict, and absence is not a skip', () => {
   // Solving and revising are activity. Neither grades anything, and a day with
   // none of either proves nothing about whether the work was skipped.
-  assert.deepEqual(dayOutcomes([{ kind: 'solved' }, { kind: 'revised' }]), [])
+  assert.deepEqual(dayOutcomes([{ slug: 'a', attempts: [], solved: true, revised: true }]), [])
   assert.deepEqual(dayOutcomes([]), [])
 })
 

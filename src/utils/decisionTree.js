@@ -39,9 +39,10 @@ export const RESULT_TONE = {
 export function dayOutcomes(done = []) {
   const found = new Set()
   for (const entry of done) {
-    if (entry.kind !== 'attempt') continue
-    if (entry.skipped || entry.result === 'skipped' || entry.result === 'not_completed') found.add('not_completed')
-    else if (entry.result) found.add(entry.result)
+    for (const a of entry.attempts || []) {
+      if (a.skipped || a.result === 'skipped' || a.result === 'not_completed') found.add('not_completed')
+      else if (a.result) found.add(a.result)
+    }
   }
   return OUTCOME_ORDER.filter(r => found.has(r))
 }

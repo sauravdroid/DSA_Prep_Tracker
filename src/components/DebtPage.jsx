@@ -269,13 +269,14 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
               <div className="space-y-1.5">
                 {doneToday.map(item => (
                   <div key={item.key} className="flex flex-wrap items-center gap-2 rounded-lg px-1 py-1 text-sm hover:bg-white/70">
-                    {item.kind === 'attempt' ? (
-                      <span className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${RESULT_DOT[item.result]}`}
-                        title={`graded ${item.result}`}>
-                        {item.result[0].toUpperCase()}
+                    {item.attempts.map(a => (
+                      <span key={a.id} title={`graded ${a.result}`}
+                        className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${RESULT_DOT[a.result] || 'bg-slate-200 text-slate-500'}`}>
+                        {(a.result || '?')[0].toUpperCase()}
                       </span>
-                    ) : (
-                      <Chip className="bg-emerald-100 text-emerald-700">{item.kind}</Chip>
+                    ))}
+                    {item.attempts.length === 0 && (
+                      <Chip className="bg-emerald-100 text-emerald-700">{item.solved ? 'solved' : 'revised'}</Chip>
                     )}
 
                     <ProblemLink slug={item.slug} title={item.problem?.title} onOpen={onOpenProblem} className="font-medium text-slate-800" />
@@ -290,18 +291,23 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
                       <span className="text-[11px] text-slate-400">not a tracked topic</span>
                     )}
 
-                    {item.kind === 'attempt' && (
-                      <span className="text-xs text-slate-400">
-                        {item.mode}
-                        {item.timeMinutes != null && ` · ${item.timeMinutes}m`}
-                        {item.help && item.help !== 'none' && ` · ${item.help}`}
-                        {item.sessionRepeat && ' · repeat'}
+                    {item.attempts.map(a => (
+                      <span key={`meta:${a.id}`} className="text-xs text-slate-400">
+                        {a.mode}
+                        {a.timeMinutes != null && ` · ${a.timeMinutes}m`}
+                        {a.help && a.help !== 'none' && ` · ${a.help}`}
+                        {a.sessionRepeat && ' · repeat'}
                       </span>
-                    )}
+                    ))}
+
+                    {/* Resubmissions come from LeetCode, so they are their own
+                        fact even when the problem was also graded by hand. */}
+                    {item.attempts.length > 0 && item.solved && <Chip className="bg-slate-100 text-slate-500">solved</Chip>}
+                    {item.attempts.length > 0 && item.revised && <Chip className="bg-slate-100 text-slate-500">revised</Chip>}
                   </div>
                 ))}
               </div>
-              {!doneToday.some(i => i.kind === 'attempt') && (
+              {!doneToday.some(i => i.attempts.length > 0) && (
                 <p className="mt-2 text-xs text-slate-500">
                   Solves and revisions are activity, not retention evidence. Only a recorded
                   attempt counts toward validation.
