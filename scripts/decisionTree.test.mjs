@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-import { buildDecisionTree, treeRows, defaultCollapsed, describeEdge, dayOutcomes, nodeProgress } from '../src/utils/decisionTree.js'
+import { buildDecisionTree, treeRows, defaultCollapsed, describeEdge, dayOutcomes, nodeProgress, holdsOpen } from '../src/utils/decisionTree.js'
 
 const fixture = name => JSON.parse(readFileSync(new URL(`../fixtures/${name}`, import.meta.url)))
 
@@ -184,6 +184,28 @@ test('by default the taken path is open and the alternatives are folded shut', (
     '2026-10-02:cousins-red',
     '2026-10-02:diameter',
   ])
+})
+
+test('the days up to today are held open, whatever branch they sit on', () => {
+  // Nothing is recorded, so no Friday branch is taken. Thursday still has to
+  // show them: it is the day itself, not the branch, that cannot be hidden.
+  const tree = buildDecisionTree(decision, { practiceLog: [] })
+  const root = tree.roots[0]
+  assert.equal(holdsOpen(root, '2026-10-02'), true)
+  assert.equal(defaultCollapsed(tree.roots, '2026-10-02').has(root.id), false)
+})
+
+test('a day still ahead stays foldable', () => {
+  const tree = buildDecisionTree(decision, { practiceLog: [] })
+  const root = tree.roots[0]
+  assert.equal(holdsOpen(root, '2026-10-01'), false, 'Friday has not arrived yet')
+  assert.equal(holdsOpen(root.children[0], '2026-10-02'), false, 'nor has Saturday')
+})
+
+test('a leaf holds nothing open, having nothing below it', () => {
+  const tree = buildDecisionTree(decision, { practiceLog: [] })
+  const leaf = tree.roots[0].children[0].children[0]
+  assert.equal(holdsOpen(leaf, '2026-10-09'), false)
 })
 
 test('an unconditional branch has no edge to describe', () => {

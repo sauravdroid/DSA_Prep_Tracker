@@ -308,11 +308,20 @@ export function treeRows(list, guides = [], depth = 0) {
   })
 }
 
+/**
+ * Whether a node's children reach today or earlier. Those days have already
+ * happened, so they are not a forecast to be folded away — they are the record
+ * of how you got here, and the tree is unreadable without them.
+ */
+export function holdsOpen(node, today) {
+  return !!today && (node?.children || []).some(c => c.date <= today)
+}
+
 /** Everything but the path the facts picked, so the live route reads at a glance. */
-export function defaultCollapsed(roots) {
+export function defaultCollapsed(roots, today) {
   const collapsed = new Set()
   const walk = node => {
-    if (node.state !== 'taken') collapsed.add(node.id)
+    if (node.state !== 'taken' && !holdsOpen(node, today)) collapsed.add(node.id)
     node.children.forEach(walk)
   }
   roots.forEach(walk)

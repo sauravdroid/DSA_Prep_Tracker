@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { treeRows, defaultCollapsed, dayOutcomes, nodeProgress, RESULT_LABEL, RESULT_TONE } from '../utils/decisionTree'
+import { treeRows, defaultCollapsed, dayOutcomes, nodeProgress, holdsOpen, RESULT_LABEL, RESULT_TONE } from '../utils/decisionTree'
 
 const LINE = {
   red: 'border-rose-400',
@@ -212,7 +212,8 @@ function Row({ row, selectedId, onSelect, collapsed, onToggle, today, doneOn, on
   const done = arrived ? doneOn?.(node.date) || [] : []
   const outcomes = arrived ? dayOutcomes(done) : []
   const progress = nodeProgress(node, today)
-  const open = !collapsed.has(node.id)
+  const pinned = holdsOpen(node, today)
+  const open = pinned || !collapsed.has(node.id)
   const selected = node.id === selectedId
 
   const hold = useCallback(() => clearTimeout(closing.current), [])
@@ -257,12 +258,13 @@ function Row({ row, selectedId, onSelect, collapsed, onToggle, today, doneOn, on
 
         <div className="flex min-w-0 flex-1 items-center gap-1.5 py-1">
           <button
-            onClick={() => hasChildren && onToggle(node.id)}
+            onClick={() => hasChildren && !pinned && onToggle(node.id)}
             aria-expanded={hasChildren ? open : undefined}
-            aria-label={hasChildren ? `${open ? 'Collapse' : 'Expand'} what follows ${node.label}` : undefined}
-            disabled={!hasChildren}
-            className={`flex size-5 shrink-0 items-center justify-center rounded border-0 bg-transparent text-slate-400 ${
-              hasChildren ? 'cursor-pointer hover:bg-slate-100 hover:text-slate-700' : 'invisible'
+            aria-label={hasChildren && !pinned ? `${open ? 'Collapse' : 'Expand'} what follows ${node.label}` : undefined}
+            title={pinned ? 'Today and the days before it are always shown' : undefined}
+            disabled={!hasChildren || pinned}
+            className={`flex size-5 shrink-0 items-center justify-center rounded border-0 bg-transparent ${
+              !hasChildren ? 'invisible' : pinned ? 'text-slate-300' : 'cursor-pointer text-slate-400 hover:bg-slate-100 hover:text-slate-700'
             }`}
           >
             <Chevron open={open} />
@@ -357,10 +359,10 @@ function Row({ row, selectedId, onSelect, collapsed, onToggle, today, doneOn, on
  * one branch per result that would select it.
  */
 export default function DecisionTree({ tree, selectedId, onSelect, today, doneOn, onOpenProblem }) {
-  const [collapsed, setCollapsed] = useState(() => defaultCollapsed(tree.roots))
+  const [collapsed, setCollapsed] = useState(() => defaultCollapsed(tree.roots, today))
 
   // A newly adopted plan gets its own folds rather than inheriting the last one's.
-  useEffect(() => setCollapsed(defaultCollapsed(tree.roots)), [tree])
+  useEffect(() => setCollapsed(defaultCollapsed(tree.roots, today)), [tree, today])
 
   const rows = useMemo(() => treeRows(tree.roots), [tree])
 
@@ -375,11 +377,11 @@ export default function DecisionTree({ tree, selectedId, onSelect, today, doneOn
     const seen = new Set()
     const walk = list => list.forEach(n => {
       seen.add(n.depth)
-      if (!collapsed.has(n.id)) walk(n.children)
+      if (holdsOpen(n, today) || !collapsed.has(n.id)) walk(n.children)
     })
     walk(tree.roots)
     return seen
-  }, [tree, collapsed])
+  }, [tree, collapsed, today])
 
   // Hiding a date has to hide the ones after it too: their branches would
   // otherwise hang off a parent that is no longer on screen.
@@ -393,7 +395,9 @@ export default function DecisionTree({ tree, selectedId, onSelect, today, doneOn
     return next
   })
 
-  const setAll = value => setCollapsed(value ? new Set(tree.nodes.map(n => n.id)) : new Set())
+  const setAll = value => setCollapsed(
+    value ? new Set(tree.nodes.filter(n => !holdsOpen(n, today)).map(n => n.id)) : new Set()
+  )
 
   if (tree.roots.length === 0) return null
 
@@ -402,14 +406,15 @@ export default function DecisionTree({ tree, selectedId, onSelect, today, doneOn
       <div className="flex flex-wrap items-center gap-1 border-b border-slate-100 pb-2">
         {tree.dates.map(d => {
           const shown = visibleDepths.has(d.depth)
-          const fixed = d.depth === 0
+          // A day that has already happened is record, not forecast.
+          const fixed = d.depth === 0 || d.date <= today
           return (
             <button
               key={d.date}
               onClick={() => !fixed && toggleDate(d.depth)}
               disabled={fixed}
               aria-pressed={fixed ? undefined : shown}
-              title={fixed ? 'The first day is always shown' : `${shown ? 'Hide' : 'Show'} ${d.date} and after`}
+              title={fixed ? 'Today and the days before it are always shown' : `${shown ? 'Hide' : 'Show'} ${d.date} and after`}
               className={`flex items-center gap-0.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition ${
                 shown ? 'text-slate-700' : 'text-slate-300'
               } ${fixed ? 'cursor-default' : 'hover:bg-slate-100'}`}
