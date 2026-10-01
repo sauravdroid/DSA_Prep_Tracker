@@ -92,27 +92,58 @@ function dependencyIds(pred) {
   return []
 }
 
+/** Worst first, so a branch waiting on two results takes the graver colour. */
+const TONE_ORDER = ['red', 'slate', 'amber', 'emerald']
+
+function toneOf(found) {
+  if (found.has('red')) return 'red'
+  if (found.has('green')) return 'emerald'
+  if (found.has('yellow')) return 'amber'
+  return 'slate'
+}
+
 /**
- * Colour and wording of the branch a condition represents. Read from the
- * structured condition, never from the scenario's prose label.
+ * The branch a condition represents, as one clause per result it waits on.
+ *
+ * A branch can turn on two different problems, and merging their results into
+ * one set describes neither: "Jump Game II Red, Diameter Green" and "Diameter
+ * Red, Jump Game II Green" are opposite branches that would read identically.
+ * Clauses stay separate, in the order the condition names them.
+ *
+ * Read from the structured condition, never from the scenario's prose label.
  */
-export function describeEdge(pred) {
+export function describeEdge(pred, deps = []) {
   if (!pred || pred.op === 'always') return null
 
-  const found = new Set(resultsOf(pred))
-  const results = RESULT_ORDER.filter(r => found.has(r))
+  const clauses = []
+  for (const term of termsOf(pred)) {
+    const found = new Set(resultsOf(term))
+    const results = RESULT_ORDER.filter(r => found.has(r))
+    const dep = deps.find(d => d.id === term.dependency)
 
-  if (results.length > 0) {
-    const tone = found.has('red') ? 'red'
-      : found.has('green') ? 'emerald'
-        : found.has('yellow') ? 'amber'
-          : 'slate'
-    return { tone, label: results.map(r => RESULT_LABEL[r]).join(' / '), results }
+    if (results.length > 0) {
+      clauses.push({
+        dependency: term.dependency || null,
+        title: dep?.title || dep?.slug || null,
+        results,
+        label: results.map(r => RESULT_LABEL[r]).join(' / '),
+        tone: toneOf(found),
+      })
+    } else if (term.op === 'unresolved_failure') {
+      clauses.push({ dependency: null, title: null, results: [], label: 'still failing', tone: 'red' })
+    } else if (term.op === 'recheck_due') {
+      clauses.push({ dependency: null, title: null, results: [], label: 'recheck due', tone: 'amber' })
+    } else {
+      clauses.push({ dependency: null, title: null, results: [], label: 'otherwise', tone: 'slate' })
+    }
   }
 
-  if (pred.op === 'unresolved_failure') return { tone: 'red', label: 'still failing', results: [] }
-  if (pred.op === 'recheck_due') return { tone: 'amber', label: 'recheck due', results: [] }
-  return { tone: 'slate', label: 'otherwise', results: [] }
+  if (clauses.length === 0) return null
+  return {
+    tone: TONE_ORDER.find(t => clauses.some(c => c.tone === t)) || 'slate',
+    clauses,
+    label: clauses.map(c => c.label).join(' · '),
+  }
 }
 
 /** Remaining conjuncts once the parent's are removed, as one condition again. */
@@ -261,7 +292,7 @@ export function buildDecisionTree(decision, ctx = {}) {
         depth,
         label: branch.label || branch.id,
         when,
-        edge: describeEdge(restCondition(rest)),
+        edge: describeEdge(restCondition(rest), day.dependencies || []),
         edgeApproximate: !!when && !exact,
         parentId: parent?.id || null,
         children: [],

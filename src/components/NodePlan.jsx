@@ -135,8 +135,14 @@ export default function NodePlan({ node, today, doneOn, onOpenProblem, onGrade }
 
       {node.edge && (
         <p className="mt-1 text-xs text-slate-500">
-          {node.state === 'taken' ? 'Reached because the result was ' : 'Applies if the result is '}
-          <span className="font-semibold text-slate-700">{node.edge.label}</span>.
+          {node.state === 'taken' ? 'Reached because ' : 'Applies if '}
+          {node.edge.clauses.map((c, i) => (
+            <span key={i}>
+              {i > 0 && ' and '}
+              {c.title && <span className="text-slate-600">{c.title} is </span>}
+              <span className="font-semibold text-slate-700">{c.label}</span>
+            </span>
+          ))}.
           {node.edgeApproximate && ' This link is inferred — the saved file does not state it outright.'}
         </p>
       )}

@@ -283,11 +283,15 @@ function Row({ row, selectedId, onSelect, collapsed, onToggle, today, doneOn, on
               <span className={`size-2 shrink-0 rounded-full ${
                 arrived && progress.complete && node.state === 'taken' ? DOT.complete : DOT[node.state]
               }`} aria-hidden="true" />
-              {node.edge && (
-                <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${PILL[node.edge.tone] || PILL.slate}`}>
-                  {node.edge.label}
+              {node.edge?.clauses.map((c, i) => (
+                <span
+                  key={i}
+                  title={c.title ? `${c.title}: ${c.label}` : c.label}
+                  className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${PILL[c.tone] || PILL.slate}`}
+                >
+                  {c.label}
                 </span>
-              )}
+              ))}
               <span className={`min-w-0 flex-1 truncate text-xs ${
                 node.state === 'taken' ? 'font-semibold text-slate-900' : 'text-slate-700'
               }`}>

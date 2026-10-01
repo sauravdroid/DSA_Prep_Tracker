@@ -102,8 +102,35 @@ test('a day branching on the root grade hangs off the problem it grades', () => 
 test('the branch label and colour come from the condition, not the prose label', () => {
   const tree = buildDecisionTree(decision, { practiceLog: [] })
   const [red, pass] = tree.roots[0].children
-  assert.deepEqual(red.edge, { tone: 'red', label: 'red', results: ['red'] })
-  assert.deepEqual(pass.edge, { tone: 'emerald', label: 'green / yellow', results: ['green', 'yellow'] })
+  assert.equal(red.edge.tone, 'red')
+  assert.deepEqual(red.edge.clauses.map(c => c.label), ['red'])
+  assert.equal(pass.edge.tone, 'emerald')
+  assert.deepEqual(pass.edge.clauses.map(c => c.label), ['green / yellow'])
+})
+
+test('a branch waiting on two problems keeps their conditions apart', () => {
+  // Merged into one set these two read identically, though they are opposites.
+  const deps = [
+    { id: 'jump', slug: 'jump-game-ii', title: 'Jump Game II' },
+    { id: 'tree', slug: 'diameter-of-binary-tree', title: 'Diameter of Binary Tree' },
+  ]
+  const jumpRed = describeEdge(
+    { op: 'all', of: [resultIs('jump', ['red']), resultIs('tree', ['green', 'yellow'])] }, deps)
+  const treeRed = describeEdge(
+    { op: 'all', of: [resultIs('tree', ['red']), resultIs('jump', ['green', 'yellow'])] }, deps)
+
+  assert.deepEqual(jumpRed.clauses.map(c => `${c.title}: ${c.label}`),
+    ['Jump Game II: red', 'Diameter of Binary Tree: green / yellow'])
+  assert.deepEqual(treeRed.clauses.map(c => `${c.title}: ${c.label}`),
+    ['Diameter of Binary Tree: red', 'Jump Game II: green / yellow'])
+  assert.notDeepEqual(jumpRed.clauses, treeRed.clauses)
+})
+
+test('a branch takes the graver colour of the results it waits on', () => {
+  const edge = describeEdge(
+    { op: 'all', of: [resultIs('a', ['green']), resultIs('b', ['red'])] }, [])
+  assert.equal(edge.tone, 'red')
+  assert.deepEqual(edge.clauses.map(c => c.tone), ['emerald', 'red'])
 })
 
 test('a third day attaches to the second whose condition it repeats', () => {
@@ -115,8 +142,8 @@ test('a third day attaches to the second whose condition it repeats', () => {
 test('only the term the child adds becomes its branch', () => {
   const nodes = byId(buildDecisionTree(decision, { practiceLog: [] }))
   // Its own condition also names Monday's Cousins, but that is the parent's.
-  assert.equal(nodes['2026-10-03:clean'].edge.label, 'green / yellow')
-  assert.equal(nodes['2026-10-03:recovery-test'].edge.label, 'green')
+  assert.deepEqual(nodes['2026-10-03:clean'].edge.clauses.map(c => c.label), ['green / yellow'])
+  assert.deepEqual(nodes['2026-10-03:recovery-test'].edge.clauses.map(c => c.label), ['green'])
 })
 
 test('with nothing recorded every branch is open and none is ruled out', () => {
@@ -214,15 +241,15 @@ test('an unconditional branch has no edge to describe', () => {
 })
 
 test('a condition with no result still gets honest wording', () => {
-  assert.deepEqual(describeEdge({ op: 'unresolved_failure', scope: { topic: 'Stack' } }),
-    { tone: 'red', label: 'still failing', results: [] })
-  assert.deepEqual(describeEdge({ op: 'recheck_due', slug: 'decode-string' }),
-    { tone: 'amber', label: 'recheck due', results: [] })
+  assert.deepEqual(describeEdge({ op: 'unresolved_failure', scope: { topic: 'Stack' } }).clauses.map(c => c.label),
+    ['still failing'])
+  assert.deepEqual(describeEdge({ op: 'recheck_due', slug: 'decode-string' }).clauses.map(c => c.label),
+    ['recheck due'])
 })
 
 test('not completed reads as its own outcome rather than a failure', () => {
   const edge = describeEdge({ op: 'not_completed', dependency: 'cousins-oct1' })
-  assert.equal(edge.label, 'not completed')
+  assert.equal(edge.clauses[0].label, 'not completed')
   assert.equal(edge.tone, 'slate')
 })
 
