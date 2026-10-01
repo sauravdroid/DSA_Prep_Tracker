@@ -10,6 +10,7 @@ import { unpublishedKeys } from './src/utils/trackerDiff.js'
 import { publishSet } from './src/utils/publishSet.js'
 import { assessmentId, assessmentPath, summarise, buildIndex, INDEX_PATH, coveredDates } from './src/utils/assessments.js'
 import { dayPath, dayEntry, linkDays, daysFromDecisions } from './src/utils/days.js'
+import { rollupsFor } from './src/utils/rollups.js'
 import { sealReason, sealOutcome, outcomePath, summariseOutcome, OUTCOME_VERSION, outcomeDrift } from './src/utils/outcomes.js'
 
 const DATA_DIR = 'data'
@@ -168,6 +169,7 @@ function leetcodeProxy() {
 function githubSync() {
   let root = ''
   let dataFile = ''
+  let localDayDir = ''
   const REPO_RE = /^[\w.-]+\/[\w.-]+$/
   const REMOTE_PATH = 'tracker-data.json'
   const BRANCH = 'main'
@@ -306,7 +308,21 @@ function githubSync() {
           }
         }
 
-        return send(res, 200, { empty: false, index, days, missing })
+        // Which periods have been rolled up. The index does not name them,
+        // since they are derived from the days it already lists.
+        let periods = []
+        if (body.periods) {
+          const head = await gh(token, 'GET', `/repos/${repo}/git/ref/heads/${BRANCH}`)
+          const tree = head.status === 200
+            ? await gh(token, 'GET', `/repos/${repo}/git/trees/${head.body.object.sha}?recursive=1`)
+            : null
+          periods = (tree?.status === 200 ? tree.body.tree : [])
+            .filter(t => t.type === 'blob' && /^coaching\/(weeks|months)\//.test(t.path))
+            .map(t => t.path)
+            .sort()
+        }
+
+        return send(res, 200, { empty: false, index, days, missing, periods })
       }
 
       // --- Coaching advice. Read-only here: the app never publishes advice,
@@ -608,13 +624,43 @@ function githubSync() {
         ])
 
         const index = { ...buildIndex(summaries), days: dayIndex }
+
+        // Weeks and months are derived from the days and from what was
+        // recorded against them, so they change as practice is logged rather
+        // than only when a plan is written. Built from the local mirror: a run
+        // that fetched no decisions still has to produce correct totals, and
+        // refetching thirty day files every ten minutes to restate a month is
+        // not a way to do it.
+        const known = new Map(converted.map(d => [d.date, d]))
+        if (fs.existsSync(localDayDir)) {
+          for (const name of fs.readdirSync(localDayDir)) {
+            if (!name.endsWith('.json') || known.has(name.slice(0, -5))) continue
+            try {
+              known.set(name.slice(0, -5), JSON.parse(fs.readFileSync(path.join(localDayDir, name), 'utf8')))
+            } catch { /* a day we cannot read is one we cannot roll up */ }
+          }
+        }
+
+        let periods = 0
+        for (const { path: p, body } of rollupsFor([...known.values()], { practiceLog, today })) {
+          const content = JSON.stringify(body, null, 2)
+          const existing = present.has(p)
+            ? await gh(token, 'GET', `/repos/${repo}/contents/${p}`)
+            : null
+          const before = existing?.status === 200
+            ? Buffer.from(existing.body.content || '', 'base64').toString('utf8')
+            : null
+          if (before === content) continue
+          toWrite.set(p, content)
+          periods++
+        }
         const indexContent = JSON.stringify(index, null, 2)
         const indexChanged = !priorIndex || priorIndex.status !== 200 ||
           Buffer.from(priorIndex.body.content || '', 'base64').toString('utf8') !== indexContent
         if (indexChanged) toWrite.set(INDEX_PATH, indexContent)
 
         if (toWrite.size === 0) {
-          return send(res, 200, { committed: null, unchanged: true, archived: 0, sealed: 0, resealed: 0, days: 0, fetched, count: index.count })
+          return send(res, 200, { committed: null, unchanged: true, archived: 0, sealed: 0, resealed: 0, days: 0, periods: 0, fetched, count: index.count })
         }
 
         const newTree = await gh(token, 'POST', `/repos/${repo}/git/trees`, {
@@ -645,6 +691,7 @@ function githubSync() {
           sealed,
           resealed,
           days: written,
+          periods,
           fetched,
           count: index.count,
           files: [...toWrite.keys()],
@@ -733,6 +780,7 @@ function githubSync() {
     configResolved(config) {
       root = config.root
       dataFile = path.join(root, DATA_DIR, DATA_FILE)
+      localDayDir = path.join(root, DATA_DIR, 'coaching', 'days')
     },
     configureServer(server) {
       server.middlewares.use('/api/github', handler)

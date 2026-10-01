@@ -185,10 +185,14 @@ export function buildManifest({ data = {}, savedAt = null, shards = [], repo, co
       })),
     },
     coaching: {
-      decision: 'coaching/decision.json',
       index: 'coaching/index.json',
+      days: 'coaching/days/',
       assessments: 'coaching/assessments/',
       outcomes: 'coaching/outcomes/',
+      weeks: 'coaching/weeks/',
+      months: 'coaching/months/',
+      // Superseded by days/, and still written by older tooling.
+      decision: 'coaching/decision.json',
       current: currentAssessment,
     },
   }

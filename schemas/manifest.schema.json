@@ -107,10 +107,13 @@
     "coaching": {
       "type": "object",
       "properties": {
-        "decision": { "type": "string", "description": "The current plan. Overwritten on every revision." },
-        "index": { "type": "string", "description": "Summaries of every published assessment, newest first, with the dates each covers. Read this for prior advice rather than walking commits." },
-        "assessments": { "type": "string", "description": "Directory of archived assessments, addressable by id." },
+        "index": { "type": "string", "description": "Read this to orient. Every day planned and every assessment published, summarised, with the links between days in both directions." },
+        "days": { "type": "string", "description": "Directory of day plans, one file per date, addressable by the date itself. A day is written by the run that planned it and never rewritten once that date has passed." },
+        "assessments": { "type": "string", "description": "Directory of archived assessments, addressable by id. An assessment holds the reasoning behind a run — mode, debt, tracker snapshot, provenance — never the day plans themselves." },
         "outcomes": { "type": "string", "description": "How each assessment's forecast resolved, sealed once it could no longer change, with the evidence fingerprint it was based on. Whether a given assessment is sealed, and how it turned out, is summarised in the index." },
+        "weeks": { "type": "string", "description": "Directory of weekly rollups, ISO week ids. Derived from the days: what each asked for, what was recorded against it, and how the week totalled. Totals cover elapsed days only." },
+        "months": { "type": "string", "description": "Directory of monthly rollups, the same shape as a week. One read answers a month instead of thirty." },
+        "decision": { "type": "string", "description": "The former single-file plan, superseded by days/. Still written by older tooling." },
         "current": { "type": ["string", "null"] }
       },
       "additionalProperties": true
