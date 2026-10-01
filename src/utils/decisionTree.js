@@ -242,25 +242,26 @@ export function buildDecisionTree(decision, ctx = {}) {
 }
 
 /**
- * Depth-first rows for rendering. `guides` carries one flag per ancestor whose
- * branch continues past this row, which is what lets a row draw its share of
- * the trunks running through it. A child of a root needs none: the root sits in
- * no indent column, so there is nowhere for its trunk to be drawn.
+ * The tree as rows to render, children nested inside their parent rather than
+ * flattened, so a subtree can be revealed or hidden as one block.
+ *
+ * `guides` carries one flag per ancestor whose branch continues past this row,
+ * which is what lets a row draw its share of the trunks running through it. A
+ * child of a root needs none: the root sits in no indent column, so there is
+ * nowhere for its trunk to be drawn.
  */
-export function flattenTree(roots, isExpanded = () => true) {
-  const rows = []
-  const walk = (list, guides, depth) => {
-    list.forEach((node, i) => {
-      const last = i === list.length - 1
-      const hasChildren = node.children.length > 0
-      rows.push({ node, depth, guides, last, hasChildren })
-      if (hasChildren && isExpanded(node.id)) {
-        walk(node.children, depth === 0 ? [] : [...guides, !last], depth + 1)
-      }
-    })
-  }
-  walk(roots, [], 0)
-  return rows
+export function treeRows(list, guides = [], depth = 0) {
+  return list.map((node, i) => {
+    const last = i === list.length - 1
+    return {
+      node,
+      depth,
+      guides,
+      last,
+      hasChildren: node.children.length > 0,
+      children: treeRows(node.children, depth === 0 ? [] : [...guides, !last], depth + 1),
+    }
+  })
 }
 
 /** Everything but the path the facts picked, so the live route reads at a glance. */

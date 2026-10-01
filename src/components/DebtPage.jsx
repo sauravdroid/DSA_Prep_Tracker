@@ -187,7 +187,7 @@ function TodayHeadline({ retention, decision, staleness, validity, practiceLog, 
               <NodePlan node={selectedNode} today={today} doneOn={retention.doneOn} onOpenProblem={onOpenProblem} onGrade={onGrade} />
             </div>
             <div className="min-w-0 2xl:border-l 2xl:border-slate-100 2xl:pl-5">
-              <DecisionTree tree={tree} selectedId={selectedId} onSelect={setPickedId} today={today} doneOn={retention.doneOn} />
+              <DecisionTree tree={tree} selectedId={selectedId} onSelect={setPickedId} today={today} doneOn={retention.doneOn} onOpenProblem={onOpenProblem} />
             </div>
           </div>
         ) : (

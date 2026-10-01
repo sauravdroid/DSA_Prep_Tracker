@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-import { buildDecisionTree, flattenTree, defaultCollapsed, describeEdge } from '../src/utils/decisionTree.js'
+import { buildDecisionTree, treeRows, defaultCollapsed, describeEdge } from '../src/utils/decisionTree.js'
 
 const fixture = name => JSON.parse(readFileSync(new URL(`../fixtures/${name}`, import.meta.url)))
 
@@ -146,42 +146,40 @@ test('a prose day is one node, because its alternatives are not checkable', () =
   assert.deepEqual(tree.dates.map(d => d.count), tree.dates.map(() => 1))
 })
 
-test('rows carry the guides needed to draw the lines running past them', () => {
+test('rows nest children inside their parent, with the guides to draw them', () => {
   const tree = buildDecisionTree(decision, { practiceLog: [] })
-  const rows = flattenTree(tree.roots, () => true)
-  assert.deepEqual(rows.map(r => r.node.id), [
-    '2026-10-01:main',
-    '2026-10-02:cousins-red',
-    '2026-10-03:recovery-test',
-    '2026-10-02:diameter',
-    '2026-10-03:clean',
-  ])
+  const rows = treeRows(tree.roots)
+
+  assert.deepEqual(rows.map(r => r.node.id), ['2026-10-01:main'])
+  const [red, pass] = rows[0].children
+  assert.deepEqual([red.node.id, pass.node.id], ['2026-10-02:cousins-red', '2026-10-02:diameter'])
+  assert.deepEqual([red.depth, pass.depth], [1, 1])
+
   // A root sits in no indent column, so its children need no ancestor guide.
-  assert.deepEqual(rows[1].guides, [])
+  assert.deepEqual(red.guides, [])
   // Under the first of two siblings the trunk continues; under the last it stops.
-  assert.deepEqual(rows[2].guides, [true])
-  assert.deepEqual(rows[4].guides, [false])
-  assert.deepEqual(rows.map(r => r.depth), [0, 1, 2, 1, 2])
-  assert.equal(rows[1].last, false)
-  assert.equal(rows[3].last, true)
+  assert.deepEqual(red.children[0].guides, [true])
+  assert.deepEqual(pass.children[0].guides, [false])
+  assert.equal(red.last, false)
+  assert.equal(pass.last, true)
+  assert.equal(red.hasChildren, true)
+  assert.equal(red.children[0].hasChildren, false)
 })
 
-test('a collapsed node hides its subtree and nothing else', () => {
+test('every node is present whatever is folded, so a subtree can animate shut', () => {
   const tree = buildDecisionTree(decision, { practiceLog: [] })
-  const rows = flattenTree(tree.roots, id => id !== '2026-10-02:cousins-red')
-  assert.deepEqual(rows.map(r => r.node.id), [
-    '2026-10-01:main',
-    '2026-10-02:cousins-red',
-    '2026-10-02:diameter',
-    '2026-10-03:clean',
-  ])
+  const count = rows => rows.reduce((n, r) => n + 1 + count(r.children), 0)
+  assert.equal(count(treeRows(tree.roots)), tree.nodes.length)
 })
 
 test('by default the taken path is open and the alternatives are folded shut', () => {
   const tree = buildDecisionTree(decision, { practiceLog: [] })
   const collapsed = defaultCollapsed(tree.roots)
-  const rows = flattenTree(tree.roots, id => !collapsed.has(id))
-  assert.deepEqual(rows.map(r => r.node.id), [
+
+  const visible = rows => rows.flatMap(r =>
+    [r.node.id, ...(collapsed.has(r.node.id) ? [] : visible(r.children))])
+
+  assert.deepEqual(visible(treeRows(tree.roots)), [
     '2026-10-01:main',
     '2026-10-02:cousins-red',
     '2026-10-02:diameter',

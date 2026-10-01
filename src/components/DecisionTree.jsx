@@ -1,5 +1,6 @@
-import { useMemo, useState, useEffect } from 'react'
-import { flattenTree, defaultCollapsed } from '../utils/decisionTree'
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
+import { treeRows, defaultCollapsed } from '../utils/decisionTree'
 
 const LINE = {
   red: 'border-rose-400',
@@ -27,14 +28,24 @@ const STATE_NOTE = {
   'ruled-out': 'ruled out by what you recorded',
 }
 
+const RESULT_TEXT = {
+  green: 'text-emerald-600',
+  yellow: 'text-amber-600',
+  red: 'text-rose-600',
+}
+
+const PEEK_WIDTH = 320
+const PEEK_GAP = 10
+const CLOSE_GRACE_MS = 120
+
 /**
  * Trunks run through the middle of an indent column rather than its edge, so
- * that a branch descends from under the node it belongs to.
+ * that a branch descends from under the chevron of the node it belongs to.
  */
 function Guides({ guides }) {
   return guides.map((on, i) => (
     <span key={i} className="relative w-6 shrink-0 self-stretch" aria-hidden="true">
-      {on && <span className="absolute left-2 top-0 h-full border-l border-slate-300" />}
+      {on && <span className="absolute left-2.5 top-0 h-full border-l border-slate-300" />}
     </span>
   ))
 }
@@ -47,9 +58,26 @@ function Elbow({ tone, last, dashed, faded }) {
   const stub = `${LINE[tone] || LINE.slate} ${dashed ? 'border-dashed' : ''} ${faded ? 'opacity-30' : ''}`
   return (
     <span className="relative w-6 shrink-0 self-stretch" aria-hidden="true">
-      <span className={`absolute left-2 top-0 border-l border-slate-300 ${last ? 'h-1/2' : 'h-full'}`} />
-      <span className={`absolute left-2 right-0 top-1/2 border-t-2 ${stub}`} />
+      <span className={`absolute left-2.5 top-0 border-l border-slate-300 ${last ? 'h-1/2' : 'h-full'}`} />
+      <span className={`absolute left-2.5 right-0 top-1/2 border-t-2 ${stub}`} />
     </span>
+  )
+}
+
+function Chevron({ open }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`size-3.5 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 5l7 7-7 7" />
+    </svg>
   )
 }
 
@@ -65,70 +93,135 @@ function Workload({ workload }) {
   )
 }
 
-/** The node's own plan, shown on hover so the tree can be read without clicking. */
-function Peek({ node, done, past }) {
-  const problems = node.items.filter(i => i.type === 'problem')
+function PeekLine({ slug, title, meta, metaClass = 'text-slate-400', onOpen }) {
+  const body = (
+    <>
+      <span className="min-w-0 flex-1 truncate">{title}</span>
+      <span className={`shrink-0 text-[10px] uppercase tracking-wide ${metaClass}`}>{meta}</span>
+    </>
+  )
+  if (!slug) return <li className="flex items-baseline gap-2 px-1 py-0.5 text-xs text-slate-600">{body}</li>
   return (
-    <div className="pointer-events-none absolute left-0 right-0 top-full z-20 mt-1 rounded-xl bg-slate-900 px-3 py-2 text-left shadow-lg">
-      <p className="text-[11px] font-semibold text-white">{node.label}</p>
+    <li>
+      <button
+        onClick={() => onOpen(slug, title)}
+        title="View problem details"
+        className="flex w-full items-baseline gap-2 rounded-md border-0 bg-transparent px-1 py-0.5 text-left text-xs text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+      >
+        {body}
+      </button>
+    </li>
+  )
+}
+
+/** What a node holds, shown beside it so the tree reads without being clicked. */
+function Peek({ node, done, past, at, onOpenProblem, onEnter, onLeave }) {
+  const problems = node.items.filter(i => i.type === 'problem')
+
+  return createPortal(
+    <div
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+      style={{ top: at.top, left: at.left, width: PEEK_WIDTH }}
+      className="peek-in fixed z-50 rounded-xl bg-white px-3 py-2.5 text-left shadow-2xl ring-1 ring-slate-900/10"
+    >
+      <p className="text-xs font-semibold text-slate-900">{node.label}</p>
       <p className="mt-0.5 text-[10px] uppercase tracking-wider text-slate-400">
         {node.weekday} {node.date} · {STATE_NOTE[node.state]}
       </p>
 
       {past && (
         <>
-          <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Recorded</p>
+          <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Recorded</p>
           {done.length === 0 ? (
-            <p className="text-[11px] text-slate-400">Nothing recorded that day.</p>
+            <p className="mt-0.5 px-1 text-xs text-slate-400">Nothing recorded that day.</p>
           ) : (
-            <ul className="mt-0.5 list-none space-y-1 pl-0">
+            <ul className="mt-0.5 list-none space-y-0.5 pl-0">
               {done.map(e => (
-                <li key={e.key} className="flex items-baseline gap-2 text-[11px] text-slate-200">
-                  <span className="min-w-0 flex-1 truncate">{e.problem?.title || e.slug}</span>
-                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-500">
-                    {e.kind === 'attempt' ? `${e.mode} · ${e.result}` : e.kind}
-                  </span>
-                </li>
+                <PeekLine
+                  key={e.key}
+                  slug={e.slug}
+                  title={e.problem?.title || e.slug}
+                  meta={e.kind === 'attempt' ? `${e.mode} · ${e.result}` : e.kind}
+                  metaClass={e.kind === 'attempt' ? RESULT_TEXT[e.result] || 'text-slate-400' : 'text-slate-400'}
+                  onOpen={onOpenProblem}
+                />
               ))}
             </ul>
           )}
         </>
       )}
 
-      {past && <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Planned</p>}
+      {past && <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Planned</p>}
       {problems.length === 0 ? (
-        <p className={`${past ? '' : 'mt-1.5'} text-[11px] text-slate-400`}>No problem work planned.</p>
+        <p className={`${past ? 'mt-0.5' : 'mt-2'} px-1 text-xs text-slate-400`}>No problem work planned.</p>
       ) : (
-        <ul className={`${past ? 'mt-0.5' : 'mt-1.5'} list-none space-y-1 pl-0`}>
+        <ul className={`${past ? 'mt-0.5' : 'mt-2'} list-none space-y-0.5 pl-0`}>
           {problems.map(i => (
-            <li key={i.key} className="flex items-baseline gap-2 text-[11px] text-slate-200">
-              <span className="min-w-0 flex-1 truncate">{i.title}</span>
-              {i.kind && <span className="shrink-0 text-[10px] uppercase tracking-wide text-slate-500">{i.kind}</span>}
-              {i.minutes != null && <span className="shrink-0 tabular-nums text-slate-400">{i.minutes}m</span>}
-            </li>
+            <PeekLine
+              key={i.key}
+              slug={i.slug}
+              title={i.title}
+              meta={[i.kind, i.minutes != null ? `${i.minutes}m` : null].filter(Boolean).join(' · ')}
+              onOpen={onOpenProblem}
+            />
           ))}
         </ul>
       )}
-    </div>
+    </div>,
+    document.body
   )
 }
 
-function Row({ row, selected, onSelect, expanded, onToggle, today, doneOn }) {
-  const [peek, setPeek] = useState(false)
-  const { node, guides, last, hasChildren } = row
+function Row({ row, selectedId, onSelect, collapsed, onToggle, today, doneOn, onOpenProblem }) {
+  const [at, setAt] = useState(null)
+  const rowRef = useRef(null)
+  const closing = useRef(null)
+
+  const { node, guides, last, hasChildren, children } = row
   const out = node.state === 'ruled-out'
   const isToday = node.date === today
   // A day that has been and gone is described by what was recorded, not by
   // what was once planned for it.
   const past = node.date < today
   const done = past ? doneOn?.(node.date) || [] : []
+  const open = !collapsed.has(node.id)
+  const selected = node.id === selectedId
+
+  const hold = useCallback(() => clearTimeout(closing.current), [])
+
+  const show = useCallback(() => {
+    hold()
+    const r = rowRef.current?.getBoundingClientRect()
+    if (!r) return
+    const right = r.right + PEEK_GAP
+    const left = right + PEEK_WIDTH <= window.innerWidth - 12
+      ? right
+      : Math.max(12, r.left - PEEK_GAP - PEEK_WIDTH)
+    setAt({ top: Math.min(r.top, window.innerHeight - 260), left })
+  }, [hold])
+
+  const hide = useCallback(() => {
+    closing.current = setTimeout(() => setAt(null), CLOSE_GRACE_MS)
+  }, [])
+
+  // Fixed coordinates stop meaning anything once the page moves under them.
+  useEffect(() => {
+    if (!at) return
+    const drop = () => setAt(null)
+    window.addEventListener('scroll', drop, true)
+    return () => window.removeEventListener('scroll', drop, true)
+  }, [at])
+
+  useEffect(() => () => clearTimeout(closing.current), [])
 
   return (
     <li>
       <div
+        ref={rowRef}
         className="relative flex min-h-[2.25rem] items-stretch"
-        onMouseEnter={() => setPeek(true)}
-        onMouseLeave={() => setPeek(false)}
+        onMouseEnter={show}
+        onMouseLeave={hide}
       >
         <Guides guides={guides} />
         {row.depth > 0 && (
@@ -138,20 +231,20 @@ function Row({ row, selected, onSelect, expanded, onToggle, today, doneOn }) {
         <div className="flex min-w-0 flex-1 items-center gap-1.5 py-1">
           <button
             onClick={() => hasChildren && onToggle(node.id)}
-            aria-expanded={hasChildren ? expanded : undefined}
-            aria-label={hasChildren ? `${expanded ? 'Collapse' : 'Expand'} what follows ${node.label}` : undefined}
+            aria-expanded={hasChildren ? open : undefined}
+            aria-label={hasChildren ? `${open ? 'Collapse' : 'Expand'} what follows ${node.label}` : undefined}
             disabled={!hasChildren}
-            className={`flex size-4 shrink-0 items-center justify-center rounded border-0 bg-transparent text-[9px] text-slate-400 ${
+            className={`flex size-5 shrink-0 items-center justify-center rounded border-0 bg-transparent text-slate-400 ${
               hasChildren ? 'cursor-pointer hover:bg-slate-100 hover:text-slate-700' : 'invisible'
             }`}
           >
-            {expanded ? '▾' : '▸'}
+            <Chevron open={open} />
           </button>
 
           <button
             onClick={() => onSelect(node.id)}
-            onFocus={() => setPeek(true)}
-            onBlur={() => setPeek(false)}
+            onFocus={show}
+            onBlur={hide}
             aria-current={selected ? 'true' : undefined}
             className={`min-w-0 flex-1 rounded-lg border-0 px-2 py-1 text-left transition ${
               selected ? 'bg-slate-900/5 ring-1 ring-slate-900/15' : 'bg-transparent hover:bg-slate-50'
@@ -184,8 +277,45 @@ function Row({ row, selected, onSelect, expanded, onToggle, today, doneOn }) {
           </button>
         </div>
 
-        {peek && <Peek node={node} done={done} past={past} />}
+        {at && (
+          <Peek
+            node={node}
+            done={done}
+            past={past}
+            at={at}
+            onOpenProblem={(slug, title) => { setAt(null); onOpenProblem?.(slug, title) }}
+            onEnter={hold}
+            onLeave={hide}
+          />
+        )}
       </div>
+
+      {hasChildren && (
+        // Animating the row track lets a subtree open to its own height without
+        // anyone having to measure it first.
+        <div
+          inert={!open}
+          className={`grid transition-[grid-template-rows] duration-200 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+        >
+          <div className="overflow-hidden">
+            <ul className="list-none pl-0">
+              {children.map(child => (
+                <Row
+                  key={child.node.id}
+                  row={child}
+                  selectedId={selectedId}
+                  onSelect={onSelect}
+                  collapsed={collapsed}
+                  onToggle={onToggle}
+                  today={today}
+                  doneOn={doneOn}
+                  onOpenProblem={onOpenProblem}
+                />
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
     </li>
   )
 }
@@ -194,16 +324,13 @@ function Row({ row, selected, onSelect, expanded, onToggle, today, doneOn }) {
  * The forecast as the branching structure it already is: one node per scenario,
  * one branch per result that would select it.
  */
-export default function DecisionTree({ tree, selectedId, onSelect, today, doneOn }) {
+export default function DecisionTree({ tree, selectedId, onSelect, today, doneOn, onOpenProblem }) {
   const [collapsed, setCollapsed] = useState(() => defaultCollapsed(tree.roots))
 
   // A newly adopted plan gets its own folds rather than inheriting the last one's.
   useEffect(() => setCollapsed(defaultCollapsed(tree.roots)), [tree])
 
-  const rows = useMemo(
-    () => flattenTree(tree.roots, id => !collapsed.has(id)),
-    [tree, collapsed]
-  )
+  const rows = useMemo(() => treeRows(tree.roots), [tree])
 
   const toggle = id => setCollapsed(prev => {
     const next = new Set(prev)
@@ -212,7 +339,15 @@ export default function DecisionTree({ tree, selectedId, onSelect, today, doneOn
     return next
   })
 
-  const visibleDepths = useMemo(() => new Set(rows.map(r => r.depth)), [rows])
+  const visibleDepths = useMemo(() => {
+    const seen = new Set()
+    const walk = list => list.forEach(n => {
+      seen.add(n.depth)
+      if (!collapsed.has(n.id)) walk(n.children)
+    })
+    walk(tree.roots)
+    return seen
+  }, [tree, collapsed])
 
   // Hiding a date has to hide the ones after it too: their branches would
   // otherwise hang off a parent that is no longer on screen.
@@ -243,11 +378,11 @@ export default function DecisionTree({ tree, selectedId, onSelect, today, doneOn
               disabled={fixed}
               aria-pressed={fixed ? undefined : shown}
               title={fixed ? 'The first day is always shown' : `${shown ? 'Hide' : 'Show'} ${d.date} and after`}
-              className={`rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition ${
+              className={`flex items-center gap-0.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition ${
                 shown ? 'text-slate-700' : 'text-slate-300'
               } ${fixed ? 'cursor-default' : 'hover:bg-slate-100'}`}
             >
-              {!fixed && <span className="mr-1 text-[9px]">{shown ? '▾' : '▸'}</span>}
+              {!fixed && <Chevron open={shown} />}
               {d.weekdayShort} {d.date.slice(5)}
             </button>
           )
@@ -269,12 +404,13 @@ export default function DecisionTree({ tree, selectedId, onSelect, today, doneOn
           <Row
             key={row.node.id}
             row={row}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            collapsed={collapsed}
+            onToggle={toggle}
             today={today}
             doneOn={doneOn}
-            selected={row.node.id === selectedId}
-            onSelect={onSelect}
-            expanded={!collapsed.has(row.node.id)}
-            onToggle={toggle}
+            onOpenProblem={onOpenProblem}
           />
         ))}
       </ul>
