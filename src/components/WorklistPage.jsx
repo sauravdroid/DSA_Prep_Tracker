@@ -1,22 +1,30 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
-import { LISTS, LIST_LABEL, versionNumber, attemptsSince, latestAttemptBySlug, itemMode } from '../utils/worklist'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import {
+  LIST_LABEL, versionNumber, attemptsSince, latestAttemptBySlug, itemMode, sheetName, countsByPattern,
+} from '../utils/worklist'
 import { loadAccepted } from '../utils/worklistStore'
 import { subscribeSync } from '../utils/autoSync'
-import { backupIfConnected } from '../utils/github'
+import { backupIfConnected, worklistPreview } from '../utils/github'
 import WorklistDrawer from './WorklistDrawer'
 import WorklistReview from './WorklistReview'
+import Roadmap from './Roadmap'
 import ColdTestModal from './ColdTestModal'
 import * as store from '../store'
 
-export const DIFF_TONE = { Easy: 'text-[#00b8a3]', Medium: 'text-[#ffb800]', Hard: 'text-[#ff375f]' }
+const DIFF_TONE = { Easy: 'text-[#00b8a3]', Medium: 'text-[#ffb800]', Hard: 'text-[#ff375f]' }
 
 function shortDate(iso) {
   if (!iso) return ''
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+function idDate(id) {
+  const m = /^(\d{4})(\d{2})(\d{2})T/.exec(id || '')
+  return m ? new Date(`${m[1]}-${m[2]}-${m[3]}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''
+}
+
 /** Filled when you have recorded an attempt the coach has not seen yet. */
-export function StatusIcon({ attempt }) {
+function StatusIcon({ attempt }) {
   if (!attempt) {
     return (
       <svg viewBox="0 0 16 16" className="size-4" aria-label="Not attempted">
@@ -55,21 +63,80 @@ function SyncButton({ onClick, available }) {
   )
 }
 
-function Row({ item, attempt, selected, onOpen }) {
+/** Every sheet the coach has published, newest first. */
+function SheetPicker({ manifest, currentId, shownId, onPick }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    const onKey = e => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey) }
+  }, [open])
+
+  const versions = [...(manifest?.versions || [])].map((v, i) => ({ ...v, number: i + 1 })).reverse()
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+      >
+        All sheets
+        <span className="text-xs text-slate-400">{versions.length}</span>
+        <svg viewBox="0 0 12 12" className="size-3 text-slate-400" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 z-30 mt-1.5 w-[22rem] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+          <div className="max-h-80 overflow-y-auto py-1">
+            {versions.map(v => (
+              <button
+                key={v.id}
+                onClick={() => { setOpen(false); onPick(v.id) }}
+                className={`flex w-full items-start gap-3 border-0 bg-transparent px-3.5 py-2.5 text-left hover:bg-slate-50 ${v.id === shownId ? 'bg-slate-50' : ''}`}
+              >
+                <span className={`mt-0.5 shrink-0 rounded px-1.5 py-px font-mono text-[11px] ${v.id === currentId ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                  v{v.number}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-slate-900">{v.name || `Sheet ${v.number}`}</span>
+                  <span className="block truncate text-xs text-slate-500">
+                    {idDate(v.id)}{v.summary ? ` · ${v.summary}` : ''}
+                  </span>
+                </span>
+                {v.id === currentId && <span className="mt-0.5 shrink-0 text-[10px] font-bold uppercase text-emerald-600">current</span>}
+              </button>
+            ))}
+          </div>
+          <p className="border-t border-slate-100 bg-slate-50 px-3.5 py-2 text-[11px] text-slate-500">
+            Sync to see sheets published since you last looked.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Row({ rank, item, attempt, selected, onOpen }) {
   return (
     <button
       onClick={() => onOpen(item)}
-      className={`grid h-12 w-full grid-cols-[1.25rem_minmax(0,1fr)_4.5rem_3.5rem] items-center gap-3.5 border-0 border-t border-slate-100 px-4 text-left transition first:border-t-0 even:bg-[#f7f8fa] hover:bg-slate-100 ${
+      className={`grid h-12 w-full grid-cols-[1.5rem_1.25rem_minmax(0,1fr)_4.5rem_3.5rem] items-center gap-3 border-0 border-t border-slate-100 px-4 text-left transition first:border-t-0 even:bg-[#f7f8fa] hover:bg-slate-100 ${
         selected ? '!bg-[#fff7ea] shadow-[inset_3px_0_0_#ffa116]' : ''
       }`}
     >
+      <span className="text-right text-xs font-semibold tabular-nums text-slate-400">{rank}</span>
       <StatusIcon attempt={attempt} />
       <span className="flex min-w-0 items-baseline gap-2.5">
         <span className="shrink-0 font-medium text-slate-900">
           {item.number ? `${item.number}. ` : ''}{item.title}
         </span>
         {item.flag === 'repair' && (
-          <span className="shrink-0 rounded px-1.5 py-px text-[11px] font-semibold text-[#ff375f] ring-1 ring-[#ff375f]/20 bg-[#ffe8ed]">
+          <span className="shrink-0 rounded bg-[#ffe8ed] px-1.5 py-px text-[11px] font-semibold text-[#ff375f] ring-1 ring-[#ff375f]/20">
             Repair
           </span>
         )}
@@ -83,14 +150,37 @@ function Row({ item, attempt, selected, onOpen }) {
   )
 }
 
+function Summary({ headline, summary }) {
+  const long = (summary || '').length > 320
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <section className="mt-4 rounded-[10px] border border-[#ffe2b3] bg-[#fff7ea] px-4 py-3">
+      <div className="flex items-baseline gap-2.5">
+        <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-[#c2410c]">Coach</span>
+        <p className="text-[13px] font-medium text-zinc-800">{headline}</p>
+      </div>
+      {summary && (
+        <div className="mt-2 pl-[3.1rem] text-[13px] leading-relaxed text-zinc-700">
+          <p className={`whitespace-pre-line ${long && !expanded ? 'line-clamp-3' : ''}`}>{summary}</p>
+          {long && (
+            <button onClick={() => setExpanded(e => !e)} className="mt-1 text-xs font-semibold text-[#c2410c] underline-offset-2 hover:underline">
+              {expanded ? 'Show less' : 'Read the full summary'}
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function EmptyState({ onSync, unavailable, available }) {
   return (
     <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
-      <p className="text-base font-semibold text-slate-900">No worklist yet</p>
+      <p className="text-base font-semibold text-slate-900">No prep sheet yet</p>
       <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
         {unavailable
-          ? 'The local data server is not reachable, so the accepted worklist cannot be read.'
-          : 'The coach publishes worklists to your data repository. Sync to review the latest one and accept it.'}
+          ? 'The local data server is not reachable, so your sheet cannot be read.'
+          : 'The coach publishes prep sheets to your data repository. Sync to review the latest one and make it your current sheet.'}
       </p>
       <div className="mt-5"><SyncButton onClick={onSync} available={available} /></div>
     </div>
@@ -101,10 +191,14 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
   const [accepted, setAccepted] = useState(null)
   const [loaded, setLoaded] = useState(false)
   const [unavailable, setUnavailable] = useState(false)
+  const [viewing, setViewing] = useState(null)
+  const [latestManifest, setLatestManifest] = useState(null)
   const [tab, setTab] = useState(null)
+  const [focus, setFocus] = useState(null)
+  const [showRoadmap, setShowRoadmap] = useState(true)
   const [open, setOpen] = useState(null)
   const [recording, setRecording] = useState(null)
-  const [reviewing, setReviewing] = useState(false)
+  const [reviewing, setReviewing] = useState(null)
   const [available, setAvailable] = useState(null)
   const [notice, setNotice] = useState(null)
 
@@ -117,16 +211,35 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
   }, [])
   useEffect(() => subscribeSync(s => setAvailable(s.worklistAvailable)), [])
 
-  const version = accepted?.version || null
-  const number = versionNumber(accepted?.manifest, version?.id)
-  const unseen = useMemo(() => attemptsSince(version, log), [version, log])
-  const latestBySlug = useMemo(() => latestAttemptBySlug(version, log), [version, log])
+  const current = accepted?.version || null
+  const sheet = viewing?.version || current
+  const manifest = latestManifest || viewing?.manifest || accepted?.manifest
+  const number = versionNumber(manifest, sheet?.id)
+  const unseen = useMemo(() => attemptsSince(sheet, log), [sheet, log])
+  const latestBySlug = useMemo(() => latestAttemptBySlug(sheet, log), [sheet, log])
+  const counts = useMemo(() => countsByPattern(sheet), [sheet])
 
-  const activeTab = tab || (version?.revision?.length || !version?.new?.length ? 'revision' : 'new')
-  const groups = version?.[activeTab] || []
-  const count = list => (version?.[list] || []).reduce((n, g) => n + g.items.length, 0)
+  const count = list => (sheet?.[list] || []).reduce((n, g) => n + g.items.length, 0)
+  const activeTab = tab || (count('revision') || !count('new') ? 'revision' : 'new')
+  const groups = (sheet?.[activeTab] || []).filter(g => !focus || g.pattern === focus)
+  const otherTab = activeTab === 'new' ? 'revision' : 'new'
+  const focusElsewhere = focus ? counts.get(focus)?.[otherTab] || 0 : 0
 
-  const openItem = useCallback(item => setOpen({ ...item, list: item.list || activeTab }), [activeTab])
+  const pick = useCallback(async id => {
+    setFocus(null)
+    setTab(null)
+    if (!id || id === current?.id) { setViewing(null); return }
+    setViewing({ id, loading: true })
+    try {
+      const r = await worklistPreview({ id })
+      if (r.empty || !r.version) throw new Error('That sheet could not be read.')
+      setLatestManifest(r.manifest)
+      setViewing({ id, version: r.version, manifest: r.manifest, valid: r.valid })
+    } catch (e) {
+      setViewing(null)
+      setNotice({ tone: 'warn', text: `Could not open that sheet: ${e.message}` })
+    }
+  }, [current?.id])
 
   const saveAttempt = useCallback(entry => {
     store.recordAttempt(entry)
@@ -153,16 +266,20 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
       <div className="mx-auto w-full max-w-[960px] pb-16 pt-2">
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-0 flex-1">
-            <h1 className="text-[22px] font-bold tracking-tight text-slate-900">Worklist</h1>
-            {version && (
-              <p className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-slate-500">
-                <span>
-                  <strong className="font-semibold text-slate-900">{number ? `v${number}` : 'Accepted'}</strong>
-                  {' '}by coach, {shortDate(version.writtenAt)}
-                </span>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Prep sheet
+              {number && <span className="normal-case"> · v{number}</span>}
+              {viewing && !viewing.loading ? ' · older sheet' : ''}
+            </p>
+            <h1 className="mt-0.5 truncate text-[22px] font-bold tracking-tight text-slate-900">
+              {sheet ? sheetName(sheet, number) : 'Prep sheet'}
+            </h1>
+            {sheet && (
+              <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-slate-500">
+                <span>By coach, {shortDate(sheet.writtenAt)}</span>
                 <span className="size-[3px] rounded-full bg-slate-300" aria-hidden="true" />
-                <span>based on {version.basedOn?.attempts ?? '?'} attempts</span>
-                {unseen.length > 0 && (
+                <span>based on {sheet.basedOn?.attempts ?? '?'} attempts</span>
+                {!viewing && unseen.length > 0 && (
                   <>
                     <span className="size-[3px] rounded-full bg-slate-300" aria-hidden="true" />
                     <span className="font-medium text-[#c2410c]">
@@ -173,8 +290,25 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
               </p>
             )}
           </div>
-          {version && <SyncButton onClick={() => setReviewing(true)} available={available} />}
+          {manifest && <SheetPicker manifest={manifest} currentId={current?.id} shownId={sheet?.id} onPick={pick} />}
+          {current && <SyncButton onClick={() => setReviewing({})} available={available} />}
         </div>
+
+        {viewing && (
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg bg-slate-900 px-4 py-2.5 text-[13px] text-white">
+            <span className="flex-1">
+              {viewing.loading ? 'Opening sheet…' : "You're looking at an older sheet. Your current sheet is unchanged."}
+            </span>
+            {!viewing.loading && (
+              <button onClick={() => setReviewing({ id: viewing.id })} className="rounded-md bg-white/10 px-3 py-1 text-xs font-semibold hover:bg-white/20">
+                Make this my current sheet
+              </button>
+            )}
+            <button onClick={() => pick(current?.id)} className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-slate-900 hover:bg-slate-100">
+              Back to current
+            </button>
+          </div>
+        )}
 
         {notice && (
           <div className={`mt-4 flex items-start gap-3 rounded-lg px-4 py-2.5 text-[13px] ring-1 ${
@@ -187,17 +321,35 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
           </div>
         )}
 
-        {loaded && !version && <EmptyState onSync={() => setReviewing(true)} unavailable={unavailable} available={available} />}
+        {loaded && !current && !viewing && (
+          <EmptyState onSync={() => setReviewing({})} unavailable={unavailable} available={available} />
+        )}
 
-        {version && (
+        {sheet && (
           <>
-            <div className="mt-4 flex items-center gap-2.5 rounded-[10px] border border-[#ffe2b3] bg-[#fff7ea] px-4 py-2.5 text-[13px] text-zinc-700">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#c2410c]">Coach</span>
-              <span>{version.headline}</span>
-            </div>
+            <Summary key={sheet.id} headline={sheet.headline} summary={sheet.summary} />
 
-            <div className="mt-5 flex gap-6 border-b border-slate-200">
-              {LISTS.slice().reverse().map(list => (
+            {sheet.roadmap?.length > 0 && (
+              <section className="mt-4 rounded-[10px] border border-slate-200 bg-white px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-[13px] font-bold text-slate-900">Roadmap</h2>
+                  <span className="flex-1 text-xs text-slate-400">
+                    {showRoadmap ? 'Click a pattern to see only its problems.' : ''}
+                  </span>
+                  <button onClick={() => setShowRoadmap(s => !s)} className="text-xs font-medium text-slate-500 underline-offset-2 hover:underline">
+                    {showRoadmap ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                {showRoadmap && (
+                  <div className="mt-2">
+                    <Roadmap roadmap={sheet.roadmap} counts={counts} selected={focus} onSelect={setFocus} />
+                  </div>
+                )}
+              </section>
+            )}
+
+            <div className="mt-5 flex items-end gap-6 border-b border-slate-200">
+              {['revision', 'new'].map(list => (
                 <button
                   key={list}
                   onClick={() => setTab(list)}
@@ -213,11 +365,21 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
                   </span>
                 </button>
               ))}
+              {focus && (
+                <span className="mb-2 ml-auto inline-flex items-center gap-1.5 rounded-full bg-slate-900 py-0.5 pl-3 pr-1 text-xs font-medium text-white">
+                  {focus}
+                  <button onClick={() => setFocus(null)} aria-label="Show all patterns" className="flex size-5 items-center justify-center rounded-full hover:bg-white/20">✕</button>
+                </span>
+              )}
             </div>
 
             {groups.length === 0 && (
               <p className="mt-8 text-center text-sm text-slate-400">
-                Nothing in {LIST_LABEL[activeTab]} right now.
+                {focus
+                  ? <>No {LIST_LABEL[activeTab].toLowerCase()} problems for {focus} on this sheet.{focusElsewhere > 0 && (
+                    <> <button onClick={() => setTab(otherTab)} className="font-medium text-slate-700 underline underline-offset-2">See {focusElsewhere} in {LIST_LABEL[otherTab]}</button></>
+                  )}</>
+                  : `Nothing in ${LIST_LABEL[activeTab]} on this sheet.`}
               </p>
             )}
 
@@ -231,13 +393,14 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
                     {group.note && <span className="min-w-0 flex-1 truncate text-xs text-slate-500">{group.note}</span>}
                   </div>
                   <div className="overflow-hidden rounded-[10px] border border-slate-200 bg-white">
-                    {group.items.map(item => (
+                    {group.items.map((item, i) => (
                       <Row
                         key={item.slug}
+                        rank={i + 1}
                         item={{ ...item, list: activeTab, pattern: group.pattern }}
                         attempt={latestBySlug.get(item.slug)}
                         selected={open?.slug === item.slug}
-                        onOpen={openItem}
+                        onOpen={setOpen}
                       />
                     ))}
                   </div>
@@ -274,13 +437,18 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
       {reviewing && (
         <WorklistReview
           accepted={accepted}
+          initialId={reviewing.id}
           practiceLog={log}
-          onClose={() => setReviewing(false)}
+          onManifest={setLatestManifest}
+          onClose={() => setReviewing(null)}
           onAccepted={record => {
             setAccepted(record)
-            setReviewing(false)
+            setLatestManifest(record.manifest)
+            setReviewing(null)
+            setViewing(null)
             setTab(null)
-            setNotice({ tone: 'ok', text: `Now following ${record.source?.number ? `v${record.source.number}` : 'the new worklist'}.` })
+            setFocus(null)
+            setNotice({ tone: 'ok', text: `“${sheetName(record.version, record.source?.number)}” is now your current sheet.` })
           }}
         />
       )}

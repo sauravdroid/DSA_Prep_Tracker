@@ -24,6 +24,69 @@ export function versionNumber(manifest, id) {
   return i < 0 ? null : i + 1
 }
 
+/** What to call a sheet: its own name, or its number when it has none. */
+export function sheetName(sheet, number) {
+  return sheet?.name || (number ? `Sheet ${number}` : 'Untitled sheet')
+}
+
+/**
+ * The roadmap in rows: a pattern sits one row below the deepest pattern it
+ * builds on. Within a row, patterns are placed near the patterns they build
+ * on (to keep edges short), and otherwise in the coach's order.
+ */
+export function roadmapLayers(roadmap = []) {
+  const byName = new Map(roadmap.map((n, order) => [n.pattern, { ...n, order }]))
+  const parentsOf = name => (byName.get(name)?.after || []).filter(p => byName.has(p) && p !== name)
+
+  const depth = new Map()
+  const depthOf = (name, path = new Set()) => {
+    if (depth.has(name)) return depth.get(name)
+    if (path.has(name)) return 0
+    path.add(name)
+    const parents = parentsOf(name)
+    const d = parents.length ? 1 + Math.max(...parents.map(p => depthOf(p, path))) : 0
+    path.delete(name)
+    depth.set(name, d)
+    return d
+  }
+  for (const name of byName.keys()) depthOf(name)
+
+  const rows = []
+  for (const node of byName.values()) {
+    const d = depth.get(node.pattern)
+    ;(rows[d] ||= []).push(node)
+  }
+
+  const position = new Map()
+  return rows.filter(Boolean).map(row => {
+    const centre = node => {
+      const ps = parentsOf(node.pattern).filter(p => position.has(p))
+      return ps.length ? ps.reduce((s, p) => s + position.get(p), 0) / ps.length : null
+    }
+    const sorted = [...row].sort((a, b) => {
+      const ca = centre(a)
+      const cb = centre(b)
+      if (ca != null && cb != null && ca !== cb) return ca - cb
+      return a.order - b.order
+    })
+    sorted.forEach((n, i) => position.set(n.pattern, (i + 0.5) / sorted.length))
+    return sorted.map(n => ({ ...n, after: parentsOf(n.pattern) }))
+  })
+}
+
+/** Problems on the sheet per pattern, across both lists. */
+export function countsByPattern(sheet) {
+  const counts = new Map()
+  for (const list of LISTS) {
+    for (const group of sheet?.[list] || []) {
+      const c = counts.get(group.pattern) || { new: 0, revision: 0 }
+      c[list] += group.items.length
+      counts.set(group.pattern, c)
+    }
+  }
+  return counts
+}
+
 /** Every item with the list and pattern it sits in, in display order. */
 export function flattenItems(worklist) {
   const out = []

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { worklistPreview, backupIfConnected, getRepo } from '../utils/github'
 import { acceptWorklist } from '../utils/worklistStore'
 import { worklistAccepted } from '../utils/autoSync'
-import { diffWorklists, changesByList, versionNumber, attemptsSince, LIST_LABEL } from '../utils/worklist'
+import { diffWorklists, changesByList, versionNumber, attemptsSince, sheetName, LIST_LABEL } from '../utils/worklist'
 
 const ANIM_MS = 200
 
@@ -31,7 +31,7 @@ function Check({ ok, warn, children }) {
  * Shows what the coach has published before anything changes. Accepting
  * stores the exact snapshot shown here; anything newer needs its own review.
  */
-export default function WorklistReview({ accepted, practiceLog, onClose, onAccepted }) {
+export default function WorklistReview({ accepted, initialId, practiceLog, onManifest, onClose, onAccepted }) {
   const [shown, setShown] = useState(false)
   const [phase, setPhase] = useState('publishing')
   const [published, setPublished] = useState(null)
@@ -60,6 +60,7 @@ export default function WorklistReview({ accepted, practiceLog, onClose, onAccep
     try {
       const r = await worklistPreview({ id, acceptedId: current?.id, acceptedHash: accepted?.source?.hash })
       setResult(r)
+      if (r.manifest) onManifest?.(r.manifest)
       setPhase('ready')
     } catch (e) {
       setError(e.message)
@@ -77,10 +78,11 @@ export default function WorklistReview({ accepted, practiceLog, onClose, onAccep
       } catch (e) {
         if (!cancelled) setPublished({ ok: false, error: e.message })
       }
-      if (!cancelled) load()
+      if (!cancelled) load(initialId)
     })()
     return () => { cancelled = true }
-  }, [load])
+    // Runs once when the panel opens; later loads come from picking a version.
+  }, [])
 
   const view = useMemo(() => {
     if (!result || result.empty || !result.manifest) return null
@@ -164,7 +166,7 @@ export default function WorklistReview({ accepted, practiceLog, onClose, onAccep
 
           {(phase === 'publishing' || phase === 'loading') && (
             <p className="mt-8 text-sm text-slate-500">
-              {phase === 'publishing' ? 'Publishing your attempts…' : 'Reading the latest worklist…'}
+              {phase === 'publishing' ? 'Publishing your attempts…' : 'Reading the latest sheet…'}
             </p>
           )}
 
@@ -185,9 +187,12 @@ export default function WorklistReview({ accepted, practiceLog, onClose, onAccep
             <>
               <h2 className="mt-3 text-xl font-bold text-slate-900">
                 {view.isCurrent
-                  ? "You're on the latest"
-                  : view.isLatest ? 'New worklist from coach' : `Version v${view.number}`}
+                  ? 'This is your current sheet'
+                  : view.isLatest ? 'New sheet from coach' : `Older sheet · v${view.number}`}
               </h2>
+              {view.next && (
+                <p className="mt-1 text-[15px] font-semibold text-slate-700">{sheetName(view.next, view.number)}</p>
+              )}
 
               <div className="mt-2.5 flex flex-wrap items-center gap-2">
                 {current && !view.isCurrent && (
@@ -232,7 +237,10 @@ export default function WorklistReview({ accepted, practiceLog, onClose, onAccep
                 <section className="mt-5">
                   <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Coach says</h3>
                   <div className="rounded-lg border border-l-[3px] border-[#ffe7c2] border-l-[#ffa116] bg-[#fffaf2] px-4 py-3">
-                    <p className="text-sm leading-relaxed text-slate-900">{view.next.headline}</p>
+                    <p className="text-sm font-medium leading-relaxed text-slate-900">{view.next.headline}</p>
+                    {view.next.summary && (
+                      <p className="mt-2 whitespace-pre-line text-[13px] leading-relaxed text-zinc-700">{view.next.summary}</p>
+                    )}
                   </div>
                 </section>
               )}
@@ -273,7 +281,7 @@ export default function WorklistReview({ accepted, practiceLog, onClose, onAccep
                   onClick={() => setShowVersions(v => !v)}
                   className="text-xs font-medium text-slate-500 underline-offset-2 hover:underline"
                 >
-                  {showVersions ? 'Hide' : 'Show'} all versions ({result.manifest.versions.length})
+                  {showVersions ? 'Hide' : 'Show'} all sheets ({result.manifest.versions.length})
                 </button>
                 {showVersions && (
                   <ul className="mt-2 list-none space-y-0 pl-0">
@@ -287,7 +295,7 @@ export default function WorklistReview({ accepted, practiceLog, onClose, onAccep
                             v{all.length - i}
                           </span>
                           <span className="w-14 shrink-0 text-slate-400">{idDate(v.id)}</span>
-                          <span className="min-w-0 flex-1 truncate text-slate-600">{v.summary || ''}</span>
+                          <span className="min-w-0 flex-1 truncate text-slate-600">{v.name || v.summary || ''}</span>
                           {v.migrated && <span className="rounded bg-slate-100 px-1.5 text-[10px] font-bold uppercase text-slate-500">migrated</span>}
                         </button>
                       </li>
@@ -306,7 +314,7 @@ export default function WorklistReview({ accepted, practiceLog, onClose, onAccep
               disabled={!canAccept || busy}
               className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              {busy ? 'Accepting…' : view.isLatest ? `Accept v${view.number}` : `Switch to v${view.number}`}
+              {busy ? 'Saving…' : `Make v${view.number} current`}
             </button>
           )}
           <button onClick={close} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
@@ -314,7 +322,7 @@ export default function WorklistReview({ accepted, practiceLog, onClose, onAccep
           </button>
           {error && phase === 'ready' && <span className="ml-2 min-w-0 flex-1 truncate text-xs text-[#be123c]">{error}</span>}
           {!error && current && view && !view.isCurrent && (
-            <span className="ml-auto text-xs text-slate-400">Your list stays on v{view.currentNumber ?? '?'} until you accept.</span>
+            <span className="ml-auto text-xs text-slate-400">You stay on v{view.currentNumber ?? '?'} until you choose.</span>
           )}
         </div>
       </aside>

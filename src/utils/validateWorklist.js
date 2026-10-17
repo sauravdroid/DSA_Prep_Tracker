@@ -46,6 +46,42 @@ function worklistSemantics(w) {
       }
     }
   }
+  if (Array.isArray(w.roadmap)) errors.push(...roadmapErrors(w))
+  return errors
+}
+
+function roadmapErrors(w) {
+  const errors = []
+  const names = new Set()
+  for (const node of w.roadmap) {
+    if (names.has(node.pattern)) errors.push(`roadmap: "${node.pattern}" appears twice.`)
+    names.add(node.pattern)
+  }
+  for (const node of w.roadmap) {
+    for (const parent of node.after || []) {
+      if (parent === node.pattern) errors.push(`roadmap: "${node.pattern}" cannot come after itself.`)
+      else if (!names.has(parent)) errors.push(`roadmap: "${node.pattern}" comes after "${parent}", which is not in the roadmap.`)
+    }
+  }
+
+  // A cycle has no first pattern, so it cannot be drawn as a roadmap.
+  const after = new Map(w.roadmap.map(n => [n.pattern, (n.after || []).filter(p => names.has(p) && p !== n.pattern)]))
+  const state = new Map()
+  const visit = name => {
+    if (state.get(name) === 'done') return false
+    if (state.get(name) === 'open') return true
+    state.set(name, 'open')
+    const cyclic = after.get(name).some(visit)
+    state.set(name, 'done')
+    return cyclic
+  }
+  if ([...names].some(visit)) errors.push('roadmap: the "after" links form a cycle.')
+
+  for (const list of ['new', 'revision']) {
+    for (const group of w[list] || []) {
+      if (!names.has(group.pattern)) errors.push(`${list}: pattern "${group.pattern}" is not in the roadmap.`)
+    }
+  }
   return errors
 }
 

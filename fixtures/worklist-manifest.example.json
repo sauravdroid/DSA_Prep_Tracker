@@ -15,6 +15,7 @@
       "path": "coaching/worklists/20260302T090000Z.json",
       "writtenAt": "2026-03-02T09:00:00Z",
       "replaces": "20260227T183000Z",
+      "name": "Stack repair, then Intervals",
       "summary": "Monotonic stack repair; start intervals."
     }
   ]

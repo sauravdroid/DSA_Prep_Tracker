@@ -211,9 +211,9 @@ export default function SyncSettings({ onSyncComplete }) {
     }
     const s = r.summary
 
-    // The worklist is never adopted without review, so a restore only brings
-    // the facts back; the Worklist page offers the coach's latest to review.
-    setStatus(`Restored +${s.problemsAdded} problems, +${s.revisionsAdded} revisions, +${s.attemptsAdded} graded attempts. Open Worklist and Sync to review the coach's latest list.`)
+    // A prep sheet is never adopted without review, so a restore only brings
+    // the facts back; the Sheets page offers the coach's latest to review.
+    setStatus(`Restored +${s.problemsAdded} problems, +${s.revisionsAdded} revisions, +${s.attemptsAdded} graded attempts. Open Sheets and Sync to review the coach's latest prep sheet.`)
     onSyncComplete()
   })
 

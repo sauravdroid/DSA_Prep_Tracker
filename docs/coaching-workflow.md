@@ -4,7 +4,7 @@ Repository-owned copy of the reusable protocol. This file is the authority for
 how coaching works; refresh any ChatGPT project upload from this version rather
 than editing a separate copy.
 
-**Writing a worklist?** Start with
+**Writing a prep sheet?** Start with
 [coach-planning-protocol.md](./coach-planning-protocol.md). It is the entry
 point: which files to read, what a version contains, and how to publish one.
 This document supplies the rules that protocol applies.
@@ -18,12 +18,12 @@ application code.
 
 | Party | Owns |
 | --- | --- |
-| Application | Practice facts: recording attempts and publishing them. Rendering the accepted worklist exactly as written. Checking that a published version is valid and kept to its paths |
+| Application | Practice facts: recording attempts and publishing them. Rendering the current prep sheet exactly as written, and any earlier sheet on request. Checking that a published sheet is valid and kept to its paths |
 | Coach | Every decision about what to do: which problems, which list, which pattern, what order, when to repair, when to retest, when an item comes off. The reasoning and explanation |
 
 The coach cannot manufacture attempts or override recorded evidence. The
 application makes no learning judgements. It computes no plan, due date, debt
-or branch, and it never adopts a worklist the user has not reviewed.
+or branch, and it never makes a sheet current before the user has reviewed it.
 
 ## What counts as evidence
 
@@ -101,14 +101,15 @@ found" does not prove the work was skipped.
    session; it is not piled on top of a full day.
 
 For each item, say its purpose in `reason`, and put the evidence used and what
-result would change the plan in `detail`. A worklist has no dates: it covers
+result would change the plan in `detail`. A prep sheet has no dates: it covers
 whatever span the user is planning for, sized to their capacity over that span.
 
-## Authoring a worklist
+## Authoring a prep sheet
 
 Write against [`schemas/worklist.schema.json`](../schemas/worklist.schema.json),
 and update [`schemas/worklist-manifest.schema.json`](../schemas/worklist-manifest.schema.json)
-in the same commit. Worked examples:
+in the same commit. A sheet has a `name`, a `summary`, a pattern `roadmap`,
+and `new` and `revision` problems grouped by pattern in priority order. Worked examples:
 - [`fixtures/worklist.example.json`](../fixtures/worklist.example.json)
 - [`fixtures/worklist.migrated.example.json`](../fixtures/worklist.migrated.example.json)
 - [`fixtures/worklist-manifest.example.json`](../fixtures/worklist-manifest.example.json)
@@ -118,6 +119,8 @@ Rules the app enforces before it lets the user accept a version:
 - The version and the manifest are schema-valid.
 - `id` is `writtenAt` without punctuation.
 - No problem appears twice, and no pattern name repeats within a list.
+- The roadmap names each pattern once, links only to patterns on it, has no
+  cycles, and includes every pattern used in the lists.
 - The publishing commit touched only `coaching/worklists/`.
 - The commit added version files without editing or deleting any.
 - The version the user currently follows still has the content they accepted.
@@ -129,5 +132,5 @@ The app works out what changed between versions on its own. A version's
 
 `coaching/decision.json`, `index.json`, `days/`, `assessments/`, `outcomes/`,
 `weeks/` and `months/` are frozen history from the dated-plan era. Nothing
-writes to them anymore. They became the first worklist version through the
+writes to them anymore. They became the first prep sheet through the
 rules in [worklist-migration.md](./worklist-migration.md).

@@ -17,8 +17,8 @@ import { startAutoSync, subscribeSync } from './utils/autoSync'
 import * as store from './store'
 
 // Study Plan and Today's Revision are intentionally not navigable while the
-// coach's worklist owns planning; their components are still wired below.
-const TABS = ['Calendar', 'Problems', 'Worklist', 'Stats', 'Recursion', 'Settings']
+// coach's prep sheets own planning; their components are still wired below.
+const TABS = ['Calendar', 'Problems', 'Sheets', 'Stats', 'Recursion', 'Settings']
 
 export default function App() {
   const [tab, setTab] = useState('Calendar')
@@ -135,8 +135,8 @@ export default function App() {
             >
               {t}
               {t === 'Problems' && count > 0 && <span className="tab-badge">{count}</span>}
-              {t === 'Worklist' && worklistAvailable && (
-                <span className="tab-badge" title="A new worklist is ready to review">
+              {t === 'Sheets' && worklistAvailable && (
+                <span className="tab-badge" title="A new prep sheet is ready to review">
                   {worklistAvailable.number ? `v${worklistAvailable.number}` : 'new'}
                 </span>
               )}
@@ -185,7 +185,7 @@ export default function App() {
             revisions={revisions}
           />
         )}
-        {tab === 'Worklist' && (
+        {tab === 'Sheets' && (
           <WorklistPage
             problems={problems}
             practiceLog={practiceLog}

@@ -17,6 +17,9 @@ import {
   latestAttemptBySlug,
   diffWorklists,
   changesByList,
+  sheetName,
+  roadmapLayers,
+  countsByPattern,
 } from '../src/utils/worklist.js'
 
 const fixture = n => JSON.parse(readFileSync(new URL(`../fixtures/${n}`, import.meta.url)))
@@ -182,6 +185,60 @@ test('moving between lists is a move, grouped under the destination', () => {
   const grouped = changesByList(d)
   assert.equal(grouped.revision[0].op, 'moved')
   assert.equal(grouped.new.length, 0)
+})
+
+/* ---------- Sheets: name, summary, roadmap ---------- */
+
+test('roadmap: unknown links, duplicates and cycles are rejected', () => {
+  const w = clone(current)
+  w.roadmap.push({ pattern: 'Trees', after: ['Graphs'] })
+  w.roadmap.push({ pattern: 'Intervals' })
+  const errs = validateWorklist(w).errors.join(' ')
+  assert.match(errs, /"Trees" comes after "Graphs", which is not in the roadmap/)
+  assert.match(errs, /"Intervals" appears twice/)
+
+  const cyc = clone(current)
+  cyc.roadmap[0].after = ['Heap / Priority Queue']
+  assert.match(validateWorklist(cyc).errors.join(' '), /form a cycle/)
+})
+
+test('roadmap: every pattern on the lists must be on the roadmap', () => {
+  const w = clone(current)
+  w.roadmap = w.roadmap.filter(n => n.pattern !== 'Sliding Window')
+  w.roadmap.find(n => n.pattern === 'Intervals').after = ['Two Pointers']
+  assert.match(validateWorklist(w).errors.join(' '), /revision: pattern "Sliding Window" is not in the roadmap/)
+})
+
+test('a sheet without a roadmap, name or summary is still valid', () => {
+  assert.ok(validateWorklist(migrated).valid)
+  assert.equal(sheetName(migrated, 1), 'Sheet 1')
+  assert.equal(sheetName(current, 2), 'Stack repair, then Intervals')
+})
+
+test('roadmap layers place a pattern below the deepest pattern it builds on', () => {
+  const rows = roadmapLayers(current.roadmap).map(r => r.map(n => n.pattern))
+  assert.deepEqual(rows, [
+    ['Arrays & Hashing'],
+    ['Two Pointers', 'Monotonic Stack'],
+    ['Sliding Window', 'Intervals'],
+    ['Heap / Priority Queue'],
+  ])
+})
+
+test('roadmap layers order a row by where its parents sit', () => {
+  const rows = roadmapLayers([
+    { pattern: 'A' },
+    { pattern: 'B' },
+    { pattern: 'under B', after: ['B'] },
+    { pattern: 'under A', after: ['A'] },
+  ]).map(r => r.map(n => n.pattern))
+  assert.deepEqual(rows, [['A', 'B'], ['under A', 'under B']])
+})
+
+test('counts per pattern span both lists', () => {
+  const c = countsByPattern(current)
+  assert.deepEqual(c.get('Monotonic Stack'), { new: 0, revision: 2 })
+  assert.deepEqual(c.get('Intervals'), { new: 2, revision: 0 })
 })
 
 test('diff from nothing lists everything as added', () => {

@@ -27,7 +27,7 @@ export const STEPS = [
   { key: 'leetcode', label: 'LeetCode submissions' },
   { key: 'pull', label: 'Tracker from GitHub' },
   { key: 'push', label: 'Publish tracker' },
-  { key: 'plan', label: 'Coach worklist' },
+  { key: 'plan', label: 'Coach prep sheet' },
 ]
 
 let state = {
@@ -174,7 +174,7 @@ async function planStep() {
   const remote = await withTimeout(worklistLatest(), 'Checking the worklist')
   if (remote.empty || !remote.latest) {
     set({ worklistAvailable: null })
-    step('plan', 'skipped', 'No worklist published yet')
+    step('plan', 'skipped', 'No prep sheet published yet')
     return
   }
 
@@ -189,7 +189,7 @@ async function planStep() {
   const announced = state.worklistAvailable?.id
   set({ worklistAvailable: { id: remote.latest, number: remote.count, commit: remote.commit } })
   step('plan', 'done', `v${remote.count} ready to review`)
-  if (announced !== remote.latest) note(`New worklist v${remote.count} from the coach — open Worklist to review`)
+  if (announced !== remote.latest) note(`New prep sheet v${remote.count} from the coach — open Sheets to review`)
 }
 /** One pass. Never throws: a failed step is reported, the rest still run. */
 export async function runCycle({ manual = false } = {}) {

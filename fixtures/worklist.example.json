@@ -10,6 +10,16 @@
     "lastAttemptAt": "2026-03-01T20:15:00Z"
   },
   "headline": "Repair monotonic stack before starting interval problems.",
+  "name": "Stack repair, then Intervals",
+  "summary": "Two cold misses on monotonic stack this week, both on what the stack holds. Repair that first: re-derive the invariant on Daily Temperatures with help allowed, then check Next Greater Element II cold.\n\nIntervals starts in parallel as the new pattern. Work Merge Intervals before Insert Interval; the second is the same sweep without the sort.\n\nSliding Window stays as a single sample so it does not go cold.",
+  "roadmap": [
+    { "pattern": "Arrays & Hashing", "status": "done" },
+    { "pattern": "Two Pointers", "after": ["Arrays & Hashing"], "status": "done" },
+    { "pattern": "Monotonic Stack", "after": ["Arrays & Hashing"], "status": "active", "note": "Invariant not yet automatic." },
+    { "pattern": "Sliding Window", "after": ["Two Pointers"], "status": "done" },
+    { "pattern": "Intervals", "after": ["Two Pointers"], "status": "next" },
+    { "pattern": "Heap / Priority Queue", "after": ["Intervals", "Monotonic Stack"], "status": "later" }
+  ],
   "new": [
     {
       "pattern": "Intervals",

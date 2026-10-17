@@ -25,6 +25,7 @@
           "replaces": {
             "oneOf": [{ "$ref": "worklist.schema.json#/$defs/versionId" }, { "type": "null" }]
           },
+          "name": { "type": "string", "maxLength": 80, "description": "The sheet's name, repeated here so sheets can be listed without fetching each one." },
           "summary": { "type": "string", "maxLength": 200 },
           "migrated": { "type": "boolean", "description": "Generated from legacy coaching files rather than written by the coach." }
         }

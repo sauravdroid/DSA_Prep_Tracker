@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/sauravdroid/DSA_Prep_Tracker/schemas/worklist.schema.json",
-  "title": "Worklist version",
-  "description": "One complete, immutable worklist written by the coach: the problems to learn (`new`) and to revisit (`revision`), each grouped by pattern. A version is never edited after it is published; a change is a new version. The app renders it verbatim and makes no decisions of its own.",
+  "title": "Worklist version (a prep sheet)",
+  "description": "One complete, immutable prep sheet written by the coach: a name, a summary, a roadmap of patterns, and the problems to learn (`new`) and to revisit (`revision`), each grouped by pattern in priority order. Sheets carry no dates and no day-by-day schedule. A sheet is never edited after it is published; a change is a new sheet. The app renders it verbatim and makes no decisions of its own.",
   "type": "object",
   "required": ["worklistVersion", "id", "writtenAt", "basedOn", "headline", "new", "revision"],
   "additionalProperties": false,
@@ -45,7 +45,31 @@
         }
       }
     },
-    "headline": { "type": "string", "minLength": 1, "maxLength": 200, "description": "One line shown at the top of the page." },
+    "headline": { "type": "string", "minLength": 1, "maxLength": 200, "description": "One line shown under the sheet name." },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80, "description": "The sheet's name, e.g. \"DP push\" or \"Graphs foundations\". Shown as the page title and in the list of sheets." },
+    "summary": { "type": "string", "maxLength": 4000, "description": "What this sheet is for and how to approach it: focus, what changed and why, what to watch. Plain text; blank lines separate paragraphs." },
+    "roadmap": {
+      "type": "array",
+      "description": "The pattern roadmap: which pattern builds on which. Shown as a graph above the lists. When present, every pattern used in `new` or `revision` must appear here; it may also list patterns with no problems on this sheet, so the whole path stays visible.",
+      "items": {
+        "type": "object",
+        "required": ["pattern"],
+        "additionalProperties": false,
+        "properties": {
+          "pattern": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "after": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Patterns this one builds on. Each must be another roadmap entry."
+          },
+          "status": {
+            "enum": ["done", "active", "next", "later"],
+            "description": "Where this pattern stands for the user: done, being worked on now, up next, or later."
+          },
+          "note": { "type": "string", "maxLength": 200 }
+        }
+      }
+    },
     "new": { "$ref": "#/$defs/list", "description": "Problems to learn: first exposure or new-pattern work." },
     "revision": { "$ref": "#/$defs/list", "description": "Problems to revisit: cold checks, repairs, transfer checks." },
     "changes": {
