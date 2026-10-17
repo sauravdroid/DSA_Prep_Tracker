@@ -1,163 +1,140 @@
-import { useMemo, useState } from 'react'
-import { problemRoadmap } from '../utils/worklist'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { problemForest, packForest } from '../utils/worklist'
 
-const NODE_W = 168
-const NODE_H = 60
-const COL_GAP = 14
-const ROW_GAP = 30
-const PAD = 8
+const CARD_W = 176
+const CARD_H = 64
+const COL_GAP = 16
+const ROW_GAP = 28
+const BAND_GAP = 36
 
-const DIFF = { Easy: '#00b8a3', Medium: '#ffb800', Hard: '#ff375f' }
-const RESULT = { green: '#00b8a3', yellow: '#ffb800', red: '#ff375f' }
-const LIST_STYLE = {
-  revision: { fill: '#ffffff', stroke: '#cbd5e1' },
-  new: { fill: '#f5f3ff', stroke: '#c4b5fd' },
-}
+const DIFF_DOT = { Easy: 'bg-[#00b8a3]', Medium: 'bg-[#ffb800]', Hard: 'bg-[#ff375f]' }
+const RESULT_DOT = { green: 'bg-[#00b8a3]', yellow: 'bg-[#ffb800]', red: 'bg-[#ff375f]' }
 
-/** Up to two lines of about `max` characters. */
-function wrap(text, max) {
-  const lines = ['']
-  for (const w of text.split(' ')) {
-    const cur = lines[lines.length - 1]
-    if (!cur) lines[lines.length - 1] = w
-    else if ((cur + ' ' + w).length <= max) lines[lines.length - 1] = `${cur} ${w}`
-    else lines.push(w)
-  }
-  if (lines.length > 2) return [lines[0], `${lines.slice(1).join(' ').slice(0, max - 1)}…`]
-  return lines
+function useWidth(ref) {
+  const [width, setWidth] = useState(0)
+  useEffect(() => {
+    if (!ref.current) return
+    const ro = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width))
+    ro.observe(ref.current)
+    return () => ro.disconnect()
+  }, [ref])
+  return width
 }
 
 /**
- * Every problem on the sheet as a roadmap, top to bottom: a problem sits below
- * the problems it comes after. Clicking one opens it.
+ * Every problem on the sheet as a tree, top to bottom: a problem hangs under
+ * the one it comes after. Independent branches sit side by side and wrap to
+ * the width of the page. Clicking a card opens the problem.
  */
 export default function Roadmap({ sheet, attempts, selected, onOpen }) {
+  const box = useRef(null)
+  const width = useWidth(box) || 900
   const [hover, setHover] = useState(null)
 
-  const { nodes, edges, width, height } = useMemo(() => {
-    const rows = problemRoadmap(sheet)
-    const widest = Math.max(1, ...rows.map(r => r.length))
-    const width = widest * (NODE_W + COL_GAP) - COL_GAP + PAD * 2
-    const at = new Map()
-    const nodes = []
-    rows.forEach((row, r) => {
-      const rowWidth = row.length * (NODE_W + COL_GAP) - COL_GAP
-      const left = (width - rowWidth) / 2
-      row.forEach((n, i) => {
-        const node = { ...n, x: left + i * (NODE_W + COL_GAP), y: PAD + r * (NODE_H + ROW_GAP) }
-        at.set(n.key, node)
-        nodes.push(node)
-      })
-    })
-    const edges = nodes.flatMap(n => n.after.map(p => ({ from: at.get(p), to: n })))
-    return { nodes, edges, width, height: PAD * 2 + rows.length * (NODE_H + ROW_GAP) - ROW_GAP }
-  }, [sheet])
+  const forest = useMemo(() => problemForest(sheet), [sheet])
+  const maxCols = Math.max(1, Math.floor((width + COL_GAP) / (CARD_W + COL_GAP)))
+
+  const { cards, height, pos } = useMemo(() => {
+    const bands = packForest(forest.trees, maxCols)
+    const pos = new Map()
+    const cards = []
+    let top = 0
+    for (const band of bands) {
+      const bandPx = band.width * (CARD_W + COL_GAP) - COL_GAP
+      const left = Math.max(0, (width - bandPx) / 2)
+      for (const tree of band.trees) {
+        for (const n of tree.nodes) {
+          const x = left + (tree.offset + n.col) * (CARD_W + COL_GAP)
+          const y = top + n.depth * (CARD_H + ROW_GAP)
+          pos.set(n.slug, { x, y })
+          cards.push({ ...n, x, y })
+        }
+      }
+      top += band.height * (CARD_H + ROW_GAP) - ROW_GAP + BAND_GAP
+    }
+    return { cards, pos, height: Math.max(0, top - BAND_GAP) }
+  }, [forest, maxCols, width])
 
   const focus = hover || selected
-  const near = new Set(focus ? [focus, ...edges.filter(e => e.from.key === focus || e.to.key === focus).flatMap(e => [e.from.key, e.to.key])] : [])
-  const hasNew = nodes.some(n => n.list === 'new')
+  const linked = new Set(focus ? [focus, ...forest.edges.filter(e => e.from === focus || e.to === focus).flatMap(e => [e.from, e.to])] : [])
+  const hasNew = cards.some(c => c.list === 'new')
 
   return (
     <div>
-      <div className="overflow-x-auto">
-        <svg
-          width={width}
-          height={height}
-          viewBox={`0 0 ${width} ${height}`}
-          className="mx-auto block"
-          role="group"
-          aria-label="Problem roadmap"
-        >
-          {edges.map(({ from, to }) => {
-            const x1 = from.x + NODE_W / 2
-            const y1 = from.y + NODE_H
-            const x2 = to.x + NODE_W / 2
-            const y2 = to.y
-            const mid = (y1 + y2) / 2
-            const lit = focus && (focus === from.key || focus === to.key)
+      <div ref={box} className="relative w-full" style={{ height }}>
+        <svg className="pointer-events-none absolute inset-0 overflow-visible" width="100%" height={height} aria-hidden="true">
+          {forest.edges.map(e => {
+            const a = pos.get(e.from)
+            const b = pos.get(e.to)
+            if (!a || !b) return null
+            const x1 = a.x + CARD_W / 2
+            const y1 = a.y + CARD_H
+            const x2 = b.x + CARD_W / 2
+            const y2 = b.y
+            const lit = focus && (focus === e.from || focus === e.to)
+            const d = y2 > y1
+              ? `M ${x1} ${y1} C ${x1} ${y1 + ROW_GAP * 0.6}, ${x2} ${y2 - ROW_GAP * 0.6}, ${x2} ${y2}`
+              : `M ${x1} ${y1} C ${x1} ${y1 + 40}, ${x2} ${y2 - 40}, ${x2} ${y2}`
             return (
               <path
-                key={`${from.key}->${to.key}`}
-                d={`M ${x1} ${y1} C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${y2}`}
+                key={`${e.from}->${e.to}`}
+                d={d}
                 fill="none"
-                stroke={lit ? '#475569' : '#d4d9e1'}
+                stroke={lit ? '#475569' : '#cbd5e1'}
                 strokeWidth={lit ? 2 : 1.5}
+                strokeDasharray={e.primary ? undefined : '4 4'}
               />
             )
           })}
-
-          {nodes.map(n => {
-            const s = LIST_STYLE[n.list]
-            const attempt = attempts.get(n.slug)
-            const isSel = selected === n.slug
-            const dim = focus && !near.has(n.slug)
-            const title = `${n.number ? `${n.number}. ` : ''}${n.title}`
-            const lines = wrap(title, 21)
-            return (
-              <g
-                key={n.key}
-                role="button"
-                tabIndex={0}
-                aria-label={`${title}, ${n.pattern}${n.flag === 'repair' ? ', repair' : ''}${attempt ? `, recorded ${attempt.result}` : ''}`}
-                onClick={() => onOpen(n)}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(n) } }}
-                onMouseEnter={() => setHover(n.slug)}
-                onMouseLeave={() => setHover(null)}
-                className="cursor-pointer outline-none"
-                opacity={dim ? 0.45 : 1}
-              >
-                <title>{[title, n.reason].filter(Boolean).join(' — ')}</title>
-                <rect
-                  x={n.x}
-                  y={n.y}
-                  width={NODE_W}
-                  height={NODE_H}
-                  rx={9}
-                  fill={isSel ? '#fff7ea' : s.fill}
-                  stroke={isSel ? '#ffa116' : n.flag === 'repair' ? '#ff375f' : s.stroke}
-                  strokeWidth={isSel || n.flag === 'repair' ? 2 : 1.5}
-                />
-                <rect x={n.x + 1} y={n.y + 10} width={3.5} height={NODE_H - 20} rx={1.75} fill={DIFF[n.difficulty] || '#cbd5e1'} />
-                {lines.map((line, i) => (
-                  <text
-                    key={i}
-                    x={n.x + 14}
-                    y={n.y + (lines.length === 1 ? 26 : 20) + i * 15}
-                    fontSize="12"
-                    fontWeight="600"
-                    fill="#0f172a"
-                  >
-                    {line}
-                  </text>
-                ))}
-                <text x={n.x + 14} y={n.y + NODE_H - 9} fontSize="10.5" fill="#94a3b8">
-                  {n.pattern}{n.flag === 'repair' ? ' · repair' : ''}
-                </text>
-                {attempt && (
-                  <circle cx={n.x + NODE_W - 12} cy={n.y + 12} r={5.5} fill={RESULT[attempt.result] || '#94a3b8'} />
-                )}
-              </g>
-            )
-          })}
         </svg>
+
+        {cards.map(c => {
+          const attempt = attempts.get(c.slug)
+          const isSel = selected === c.slug
+          const dim = focus && !linked.has(c.slug)
+          const tone = isSel
+            ? 'border-[#ffa116] bg-[#fff7ea]'
+            : c.list === 'new'
+              ? 'border-violet-200 bg-violet-50/60 hover:border-violet-400'
+              : 'border-slate-200 bg-white hover:border-slate-400'
+          return (
+            <button
+              key={c.slug}
+              onClick={() => onOpen(c)}
+              onMouseEnter={() => setHover(c.slug)}
+              onMouseLeave={() => setHover(null)}
+              onFocus={() => setHover(c.slug)}
+              onBlur={() => setHover(null)}
+              title={c.reason}
+              style={{ left: c.x, top: c.y, width: CARD_W, height: CARD_H }}
+              className={`absolute flex flex-col justify-between rounded-lg border px-3 py-2 text-left shadow-sm transition ${tone} ${dim ? 'opacity-40' : ''}`}
+            >
+              <span className="flex items-start gap-1.5">
+                <span className="line-clamp-2 min-w-0 flex-1 text-[12.5px] font-semibold leading-snug text-slate-900">
+                  {c.number ? `${c.number}. ` : ''}{c.title}
+                </span>
+                {attempt && (
+                  <span className={`mt-1 size-2 shrink-0 rounded-full ${RESULT_DOT[attempt.result] || 'bg-slate-400'}`} title={`Recorded ${attempt.result}`} />
+                )}
+              </span>
+              <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-slate-400">
+                <span className={`size-1.5 shrink-0 rounded-full ${DIFF_DOT[c.difficulty] || 'bg-slate-300'}`} />
+                <span className="truncate">{c.pattern}</span>
+                {c.flag === 'repair' && (
+                  <span className="ml-auto shrink-0 rounded bg-[#ffe8ed] px-1 text-[10px] font-semibold text-[#e0244b]">Repair</span>
+                )}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm" style={{ boxShadow: 'inset 0 0 0 1.5px #cbd5e1' }} />Revision
-        </span>
-        {hasNew && (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-2.5 rounded-sm" style={{ background: '#f5f3ff', boxShadow: 'inset 0 0 0 1.5px #c4b5fd' }} />New
-          </span>
-        )}
-        <span className="inline-flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm" style={{ boxShadow: 'inset 0 0 0 2px #ff375f' }} />Repair
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="size-2 rounded-full bg-[#00b8a3]" />recorded since the coach looked
-        </span>
-        <span className="text-slate-400">Top to bottom: do a problem after the ones above it that lead to it.</span>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+        <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-sm border border-slate-300 bg-white" />Revision</span>
+        {hasNew && <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-sm border border-violet-300 bg-violet-50" />New</span>}
+        <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#00b8a3]" />recorded since the coach looked</span>
+        <span className="inline-flex items-center gap-1.5"><svg width="18" height="6" aria-hidden="true"><path d="M0 3h18" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 3" /></svg>also needs</span>
+        <span className="text-slate-400">Start at the top of any branch.</span>
       </div>
     </div>
   )

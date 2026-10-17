@@ -18,9 +18,8 @@ import {
   diffWorklists,
   changesByList,
   sheetName,
-  roadmapLayers,
-  countsByPattern,
-  problemRoadmap,
+  problemForest,
+  packForest,
 } from '../src/utils/worklist.js'
 
 const fixture = n => JSON.parse(readFileSync(new URL(`../fixtures/${n}`, import.meta.url)))
@@ -228,56 +227,6 @@ test('a sheet without a roadmap, name or summary is still valid', () => {
   assert.equal(sheetName(current, 2), 'Stack repair, then Intervals')
 })
 
-test('roadmap layers place a pattern below the deepest pattern it builds on', () => {
-  const rows = roadmapLayers(LEGACY_ROADMAP).map(r => r.map(n => n.pattern))
-  assert.deepEqual(rows, [
-    ['Arrays & Hashing'],
-    ['Two Pointers', 'Monotonic Stack'],
-    ['Sliding Window', 'Intervals'],
-    ['Heap / Priority Queue'],
-  ])
-})
-
-test('roadmap layers order a row by where its parents sit', () => {
-  const rows = roadmapLayers([
-    { pattern: 'A' },
-    { pattern: 'B' },
-    { pattern: 'under B', after: ['B'] },
-    { pattern: 'under A', after: ['A'] },
-  ]).map(r => r.map(n => n.pattern))
-  assert.deepEqual(rows, [['A', 'B'], ['under A', 'under B']])
-})
-
-test('counts per pattern span both lists', () => {
-  const c = countsByPattern(current)
-  assert.deepEqual(c.get('Monotonic Stack'), { new: 0, revision: 2 })
-  assert.deepEqual(c.get('Intervals'), { new: 2, revision: 0 })
-})
-
-test('problem roadmap: an item follows the one before it in its pattern unless it says otherwise', () => {
-  const rows = problemRoadmap(current).map(r => r.map(n => n.slug))
-  assert.deepEqual(rows, [
-    ['daily-temperatures', 'longest-substring-without-repeating-characters'],
-    ['next-greater-element-ii', 'merge-intervals'],
-    ['insert-interval'],
-  ])
-})
-
-test('problem roadmap: explicit "after" links problems across patterns and lists', () => {
-  const w = clone(current)
-  w.new[0].items[0].after = ['next-greater-element-ii']
-  w.revision[1].items[0].after = []
-  const rows = problemRoadmap(w).map(r => r.map(n => n.slug))
-  assert.deepEqual(rows[0], ['daily-temperatures', 'longest-substring-without-repeating-characters'])
-  assert.deepEqual(rows[1], ['next-greater-element-ii'])
-  assert.deepEqual(rows[2], ['merge-intervals'])
-  assert.deepEqual(rows[3], ['insert-interval'])
-  const node = problemRoadmap(w).flat().find(n => n.slug === 'merge-intervals')
-  assert.equal(node.list, 'new')
-  assert.equal(node.pattern, 'Intervals')
-  assert.equal(node.rank, 1)
-})
-
 test('"after" must name problems on the sheet and must not loop', () => {
   const w = clone(current)
   w.new[0].items[0].after = ['two-sum']
@@ -293,6 +242,41 @@ test('a changed "after" is reported as a modification', () => {
   next.new[0].items[1].after = []
   const d = diffWorklists(current, next)
   assert.deepEqual(d.modified.map(i => [i.slug, i.fields]), [['insert-interval', ['after']]])
+})
+
+test('forest: chains run straight down and parents centre over their children', () => {
+  const w = clone(current)
+  // daily-temperatures -> next-greater (implicit) and -> merge-intervals (explicit)
+  const { trees, edges } = problemForest(w)
+  assert.deepEqual(trees.map(t => [t.root, t.width, t.height]), [
+    ['daily-temperatures', 2, 3],
+    ['longest-substring-without-repeating-characters', 1, 1],
+  ])
+  const at = Object.fromEntries(trees[0].nodes.map(n => [n.slug, [n.col, n.depth]]))
+  assert.deepEqual(at['next-greater-element-ii'], [0, 1])
+  assert.deepEqual(at['merge-intervals'], [1, 1])
+  assert.deepEqual(at['insert-interval'], [1, 2])
+  assert.deepEqual(at['daily-temperatures'], [0.5, 0])
+  assert.ok(edges.every(e => e.primary))
+})
+
+test('forest: a second "after" becomes a non-primary edge, not a second parent', () => {
+  const w = clone(current)
+  w.new[0].items[1].after = ['merge-intervals', 'longest-substring-without-repeating-characters']
+  const { trees, edges } = problemForest(w)
+  const all = trees.flatMap(t => t.nodes.map(n => n.slug))
+  assert.equal(all.length, new Set(all).size)
+  assert.deepEqual(edges.filter(e => !e.primary), [{ from: 'longest-substring-without-repeating-characters', to: 'insert-interval', primary: false }])
+})
+
+test('forest packing wraps trees into bands that fit the width', () => {
+  const trees = [{ width: 2, height: 3 }, { width: 2, height: 1 }, { width: 3, height: 2 }, { width: 6, height: 1 }]
+  const bands = packForest(trees, 5)
+  assert.deepEqual(bands.map(b => [b.width, b.height, b.trees.map(t => t.offset)]), [
+    [4, 3, [0, 2]],
+    [3, 2, [0]],
+    [6, 1, [0]],
+  ])
 })
 
 test('diff from nothing lists everything as added', () => {

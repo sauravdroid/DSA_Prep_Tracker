@@ -30,58 +30,6 @@ export function sheetName(sheet, number) {
 }
 
 /**
- * A graph in rows: a node sits one row below the deepest node it comes after.
- * Within a row, nodes are placed near the nodes they come after (to keep
- * edges short), and otherwise in the given order.
- *
- * @param {object[]} entries  each with a `key` and `after` (keys)
- */
-export function layerGraph(entries = []) {
-  const byKey = new Map(entries.map((n, order) => [n.key, { ...n, order }]))
-  const parentsOf = key => (byKey.get(key)?.after || []).filter(p => byKey.has(p) && p !== key)
-
-  const depth = new Map()
-  const depthOf = (key, path = new Set()) => {
-    if (depth.has(key)) return depth.get(key)
-    if (path.has(key)) return 0
-    path.add(key)
-    const parents = parentsOf(key)
-    const d = parents.length ? 1 + Math.max(...parents.map(p => depthOf(p, path))) : 0
-    path.delete(key)
-    depth.set(key, d)
-    return d
-  }
-  for (const key of byKey.keys()) depthOf(key)
-
-  const rows = []
-  for (const node of byKey.values()) {
-    const d = depth.get(node.key)
-    ;(rows[d] ||= []).push(node)
-  }
-
-  const position = new Map()
-  return rows.filter(Boolean).map(row => {
-    const centre = node => {
-      const ps = parentsOf(node.key).filter(p => position.has(p))
-      return ps.length ? ps.reduce((s, p) => s + position.get(p), 0) / ps.length : null
-    }
-    const sorted = [...row].sort((a, b) => {
-      const ca = centre(a)
-      const cb = centre(b)
-      if (ca != null && cb != null && ca !== cb) return ca - cb
-      return a.order - b.order
-    })
-    sorted.forEach((n, i) => position.set(n.key, (i + 0.5) / sorted.length))
-    return sorted.map(n => ({ ...n, after: parentsOf(n.key) }))
-  })
-}
-
-/** The legacy pattern roadmap in rows. */
-export function roadmapLayers(roadmap = []) {
-  return layerGraph(roadmap.map(n => ({ ...n, key: n.pattern })))
-}
-
-/**
  * Every problem on the sheet with the problems it comes after. An explicit
  * `after` wins; without one, an item follows the one listed before it in the
  * same pattern.
@@ -105,22 +53,87 @@ export function problemEntries(sheet) {
   return entries
 }
 
-/** The problem roadmap: every problem on the sheet, laid out top to bottom. */
-export function problemRoadmap(sheet) {
-  return layerGraph(problemEntries(sheet))
+/**
+ * The problem roadmap as a forest of tidy trees. Each problem hangs under its
+ * first `after` that is on the sheet, so a chain runs straight down and a
+ * parent sits centred over its children. Extra `after` links are kept as
+ * edges between trees or across branches.
+ *
+ * Every tree is returned with its own width (in columns) and height (in rows)
+ * so the caller can pack trees side by side and wrap them to the page.
+ */
+export function problemForest(sheet) {
+  const entries = problemEntries(sheet)
+  const bySlug = new Map(entries.map(e => [e.slug, e]))
+  const parentOf = new Map()
+  for (const e of entries) {
+    const p = e.after.find(s => bySlug.has(s) && s !== e.slug)
+    if (p) parentOf.set(e.slug, p)
+  }
+
+  // A primary-parent loop has no root; break it at its first member so the
+  // layout still terminates. Validation reports the cycle itself.
+  const isRoot = new Set(entries.filter(e => !parentOf.has(e.slug)).map(e => e.slug))
+  const reached = new Set()
+  const children = new Map(entries.map(e => [e.slug, []]))
+  for (const e of entries) if (parentOf.has(e.slug)) children.get(parentOf.get(e.slug)).push(e.slug)
+  const mark = s => { if (reached.has(s)) return; reached.add(s); children.get(s).forEach(mark) }
+  isRoot.forEach(mark)
+  for (const e of entries) {
+    if (reached.has(e.slug)) continue
+    const p = parentOf.get(e.slug)
+    children.set(p, children.get(p).filter(s => s !== e.slug))
+    parentOf.delete(e.slug)
+    isRoot.add(e.slug)
+    mark(e.slug)
+  }
+
+  const trees = []
+  for (const e of entries) {
+    if (!isRoot.has(e.slug)) continue
+    const nodes = []
+    let next = 0
+    let depthMax = 0
+    const place = (slug, depth) => {
+      depthMax = Math.max(depthMax, depth)
+      const kids = children.get(slug)
+      let col
+      if (kids.length === 0) {
+        col = next++
+      } else {
+        const cols = kids.map(k => place(k, depth + 1))
+        col = (cols[0] + cols[cols.length - 1]) / 2
+      }
+      nodes.push({ ...bySlug.get(slug), col, depth })
+      return col
+    }
+    place(e.slug, 0)
+    trees.push({ root: e.slug, width: next, height: depthMax + 1, nodes })
+  }
+
+  const edges = entries.flatMap(e =>
+    e.after.filter(p => bySlug.has(p) && p !== e.slug).map(p => ({ from: p, to: e.slug, primary: parentOf.get(e.slug) === p }))
+  )
+  return { trees, edges }
 }
 
-/** Problems on the sheet per pattern, across both lists. */
-export function countsByPattern(sheet) {
-  const counts = new Map()
-  for (const list of LISTS) {
-    for (const group of sheet?.[list] || []) {
-      const c = counts.get(group.pattern) || { new: 0, revision: 0 }
-      c[list] += group.items.length
-      counts.set(group.pattern, c)
+/**
+ * Packs trees left to right into bands no wider than `maxCols`, in priority
+ * order. A tree wider than a band gets a band of its own.
+ */
+export function packForest(trees, maxCols) {
+  const bands = []
+  for (const t of trees) {
+    const band = bands[bands.length - 1]
+    if (band && band.width + t.width <= maxCols) {
+      band.trees.push({ ...t, offset: band.width })
+      band.width += t.width
+      band.height = Math.max(band.height, t.height)
+    } else {
+      bands.push({ width: t.width, height: t.height, trees: [{ ...t, offset: 0 }] })
     }
   }
-  return counts
+  return bands
 }
 
 /** Every item with the list and pattern it sits in, in display order. */

@@ -321,11 +321,12 @@ function githubSync() {
           } else {
             try {
               version = decodeContent(v)
-              const check = validateWorklist(version)
-              errors.push(...check.errors)
-              if (version.id !== id) errors.push(`The file for ${id} holds version ${version.id}.`)
             } catch (e) {
               errors.push(`${worklistPath(id)} is not valid JSON: ${e.message}`)
+            }
+            if (version) {
+              errors.push(...validateWorklist(version).errors)
+              if (version.id !== id) errors.push(`The file for ${id} holds version ${version.id}.`)
             }
           }
         }
