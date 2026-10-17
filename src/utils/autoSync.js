@@ -1,7 +1,6 @@
 import { syncToday } from '../services/leetcode'
-import { backupIfConnected, pullFromGithub, remoteStatus, coachingHistory, pullCoaching, archiveCoaching, pullDays, getRepo } from './github'
-import { loadDecision, saveDecision, loadDays, saveDays } from './coaching'
-import { canonical } from './trackerDiff'
+import { backupIfConnected, pullFromGithub, remoteStatus, worklistLatest } from './github'
+import { loadAccepted } from './worklistStore'
 import * as store from '../store'
 
 export const INTERVAL_MS = 10 * 60 * 1000
@@ -28,7 +27,7 @@ export const STEPS = [
   { key: 'leetcode', label: 'LeetCode submissions' },
   { key: 'pull', label: 'Tracker from GitHub' },
   { key: 'push', label: 'Publish tracker' },
-  { key: 'plan', label: 'Coaching plan' },
+  { key: 'plan', label: 'Coach worklist' },
 ]
 
 let state = {
@@ -41,6 +40,9 @@ let state = {
   summary: null,
   failed: false,
   log: [],
+  // The newest worklist upstream, when it differs from the accepted one.
+  // Only ever announced: accepting is a review the user does.
+  worklistAvailable: null,
 }
 
 const listeners = new Set()
@@ -163,97 +165,32 @@ async function pushStep(changed, status) {
   note(`Published tracker${r.committed ? ` (${r.committed})` : ''}`)
 }
 
-/** Copies published revisions somewhere addressable. Never blocks adoption. */
-async function archiveStep() {
-  try {
-    const r = await withTimeout(archiveCoaching(), 'Archiving assessments')
-    if (r.archived > 0) note(`Archived ${r.archived} assessment${r.archived === 1 ? '' : 's'} (${r.count} in the index)`)
-    return r
-  } catch (e) {
-    note(`Could not archive assessments: ${e.message}`)
-    return null
-  }
-}
-
 /**
- * Brings the published day plans into the local store.
- *
- * Runs after archiving, which is what produces them: a revision published
- * while the app was closed becomes a day file first and is copied here second.
+ * Whether the coach has published a worklist newer than the one accepted.
+ * Never adopts: a new version only becomes the list after it is reviewed.
  */
-async function daysStep(changed) {
-  try {
-    const remote = await withTimeout(pullDays(), 'Fetching day plans')
-    if (remote.empty || !remote.index) return
-
-    const local = await loadDays()
-    const fresh = Object.keys(remote.days || {})
-      .filter(d => canonical(local.days?.[d]) !== canonical(remote.days[d]))
-    if (fresh.length === 0) return
-
-    await withTimeout(saveDays({ index: remote.index, days: remote.days }), 'Storing day plans')
-    note(`Updated ${fresh.length} day plan${fresh.length === 1 ? '' : 's'}`)
-    changed.push(`${fresh.length} day plan${fresh.length === 1 ? '' : 's'}`)
-  } catch (e) {
-    note(`Could not fetch day plans: ${e.message}`)
-  }
-}
-
-/** The published plan, downloaded only when its head differs from the pin. */
-async function planStep(changed) {
+async function planStep() {
   step('plan', 'running')
-  const { decision } = await withTimeout(loadDecision(), 'Reading the adopted plan')
-  const adopted = decision?.adoptedFrom?.commit || null
-  const { revisions } = await withTimeout(coachingHistory(), 'Plan history')
-  const head = revisions?.[0] || null
-
-  if (!head) {
-    step('plan', 'skipped', 'No plan published yet')
-    return
-  }
-  if (adopted === head.sha) {
-    // Still archive: a revision published while this app was closed would
-    // otherwise never be copied, since the pin already matches.
-    await archiveStep()
-    await daysStep(changed)
-    step('plan', 'done', `Up to date (${head.shortSha})`)
+  const remote = await withTimeout(worklistLatest(), 'Checking the worklist')
+  if (remote.empty || !remote.latest) {
+    set({ worklistAvailable: null })
+    step('plan', 'skipped', 'No worklist published yet')
     return
   }
 
-  const c = await withTimeout(pullCoaching(), 'Fetching the plan')
-  if (c.empty) {
-    step('plan', 'skipped', 'No plan published yet')
-    return
-  }
-  if (!c.valid) {
-    step('plan', 'failed', `Revision ${head.shortSha} failed validation, so it was not adopted`)
-    note(`Plan ${head.shortSha} failed validation and was not adopted`)
-    return
-  }
-  if (c.outOfScope?.length > 0) {
-    step('plan', 'failed', `Revision ${head.shortSha} also changed ${c.outOfScope.join(', ')}, so it was not adopted`)
-    note(`Plan ${head.shortSha} touched files outside coaching/ and was not adopted`)
+  const { accepted } = await withTimeout(loadAccepted(), 'Reading the accepted worklist')
+  const current = accepted?.version?.id || null
+  if (current === remote.latest) {
+    set({ worklistAvailable: null })
+    step('plan', 'done', 'Up to date')
     return
   }
 
-  await withTimeout(saveDecision({
-    ...c.decision,
-    adoptedFrom: {
-      repo: getRepo(),
-      path: c.path || 'coaching/decision.json',
-      commit: c.commit?.sha || head.sha,
-      shortCommit: c.commit?.shortSha || head.shortSha,
-      adoptedAt: new Date().toISOString(),
-      adoptedAutomatically: true,
-    },
-  }), 'Adopting the plan')
-  await archiveStep()
-  await daysStep(changed)
-  step('plan', 'done', `Adopted ${head.shortSha}`)
-  note(`Adopted a new plan: ${head.shortSha} — ${head.message || 'no message'}`)
-  changed.push('new plan')
+  const announced = state.worklistAvailable?.id
+  set({ worklistAvailable: { id: remote.latest, number: remote.count, commit: remote.commit } })
+  step('plan', 'done', `v${remote.count} ready to review`)
+  if (announced !== remote.latest) note(`New worklist v${remote.count} from the coach — open Worklist to review`)
 }
-
 /** One pass. Never throws: a failed step is reported, the rest still run. */
 export async function runCycle({ manual = false } = {}) {
   const stuck = state.running && state.startedAt
@@ -287,7 +224,7 @@ export async function runCycle({ manual = false } = {}) {
     await once('push', () => pushStep(changed, status)).catch(fail('publish', 'push'))
   })()
 
-  const planLane = once('plan', () => planStep(changed)).catch(fail('plan', 'plan'))
+  const planLane = once('plan', () => planStep()).catch(fail('worklist check', 'plan'))
 
   await Promise.allSettled([trackerLane, planLane])
 
@@ -341,4 +278,9 @@ export function setEnabled(on) {
 export function syncNow() {
   clearTimeout(timer)
   return runCycle({ manual: true }).finally(schedule)
+}
+
+/** Called once a version is accepted, so the badge does not wait for the next cycle. */
+export function worklistAccepted(id) {
+  if (!state.worklistAvailable || state.worklistAvailable.id === id) set({ worklistAvailable: null })
 }

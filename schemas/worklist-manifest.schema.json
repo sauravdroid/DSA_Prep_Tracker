@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sauravdroid/DSA_Prep_Tracker/schemas/worklist-manifest.schema.json",
+  "title": "Worklist manifest",
+  "description": "coaching/worklists/manifest.json. Names the latest worklist version and lists every version ever published. Versions are append-only: the coach adds a version file and updates this manifest in the same commit, and never edits or deletes an earlier version.",
+  "type": "object",
+  "required": ["manifestVersion", "latest", "versions"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "manifestVersion": { "const": 1 },
+    "latest": { "$ref": "worklist.schema.json#/$defs/versionId" },
+    "versions": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Oldest first.",
+      "items": {
+        "type": "object",
+        "required": ["id", "path", "writtenAt"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "worklist.schema.json#/$defs/versionId" },
+          "path": { "type": "string", "pattern": "^coaching/worklists/\\d{8}T\\d{6}Z\\.json$" },
+          "writtenAt": { "type": "string", "format": "date-time" },
+          "replaces": {
+            "oneOf": [{ "$ref": "worklist.schema.json#/$defs/versionId" }, { "type": "null" }]
+          },
+          "summary": { "type": "string", "maxLength": 200 },
+          "migrated": { "type": "boolean", "description": "Generated from legacy coaching files rather than written by the coach." }
+        }
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import ProblemsPage from './components/ProblemsPage'
 import CalendarView from './components/CalendarView'
 import DailyRevisions from './components/DailyRevisions'
@@ -7,20 +7,18 @@ import SyncSettings from './components/SyncSettings'
 import StudyPlanCalendar from './components/StudyPlanCalendar'
 import StatsPage from './components/StatsPage'
 import RecursionVisualizer from './components/RecursionVisualizer'
-import DebtPage from './components/DebtPage'
+import WorklistPage from './components/WorklistPage'
 import SyncNotesPanel from './components/SyncNotesPanel'
 import ColdTestModal from './components/ColdTestModal'
 import SyncDock from './components/SyncDock'
 import { syncProblems } from './services/leetcode'
 import { backupIfConnected } from './utils/github'
-import { startAutoSync } from './utils/autoSync'
-import { computeRetention } from './utils/retention'
-import { todayStr } from './utils/dateUtils'
+import { startAutoSync, subscribeSync } from './utils/autoSync'
 import * as store from './store'
 
 // Study Plan and Today's Revision are intentionally not navigable while the
-// coaching page owns daily planning; their components are still wired below.
-const TABS = ['Calendar', 'Problems', 'Debt', 'Stats', 'Recursion', 'Settings']
+// coach's worklist owns planning; their components are still wired below.
+const TABS = ['Calendar', 'Problems', 'Worklist', 'Stats', 'Recursion', 'Settings']
 
 export default function App() {
   const [tab, setTab] = useState('Calendar')
@@ -121,20 +119,9 @@ export default function App() {
 
   const count = Object.keys(problems).length
 
-  const debtSummary = useMemo(
-    () => {
-      const r = computeRetention({
-        problems,
-        revisions,
-        log: practiceLog,
-        anchorOverrides: store.getAnchors(),
-        topicRoles: store.getTopicRoles(),
-        today: todayStr(),
-      })
-      return { totalDebt: r.totalDebt, calculable: r.debtCalculable }
-    },
-    [problems, revisions, practiceLog, tab]
-  )
+  // Announced by the background check; accepting happens on the Worklist page.
+  const [worklistAvailable, setWorklistAvailable] = useState(null)
+  useEffect(() => subscribeSync(s => setWorklistAvailable(s.worklistAvailable)), [])
 
   return (
     <div className="app">
@@ -148,9 +135,9 @@ export default function App() {
             >
               {t}
               {t === 'Problems' && count > 0 && <span className="tab-badge">{count}</span>}
-              {t === 'Debt' && debtSummary.calculable && debtSummary.totalDebt > 0 && (
-                <span className={`tab-badge debt ${debtSummary.totalDebt >= 6 ? 'critical' : debtSummary.totalDebt >= 3 ? 'warn' : ''}`}>
-                  {debtSummary.totalDebt}
+              {t === 'Worklist' && worklistAvailable && (
+                <span className="tab-badge" title="A new worklist is ready to review">
+                  {worklistAvailable.number ? `v${worklistAvailable.number}` : 'new'}
                 </span>
               )}
             </button>
@@ -198,10 +185,10 @@ export default function App() {
             revisions={revisions}
           />
         )}
-        {tab === 'Debt' && (
-          <DebtPage
+        {tab === 'Worklist' && (
+          <WorklistPage
             problems={problems}
-            revisions={revisions}
+            practiceLog={practiceLog}
             onChanged={reload}
           />
         )}

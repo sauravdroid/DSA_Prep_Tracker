@@ -38,9 +38,9 @@ const RESULT_META = {
 }
 
 const MODE_META = {
-  cold: { label: 'Cold', blurb: 'No notes, no old code, nothing seen recently. The only mode that moves the spacing ladder.' },
-  warm: { label: 'Warm', blurb: 'Recently seen, or reproducing a solution you just read. Recorded, but does not reschedule.' },
-  repair: { label: 'Repair', blurb: 'Deliberate rework after a failure. Clears the repair flag; a later cold test still has to confirm it.' },
+  cold: { label: 'Cold', blurb: 'No notes, no old code, nothing seen recently. The only mode that counts as retention evidence.' },
+  warm: { label: 'Warm', blurb: 'Recently seen, or reproducing a solution you just read. Recorded as practice, not as retention evidence.' },
+  repair: { label: 'Repair', blurb: 'Deliberate rework after a failure. A later cold test still has to confirm it.' },
   learn: { label: 'Learn', blurb: 'First exposure while learning the idea.' },
 }
 
@@ -50,12 +50,23 @@ const HELP_META = {
   solution: { label: 'Solution shown', blurb: 'The key insight or the code itself was revealed' },
 }
 
+// What went wrong, for the coach. Several can apply.
+export const FAILURE_REASONS = {
+  pattern: "Didn't recognise the pattern",
+  invariant: 'Wrong or unclear invariant',
+  'edge-cases': 'Missed edge cases',
+  bug: 'Bug in the implementation',
+  slow: 'Too slow',
+  forgot: 'Forgot the key trick',
+}
+
 export default function ColdTestModal({
   problem,
   slug,
   coldTests = [],
   defaultMode = 'cold',
   existing = null,
+  schedulePreview = true,
   onClose,
   onSave,
 }) {
@@ -63,6 +74,7 @@ export default function ColdTestModal({
   const [mode, setMode] = useState(existing?.mode || defaultMode)
   const [timeMinutes, setTimeMinutes] = useState(existing?.timeMinutes ?? '')
   const [help, setHelp] = useState(existing?.help || 'none')
+  const [failureReasons, setFailureReasons] = useState(existing?.failureReasons || [])
   const [invariant, setInvariant] = useState(existing?.notes?.invariant || '')
   const [whyHelp, setWhyHelp] = useState(existing?.notes?.whyHelp || '')
   const [clicked, setClicked] = useState(existing?.notes?.clicked || '')
@@ -72,7 +84,7 @@ export default function ColdTestModal({
   // history this grade is measured against.
   const priorTests = existing ? coldTests.filter(t => t.id !== existing.id) : coldTests
   const movesLadder = mode === 'cold'
-  const preview = result && movesLadder ? previewNextDue(priorTests, result, today) : null
+  const preview = schedulePreview && result && movesLadder ? previewNextDue(priorTests, result, today) : null
 
   const budget = problem?.difficulty === 'Hard' ? 35 : problem?.difficulty === 'Easy' ? 15 : 30
   const overBudget = timeMinutes !== '' && Number(timeMinutes) > budget
@@ -97,6 +109,7 @@ export default function ColdTestModal({
       result,
       timeMinutes: timeMinutes === '' ? null : Number(timeMinutes),
       help,
+      failureReasons: result === 'green' ? [] : failureReasons,
       notes: { invariant, whyHelp, clicked },
     })
   }
@@ -198,6 +211,29 @@ export default function ColdTestModal({
             <p className="mt-2 text-xs text-slate-500">{HELP_META[help].blurb}</p>
           </div>
 
+          {(result === 'yellow' || result === 'red') && (
+            <div>
+              <span className="block text-xs font-semibold uppercase tracking-wide text-slate-400">What went wrong?</span>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {Object.entries(FAILURE_REASONS).map(([key, label]) => {
+                  const on = failureReasons.includes(key)
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setFailureReasons(on ? failureReasons.filter(k => k !== key) : [...failureReasons, key])}
+                      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                        on ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Pick any that apply. The coach uses this to plan the repair.</p>
+            </div>
+          )}
+
           <div className="flex items-end gap-6">
             <label className="block">
               <span className="block text-xs font-semibold uppercase tracking-wide text-slate-400">Minutes</span>
@@ -256,7 +292,7 @@ export default function ColdTestModal({
                 Next cold test <strong className="font-semibold text-slate-900">{preview.due}</strong>
                 <span className="text-slate-400"> ({preview.interval}d interval)</span>
               </span>
-            ) : result ? (
+            ) : result && schedulePreview ? (
               <span className="text-slate-400">This mode does not reschedule the anchor.</span>
             ) : null}
           </div>

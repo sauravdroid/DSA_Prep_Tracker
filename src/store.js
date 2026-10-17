@@ -170,6 +170,7 @@ export function saveTodayRevisionList(slugs) {
 // { id, slug, date, at, mode: 'cold'|'warm'|'learn'|'repair',
 //   result: 'green'|'yellow'|'red', timeMinutes,
 //   help: 'none'|'hint'|'solution', sessionRepeat,
+//   failureReasons: ['pattern'|'invariant'|'edge-cases'|'bug'|'slow'|'forgot'],
 //   notes: { invariant, whyHelp, clicked }, freeNote }
 export function getPracticeLog() {
   return read(KEYS.PRACTICE_LOG, [])
@@ -199,6 +200,7 @@ export function addPracticeEntry(entry) {
     result: entry.result,
     timeMinutes: entry.timeMinutes ?? null,
     help: entry.help || 'none',
+    failureReasons: Array.isArray(entry.failureReasons) ? entry.failureReasons : [],
     sessionRepeat: false,
     notes: {
       invariant: entry.notes?.invariant || '',

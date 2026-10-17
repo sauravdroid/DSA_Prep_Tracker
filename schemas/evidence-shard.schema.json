@@ -87,6 +87,11 @@
           "result": { "type": "string", "enum": ["green", "yellow", "red"] },
           "timeMinutes": { "type": ["number", "null"] },
           "help": { "type": "string", "enum": ["none", "hint", "solution"] },
+          "failureReasons": {
+            "type": "array",
+            "description": "What went wrong on a Yellow or Red, as you reported it. Absent on older records.",
+            "items": { "type": "string", "enum": ["pattern", "invariant", "edge-cases", "bug", "slow", "forgot"] }
+          },
           "sessionRepeat": { "type": "boolean" },
           "notes": { "type": "object" },
           "freeNote": { "type": "string" }

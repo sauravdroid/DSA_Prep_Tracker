@@ -1,0 +1,21 @@
+{
+  "manifestVersion": 1,
+  "latest": "20260302T090000Z",
+  "versions": [
+    {
+      "id": "20260227T183000Z",
+      "path": "coaching/worklists/20260227T183000Z.json",
+      "writtenAt": "2026-02-27T18:30:00Z",
+      "replaces": null,
+      "summary": "Migrated from the dated plans.",
+      "migrated": true
+    },
+    {
+      "id": "20260302T090000Z",
+      "path": "coaching/worklists/20260302T090000Z.json",
+      "writtenAt": "2026-03-02T09:00:00Z",
+      "replaces": "20260227T183000Z",
+      "summary": "Monotonic stack repair; start intervals."
+    }
+  ]
+}

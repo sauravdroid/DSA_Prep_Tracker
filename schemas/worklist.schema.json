@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sauravdroid/DSA_Prep_Tracker/schemas/worklist.schema.json",
+  "title": "Worklist version",
+  "description": "One complete, immutable worklist written by the coach: the problems to learn (`new`) and to revisit (`revision`), each grouped by pattern. A version is never edited after it is published; a change is a new version. The app renders it verbatim and makes no decisions of its own.",
+  "type": "object",
+  "required": ["worklistVersion", "id", "writtenAt", "basedOn", "headline", "new", "revision"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "worklistVersion": {
+      "const": 1,
+      "description": "Document format version."
+    },
+    "id": {
+      "$ref": "#/$defs/versionId",
+      "description": "`writtenAt` with punctuation removed, e.g. 20261017T212000Z. Also the file name: coaching/worklists/<id>.json."
+    },
+    "writtenAt": { "type": "string", "format": "date-time" },
+    "replaces": {
+      "oneOf": [{ "$ref": "#/$defs/versionId" }, { "type": "null" }],
+      "description": "The version this one was written to follow, or null for the first."
+    },
+    "basedOn": {
+      "type": "object",
+      "description": "The evidence the coach read. Lets the app say how much has been recorded since.",
+      "required": ["attempts"],
+      "additionalProperties": false,
+      "properties": {
+        "trackerCommit": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{7,40}$",
+          "description": "Data-repository commit the tracker was read at."
+        },
+        "trackerFingerprint": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{16}$",
+          "description": "`describes.trackerFingerprint` from the data manifest at that commit. Detects edited evidence that an attempt count cannot."
+        },
+        "attempts": { "type": "integer", "minimum": 0, "description": "Graded attempts in the tracker that was read." },
+        "lastAttemptAt": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Timestamp (`at`) of the newest graded attempt that was read."
+        }
+      }
+    },
+    "headline": { "type": "string", "minLength": 1, "maxLength": 200, "description": "One line shown at the top of the page." },
+    "new": { "$ref": "#/$defs/list", "description": "Problems to learn: first exposure or new-pattern work." },
+    "revision": { "$ref": "#/$defs/list", "description": "Problems to revisit: cold checks, repairs, transfer checks." },
+    "changes": {
+      "type": "array",
+      "description": "Why things changed since `replaces`. Display only: the app computes what changed itself and uses these for the reasons.",
+      "items": {
+        "type": "object",
+        "required": ["op", "slug", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "op": { "enum": ["added", "removed", "modified", "moved"] },
+          "slug": { "$ref": "#/$defs/slug" },
+          "list": { "enum": ["new", "revision"] },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "description": "Present only on a version generated from legacy coaching files.",
+      "required": ["sourceCommit", "sources", "excluded"],
+      "additionalProperties": false,
+      "properties": {
+        "sourceCommit": { "type": "string", "pattern": "^[0-9a-f]{7,40}$", "description": "Data-repository commit the legacy files were read at." },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "rules": { "type": "string", "description": "Path of the migration rules applied." },
+        "sources": { "type": "array", "items": { "type": "string" }, "description": "Every legacy file read." },
+        "excluded": {
+          "type": "array",
+          "description": "Legacy items deliberately not made active, with the reason. Every item in the source days is either active or listed here.",
+          "items": {
+            "type": "object",
+            "required": ["slug", "source", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "slug": { "$ref": "#/$defs/slug" },
+              "title": { "type": "string" },
+              "source": { "type": "string" },
+              "reason": { "enum": ["unresolved-alternative", "not-selected", "completed", "superseded", "past-day", "needs-review"] },
+              "detail": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "versionId": { "type": "string", "pattern": "^\\d{8}T\\d{6}Z$" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "list": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/pattern" }
+    },
+    "pattern": {
+      "type": "object",
+      "required": ["pattern", "items"],
+      "additionalProperties": false,
+      "properties": {
+        "pattern": { "type": "string", "minLength": 1, "maxLength": 60, "description": "Group name. Reuse the exact name from the previous version." },
+        "note": { "type": "string", "maxLength": 200, "description": "One line about this pattern right now." },
+        "items": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/item" } }
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": ["slug", "title", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "slug": { "$ref": "#/$defs/slug" },
+        "title": { "type": "string", "minLength": 1 },
+        "number": { "type": "integer", "minimum": 1, "description": "LeetCode frontend id." },
+        "difficulty": { "enum": ["Easy", "Medium", "Hard"] },
+        "flag": { "enum": ["repair"], "description": "Highlights the item. `repair` marks a weak skill being rebuilt." },
+        "mode": {
+          "enum": ["cold", "warm", "repair", "learn"],
+          "description": "How to attempt and record it. Defaults: `cold` in revision, `learn` in new."
+        },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 140, "description": "Why it is on the list, in one short line." },
+        "detail": { "type": "string", "description": "Longer instruction shown in the problem drawer." },
+        "checklist": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "Points to check while attempting." },
+        "minutes": { "type": "integer", "minimum": 1, "maximum": 240, "description": "Time box. Omit rather than guess." },
+        "addedIn": { "$ref": "#/$defs/versionId" },
+        "modifiedIn": { "$ref": "#/$defs/versionId" },
+        "sources": {
+          "type": "array",
+          "description": "Legacy provenance, written by the migration.",
+          "items": {
+            "type": "object",
+            "required": ["file"],
+            "additionalProperties": false,
+            "properties": {
+              "file": { "type": "string" },
+              "scenario": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

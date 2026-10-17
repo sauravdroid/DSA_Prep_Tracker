@@ -1,0 +1,86 @@
+{
+  "worklistVersion": 1,
+  "id": "20260227T183000Z",
+  "writtenAt": "2026-02-27T18:30:00Z",
+  "replaces": null,
+  "basedOn": {
+    "trackerCommit": "9f8e7d6",
+    "trackerFingerprint": "fedcba9876543210",
+    "attempts": 38,
+    "lastAttemptAt": "2026-02-27T11:05:00Z"
+  },
+  "headline": "Migrated from the dated plans: monotonic stack check, sliding window sample.",
+  "new": [],
+  "revision": [
+    {
+      "pattern": "Monotonic Stack",
+      "items": [
+        {
+          "slug": "daily-temperatures",
+          "title": "Daily Temperatures",
+          "difficulty": "Medium",
+          "mode": "cold",
+          "reason": "Delayed check after the Feb 24 learning session.",
+          "minutes": 25,
+          "addedIn": "20260227T183000Z",
+          "sources": [{ "file": "coaching/days/2026-02-27.json", "scenario": "main" }]
+        }
+      ]
+    },
+    {
+      "pattern": "Two Pointers",
+      "items": [
+        {
+          "slug": "two-sum-ii-input-array-is-sorted",
+          "title": "Two Sum II - Input Array Is Sorted",
+          "difficulty": "Medium",
+          "mode": "cold",
+          "reason": "Baseline check; never tested cold.",
+          "minutes": 15,
+          "addedIn": "20260227T183000Z",
+          "sources": [{ "file": "coaching/days/2026-02-27.json", "scenario": "main" }]
+        }
+      ]
+    },
+    {
+      "pattern": "Sliding Window",
+      "items": [
+        {
+          "slug": "longest-substring-without-repeating-characters",
+          "title": "Longest Substring Without Repeating Characters",
+          "difficulty": "Medium",
+          "mode": "cold",
+          "reason": "Strong-topic sample.",
+          "minutes": 20,
+          "addedIn": "20260227T183000Z",
+          "sources": [{ "file": "coaching/days/2026-02-26.json", "scenario": "main" }]
+        }
+      ]
+    }
+  ],
+  "migration": {
+    "sourceCommit": "9f8e7d6",
+    "generatedAt": "2026-02-27T18:30:00Z",
+    "rules": "docs/worklist-migration.md",
+    "sources": [
+      "coaching/index.json",
+      "coaching/days/2026-02-26.json",
+      "coaching/days/2026-02-27.json"
+    ],
+    "excluded": [
+      {
+        "slug": "daily-temperatures",
+        "source": "coaching/days/2026-02-27.json#if-red",
+        "reason": "unresolved-alternative",
+        "detail": "Repair branch waiting on a result that was never recorded; the active cold item covers the problem."
+      },
+      {
+        "slug": "valid-parentheses",
+        "title": "Valid Parentheses",
+        "source": "coaching/days/2026-02-26.json#main",
+        "reason": "completed",
+        "detail": "Cold Green recorded 2026-02-26."
+      }
+    ]
+  }
+}

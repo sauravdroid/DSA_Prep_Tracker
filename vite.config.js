@@ -12,6 +12,8 @@ import { assessmentId, assessmentPath, summarise, buildIndex, INDEX_PATH, covere
 import { dayPath, dayEntry, linkDays, daysFromDecisions } from './src/utils/days.js'
 import { rollupsFor } from './src/utils/rollups.js'
 import { sealReason, sealOutcome, outcomePath, summariseOutcome, OUTCOME_VERSION, outcomeDrift } from './src/utils/outcomes.js'
+import { validateWorklist, validateWorklistManifest, worklistCommitProblems, worklistHash, WORKLIST_MANIFEST } from './src/utils/validateWorklist.js'
+import { worklistPath } from './src/utils/worklist.js'
 
 const DATA_DIR = 'data'
 const DATA_FILE = 'tracker-data.json'
@@ -275,6 +277,117 @@ function githubSync() {
     const decodeContent = r => JSON.parse(Buffer.from(r.body.content || '', 'base64').toString('utf8'))
 
     try {
+      // --- Worklist. Read-only: the coach publishes, the app reviews and
+      // accepts. Everything is read at one commit, so the manifest, the
+      // version and the checks all describe the same snapshot.
+      if (url === '/worklist/latest' || url === '/worklist/preview') {
+        const head = await gh(token, 'GET', `/repos/${repo}/git/ref/heads/${BRANCH}`)
+        if (head.status !== 200) return send(res, head.status, { error: head.body?.message || `Cannot read ${BRANCH}` })
+        const commit = head.body.object.sha
+        const at = p => `/repos/${repo}/contents/${p}?ref=${commit}`
+
+        const m = await gh(token, 'GET', at(WORKLIST_MANIFEST))
+        if (m.status === 404) return send(res, 200, { empty: true, commit })
+        if (m.status !== 200) return send(res, m.status, { error: m.body?.message || `GitHub returned ${m.status}` })
+
+        let manifest
+        try {
+          manifest = decodeContent(m)
+        } catch (e) {
+          return send(res, 422, { error: `The worklist manifest is not valid JSON: ${e.message}` })
+        }
+        const manifestCheck = validateWorklistManifest(manifest)
+
+        if (url === '/worklist/latest') {
+          return send(res, 200, {
+            empty: false,
+            commit,
+            latest: manifest.latest || null,
+            count: (manifest.versions || []).length,
+            valid: manifestCheck.valid,
+          })
+        }
+
+        const id = (body.id || manifest.latest || '').trim()
+        const errors = manifestCheck.errors.map(e => `Manifest: ${e}`)
+        const listed = (manifest.versions || []).find(v => v.id === id)
+        if (!listed) errors.push(`Version ${id || '(none)'} is not listed in the manifest.`)
+
+        let version = null
+        if (listed) {
+          const v = await gh(token, 'GET', at(worklistPath(id)))
+          if (v.status !== 200) {
+            errors.push(`${worklistPath(id)} could not be read (${v.status}).`)
+          } else {
+            try {
+              version = decodeContent(v)
+              const check = validateWorklist(version)
+              errors.push(...check.errors)
+              if (version.id !== id) errors.push(`The file for ${id} holds version ${version.id}.`)
+            } catch (e) {
+              errors.push(`${worklistPath(id)} is not valid JSON: ${e.message}`)
+            }
+          }
+        }
+
+        // The commit that last touched the worklists must have kept to them,
+        // and must not have rewritten a published version.
+        let authored = null
+        const problems = []
+        const log = await gh(token, 'GET', `/repos/${repo}/commits?path=${encodeURIComponent('coaching/worklists')}&sha=${commit}&per_page=1`)
+        if (log.status === 200 && Array.isArray(log.body) && log.body[0]) {
+          const c = log.body[0]
+          authored = {
+            sha: c.sha,
+            shortSha: c.sha.slice(0, 7),
+            date: c.commit?.committer?.date || c.commit?.author?.date || null,
+            message: (c.commit?.message || '').split('\n')[0],
+            author: c.commit?.author?.name || null,
+          }
+          const detail = await gh(token, 'GET', `/repos/${repo}/commits/${c.sha}`)
+          if (detail.status === 200) problems.push(...worklistCommitProblems(detail.body?.files))
+        }
+
+        // A version already accepted here must still read the same upstream;
+        // append-only is only worth something if it is checked.
+        const acceptedId = (body.acceptedId || '').trim()
+        if (acceptedId && body.acceptedHash && acceptedId !== id) {
+          const prior = await gh(token, 'GET', at(worklistPath(acceptedId)))
+          if (prior.status === 404) {
+            problems.push(`The version you follow (${acceptedId}) has been deleted upstream.`)
+          } else if (prior.status === 200) {
+            try {
+              if (worklistHash(decodeContent(prior)) !== body.acceptedHash) {
+                problems.push(`The version you follow (${acceptedId}) was edited after you accepted it.`)
+              }
+            } catch {
+              problems.push(`The version you follow (${acceptedId}) is no longer valid JSON.`)
+            }
+          }
+        }
+
+        return send(res, 200, {
+          empty: false,
+          commit,
+          shortCommit: commit.slice(0, 7),
+          authored,
+          id,
+          manifest,
+          version,
+          hash: version ? worklistHash(version) : null,
+          valid: errors.length === 0 && !!version,
+          errors: [...new Set(errors)],
+          problems,
+        })
+      }
+
+      // The archive rewrote coaching/ on every cycle. Coaching history is
+      // frozen now that the coach owns coaching/worklists/, so nothing here
+      // may write there.
+      if (url === '/coaching/archive') {
+        return send(res, 410, { error: 'Archiving is retired: legacy coaching files are frozen.' })
+      }
+
       // The index, and whichever days are asked for. One request rather than
       // one per day: a window of four costs the same as a window of thirty.
       if (url === '/coaching/days') {
@@ -801,6 +914,8 @@ function coachingDecisionStore() {
   let file = ''
   let dayDir = ''
   let dayIndexFile = ''
+  let worklistDir = ''
+  let acceptedFile = ''
 
   const send = (res, code, body) => {
     res.statusCode = code
@@ -871,8 +986,55 @@ function coachingDecisionStore() {
     send(res, 405, { error: 'Method not allowed' })
   }
 
+  /**
+   * The worklist you accepted, exactly as reviewed. Accepting stores the
+   * snapshot the review showed; it never refetches, so a newer upstream
+   * version can only arrive through another review.
+   */
+  const worklist = (req, res) => {
+    if (req.method === 'GET') {
+      try {
+        const accepted = fs.existsSync(acceptedFile) ? readJson(acceptedFile) : null
+        return send(res, 200, { accepted, path: acceptedFile })
+      } catch (e) {
+        return send(res, 500, { error: e.message, path: acceptedFile })
+      }
+    }
+
+    if (req.method === 'PUT') {
+      let body = ''
+      req.on('data', c => (body += c))
+      req.on('end', () => {
+        try {
+          const { version, manifest, source } = JSON.parse(body)
+          const { valid, errors } = validateWorklist(version)
+          if (!valid) return send(res, 400, { error: 'Worklist failed validation', errors })
+          if (manifest) {
+            const m = validateWorklistManifest(manifest)
+            if (!m.valid) return send(res, 400, { error: 'Manifest failed validation', errors: m.errors })
+          }
+          if (!source?.hash || worklistHash(version) !== source.hash) {
+            return send(res, 409, { error: 'This is not the version that was reviewed. Review it again before accepting.' })
+          }
+
+          const record = { version, manifest: manifest || null, source: { ...source, acceptedAt: new Date().toISOString() } }
+          writeAtomic(path.join(worklistDir, `${version.id}.json`), version)
+          writeAtomic(acceptedFile, record)
+          return send(res, 200, { ok: true, accepted: record, path: acceptedFile })
+        } catch (e) {
+          return send(res, 400, { error: e.message })
+        }
+      })
+      return
+    }
+
+    send(res, 405, { error: 'Method not allowed' })
+  }
+
   const handler = (req, res) => {
-    if ((req.url || '').split('?')[0].replace(/\/$/, '') === '/days') return days(req, res)
+    const route = (req.url || '').split('?')[0].replace(/\/$/, '')
+    if (route === '/worklist') return worklist(req, res)
+    if (route === '/days') return days(req, res)
 
     if (req.method === 'GET') {
       try {
@@ -916,6 +1078,8 @@ function coachingDecisionStore() {
       file = path.join(dir, 'coaching-decision.json')
       dayDir = path.join(dir, 'coaching', 'days')
       dayIndexFile = path.join(dir, 'coaching', 'index.json')
+      worklistDir = path.join(dir, 'coaching', 'worklists')
+      acceptedFile = path.join(worklistDir, 'accepted.json')
     },
     configureServer(server) {
       server.middlewares.use('/api/coaching', handler)

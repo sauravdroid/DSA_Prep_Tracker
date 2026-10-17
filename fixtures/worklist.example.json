@@ -1,0 +1,96 @@
+{
+  "worklistVersion": 1,
+  "id": "20260302T090000Z",
+  "writtenAt": "2026-03-02T09:00:00Z",
+  "replaces": "20260227T183000Z",
+  "basedOn": {
+    "trackerCommit": "1a2b3c4",
+    "trackerFingerprint": "0123456789abcdef",
+    "attempts": 42,
+    "lastAttemptAt": "2026-03-01T20:15:00Z"
+  },
+  "headline": "Repair monotonic stack before starting interval problems.",
+  "new": [
+    {
+      "pattern": "Intervals",
+      "note": "Start of the track: one new problem a day.",
+      "items": [
+        {
+          "slug": "merge-intervals",
+          "title": "Merge Intervals",
+          "number": 56,
+          "difficulty": "Medium",
+          "reason": "Foundation of the pattern: sort, then sweep.",
+          "detail": "Hints are fine. Write down why sorting by start is enough before you code.",
+          "minutes": 30,
+          "addedIn": "20260302T090000Z"
+        },
+        {
+          "slug": "insert-interval",
+          "title": "Insert Interval",
+          "number": 57,
+          "difficulty": "Medium",
+          "reason": "Same sweep without the sort — do it after 56.",
+          "minutes": 30,
+          "addedIn": "20260302T090000Z"
+        }
+      ]
+    }
+  ],
+  "revision": [
+    {
+      "pattern": "Monotonic Stack",
+      "note": "Two misses this week: the invariant is not yet automatic.",
+      "items": [
+        {
+          "slug": "daily-temperatures",
+          "title": "Daily Temperatures",
+          "number": 739,
+          "difficulty": "Medium",
+          "flag": "repair",
+          "mode": "repair",
+          "reason": "Red on Feb 27 — rebuild the invariant with help allowed.",
+          "detail": "Re-derive what the stack holds and when a pop answers a question. Help is fine; this is repair, not a test.",
+          "checklist": [
+            "What does the stack hold, and in what order?",
+            "What does each pop answer?",
+            "Trace [73,74,75,71,69,72,76,73] by hand."
+          ],
+          "minutes": 25,
+          "addedIn": "20260227T183000Z",
+          "modifiedIn": "20260302T090000Z"
+        },
+        {
+          "slug": "next-greater-element-ii",
+          "title": "Next Greater Element II",
+          "number": 503,
+          "difficulty": "Medium",
+          "reason": "Cold check of the circular variant, a day after the repair.",
+          "minutes": 25,
+          "addedIn": "20260302T090000Z"
+        }
+      ]
+    },
+    {
+      "pattern": "Sliding Window",
+      "items": [
+        {
+          "slug": "longest-substring-without-repeating-characters",
+          "title": "Longest Substring Without Repeating Characters",
+          "number": 3,
+          "difficulty": "Medium",
+          "reason": "Last cold Green three weeks ago; sample to keep it honest.",
+          "minutes": 20,
+          "addedIn": "20260227T183000Z"
+        }
+      ]
+    }
+  ],
+  "changes": [
+    { "op": "added", "slug": "merge-intervals", "list": "new", "reason": "Starting intervals." },
+    { "op": "added", "slug": "insert-interval", "list": "new", "reason": "Starting intervals." },
+    { "op": "modified", "slug": "daily-temperatures", "list": "revision", "reason": "Cold Red on Feb 27, so repair first." },
+    { "op": "added", "slug": "next-greater-element-ii", "list": "revision", "reason": "Cold check after the repair." },
+    { "op": "removed", "slug": "two-sum-ii-input-array-is-sorted", "list": "revision", "reason": "Cold Green Mar 1." }
+  ]
+}

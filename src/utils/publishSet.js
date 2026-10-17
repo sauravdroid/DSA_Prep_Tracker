@@ -131,7 +131,7 @@ const isEligible = e =>
  * mode, debt and topic health are conclusions and belong in an assessment,
  * where the evidence behind them can be checked.
  */
-export function buildManifest({ data = {}, savedAt = null, shards = [], repo, codeCommit = null, currentAssessment = null }) {
+export function buildManifest({ data = {}, savedAt = null, shards = [], repo, codeCommit = null }) {
   const problems = parse(data.dsa_problems, {})
   const revisions = parse(data.dsa_revisions, [])
   const failures = parse(data.dsa_failures, [])
@@ -152,10 +152,10 @@ export function buildManifest({ data = {}, savedAt = null, shards = [], repo, co
       codeRepository: 'sauravdroid/DSA_Prep_Tracker',
       codeCommit,
       protocol: 'docs/coach-planning-protocol.md',
-      schema: 'schemas/coaching-decision.schema.json',
+      schema: 'schemas/worklist.schema.json',
+      worklistManifestSchema: 'schemas/worklist-manifest.schema.json',
       manifestSchema: 'schemas/manifest.schema.json',
       evidenceSchema: 'schemas/evidence-shard.schema.json',
-      outcomeSchema: 'schemas/coaching-outcome.schema.json',
       policy: 'docs/retention-policy.md',
       policyReference: 'docs/retention-policy.reference.json',
     },
@@ -185,23 +185,30 @@ export function buildManifest({ data = {}, savedAt = null, shards = [], repo, co
       })),
     },
     coaching: {
-      index: 'coaching/index.json',
-      days: 'coaching/days/',
-      assessments: 'coaching/assessments/',
-      outcomes: 'coaching/outcomes/',
-      weeks: 'coaching/weeks/',
-      months: 'coaching/months/',
-      // Superseded by days/, and still written by older tooling.
-      decision: 'coaching/decision.json',
-      current: currentAssessment,
+      // The coach's current output. Read the manifest, then the version it
+      // names as latest.
+      worklists: 'coaching/worklists/',
+      worklistManifest: 'coaching/worklists/manifest.json',
+      // Everything below is frozen history from the dated-plan era. Read it
+      // when it helps; never write to it.
+      legacy: {
+        frozen: true,
+        index: 'coaching/index.json',
+        days: 'coaching/days/',
+        assessments: 'coaching/assessments/',
+        outcomes: 'coaching/outcomes/',
+        weeks: 'coaching/weeks/',
+        months: 'coaching/months/',
+        decision: 'coaching/decision.json',
+      },
     },
   }
 }
 
 /** Everything a publish should write, as path → serialised content. */
-export function publishSet({ data, savedAt, repo, codeCommit, currentAssessment }) {
+export function publishSet({ data, savedAt, repo, codeCommit }) {
   const shards = monthlyShards(data)
-  const manifest = buildManifest({ data, savedAt, shards, repo, codeCommit, currentAssessment })
+  const manifest = buildManifest({ data, savedAt, shards, repo, codeCommit })
 
   const files = new Map()
   for (const s of shards) files.set(s.path, JSON.stringify(s.content, null, 2))

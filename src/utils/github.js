@@ -117,3 +117,23 @@ export function archiveCoaching() {
 export function pullDays(dates) {
   return call('/coaching/days', { repo: getRepo(), ...(dates ? { dates } : {}) })
 }
+
+/* ---------- Worklist ---------- */
+
+/** The latest version id upstream. Cheap: one manifest read. */
+export function worklistLatest() {
+  return call('/worklist/latest', { repo: getRepo() })
+}
+
+/**
+ * One version with its manifest, validation result, publishing-commit checks
+ * and content hash, all read at a single commit. `id` defaults to latest.
+ * Passing the accepted version lets the server confirm it was not rewritten.
+ */
+export function worklistPreview({ id, acceptedId, acceptedHash } = {}) {
+  return call('/worklist/preview', {
+    repo: getRepo(),
+    ...(id ? { id } : {}),
+    ...(acceptedId ? { acceptedId, acceptedHash } : {}),
+  })
+}

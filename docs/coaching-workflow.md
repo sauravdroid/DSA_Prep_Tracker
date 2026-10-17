@@ -4,11 +4,10 @@ Repository-owned copy of the reusable protocol. This file is the authority for
 how coaching works; refresh any ChatGPT project upload from this version rather
 than editing a separate copy.
 
-**Producing a plan?** Start with
-[coach-planning-protocol.md](./coach-planning-protocol.md) — it is the entry
-point, and covers which files to read, how to choose a review horizon, and how
-to author today plus three conditional days. This document supplies the rules
-that protocol applies.
+**Writing a worklist?** Start with
+[coach-planning-protocol.md](./coach-planning-protocol.md). It is the entry
+point: which files to read, what a version contains, and how to publish one.
+This document supplies the rules that protocol applies.
 
 **Personal context is deliberately absent.** Interview target, weekday time
 ceilings, rest days and current focus live in the private data repository
@@ -19,13 +18,12 @@ application code.
 
 | Party | Owns |
 | --- | --- |
-| Application | Practice facts, eligibility, dates, debt arithmetic, enforced scheduling constraints |
-| Coach | Learning focus, anchor coverage, task selection, reasoning, explanation |
+| Application | Practice facts: recording attempts and publishing them. Rendering the accepted worklist exactly as written. Checking that a published version is valid and kept to its paths |
+| Coach | Every decision about what to do: which problems, which list, which pattern, what order, when to repair, when to retest, when an item comes off. The reasoning and explanation |
 
 The coach cannot manufacture attempts or override recorded evidence. The
-application does not invent learning judgements. A recommendation that would
-change a fixed formula is a request for a code change, not a decision the app
-will honour.
+application makes no learning judgements. It computes no plan, due date, debt
+or branch, and it never adopts a worklist the user has not reviewed.
 
 ## What counts as evidence
 
@@ -54,8 +52,9 @@ automatically weak.
 - Same-session repeats (`sessionRepeat`)
 
 Only a recorded cold attempt that is unaided and not a repeat is eligible
-evidence. See [retention-policy.md](./retention-policy.md) for what the engine
-currently implements versus what remains agreed-but-unimplemented.
+evidence. [retention-policy.md](./retention-policy.md) describes the spacing
+and eligibility rules. They are guidance for the coach; the app no longer
+enforces them.
 
 ## Review horizons
 
@@ -101,42 +100,34 @@ found" does not prove the work was skipped.
 6. Include mixed interview-style practice as capacity permits. A mock occupies a
    session; it is not piled on top of a full day.
 
-For each task state its purpose, the evidence used, expected time, and what
-result would change the plan. Keep the next three days conditional and the rest
-of the week provisional.
+For each item, say its purpose in `reason`, and put the evidence used and what
+result would change the plan in `detail`. Keep the list small enough to finish
+before the next update.
 
-## Authoring a decision
+## Authoring a worklist
 
-Write against [`schemas/coaching-decision.schema.json`](../schemas/coaching-decision.schema.json).
-Worked examples: [`fixtures/coaching-decision.structured.example.json`](../fixtures/coaching-decision.structured.example.json)
-(resolvable) and [`fixtures/coaching-decision.legacy-prose.example.json`](../fixtures/coaching-decision.legacy-prose.example.json)
-(preview-only).
+Write against [`schemas/worklist.schema.json`](../schemas/worklist.schema.json),
+and update [`schemas/worklist-manifest.schema.json`](../schemas/worklist-manifest.schema.json)
+in the same commit. Worked examples:
+- [`fixtures/worklist.example.json`](../fixtures/worklist.example.json)
+- [`fixtures/worklist.migrated.example.json`](../fixtures/worklist.migrated.example.json)
+- [`fixtures/worklist-manifest.example.json`](../fixtures/worklist-manifest.example.json)
 
-Three independent version fields:
+Rules the app enforces before it lets the user accept a version:
 
-| Field | Current | Meaning |
-| --- | --- | --- |
-| `version` | 1 | Decision-document format |
-| `outlookSchemaVersion` | 2 | `nextThreeDays` contract |
-| retention policy | see policy doc | What the engine computes |
+- The version and the manifest are schema-valid.
+- `id` is `writtenAt` without punctuation.
+- No problem appears twice, and no pattern name repeats within a list.
+- The publishing commit touched only `coaching/worklists/`.
+- The commit added version files without editing or deleting any.
+- The version the user currently follows still has the content they accepted.
 
-Raising one does not raise the others. A structured outlook still lives inside a
-`version: 1` document.
+The app works out what changed between versions on its own. A version's
+`changes` supplies the reasons it shows; it cannot hide a change.
 
-Rules the resolver enforces, so authoring against them is worthwhile:
+## Legacy coaching files
 
-- Conditions evaluate to true / false / **unknown**. Scenarios run in ascending
-  `priority`, and resolution *stops* at the first unknown — a higher-priority
-  recovery branch that cannot be evaluated prevents a lower branch from being
-  selected on the assumption that it is false.
-- Dependencies are matched by explicit slug + local date + mode. For a `cold`
-  dependency, assisted or repeat records make it **ambiguous**, not Green.
-- An unrecognised predicate produces **Needs review**, never a guessed branch.
-- Only `type: "problem"` items count toward workload. "Record the result" and
-  "refresh coaching" are actions.
-- `followUps` describe later days and are never counted as work for this day.
-- Omit `minutes` rather than guessing; the app reports an incomplete estimate
-  instead of treating a missing value as zero.
-
-Prose in `conditional[].if` and in `branches[]` is display-only. It never selects
-a branch.
+`coaching/decision.json`, `index.json`, `days/`, `assessments/`, `outcomes/`,
+`weeks/` and `months/` are frozen history from the dated-plan era. Nothing
+writes to them anymore. They became the first worklist version through the
+rules in [worklist-migration.md](./worklist-migration.md).

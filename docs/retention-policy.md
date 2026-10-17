@@ -1,5 +1,10 @@
 # Implemented retention policy
 
+> **Status since October 17, 2026:** the Worklist page no longer runs this
+> engine. The coach owns every scheduling decision, and this document and the
+> reference policy are guidance for those decisions. `src/utils/retention.js`
+> remains in the code base until the legacy cleanup.
+
 **Policy version: 1 (partial).** This documents what the engine in
 `src/utils/retention.js` *actually computes today*, which is not yet the same as
 the agreed policy. Where they differ it is recorded below as a discrepancy.
