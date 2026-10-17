@@ -53,7 +53,7 @@ append-only, so every earlier sheet stays viewable under **All sheets**.
 src/utils/worklist.js          rendering helpers and the version diff
 src/utils/validateWorklist.js  schema, publishing-rule and content-hash checks
 src/components/Worklist*.jsx   the Sheets page, problem drawer and Sync review
-src/components/Roadmap.jsx     the pattern roadmap graph
+src/components/Roadmap.jsx     the problem roadmap tree
 src/components/                Calendar, Problems, Stats, Recursion
 schemas/ fixtures/ docs/       the coaching contract
 scripts/*.test.mjs             node --test, synthetic inputs only

@@ -50,7 +50,7 @@
     "summary": { "type": "string", "maxLength": 4000, "description": "What this sheet is for and how to approach it: focus, what changed and why, what to watch. Plain text; blank lines separate paragraphs." },
     "roadmap": {
       "type": "array",
-      "description": "The pattern roadmap: which pattern builds on which. Shown as a graph above the lists. When present, every pattern used in `new` or `revision` must appear here; it may also list patterns with no problems on this sheet, so the whole path stays visible.",
+      "description": "Legacy: a pattern-level roadmap from earlier sheets. Still validated, no longer shown. The problem roadmap is built from each item's `after`.",
       "items": {
         "type": "object",
         "required": ["pattern"],
@@ -153,6 +153,12 @@
         "minutes": { "type": "integer", "minimum": 1, "maximum": 240, "description": "Time box. Omit rather than guess." },
         "addedIn": { "$ref": "#/$defs/versionId" },
         "modifiedIn": { "$ref": "#/$defs/versionId" },
+        "after": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/slug" },
+          "description": "Problems on this sheet to do before this one: the edges of the problem roadmap, drawn top to bottom. Omit it to follow the previous problem in the same pattern; use [] to start a new branch at the top."
+        },
         "sources": {
           "type": "array",
           "description": "Legacy provenance, written by the migration.",

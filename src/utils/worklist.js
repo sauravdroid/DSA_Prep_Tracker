@@ -30,37 +30,39 @@ export function sheetName(sheet, number) {
 }
 
 /**
- * The roadmap in rows: a pattern sits one row below the deepest pattern it
- * builds on. Within a row, patterns are placed near the patterns they build
- * on (to keep edges short), and otherwise in the coach's order.
+ * A graph in rows: a node sits one row below the deepest node it comes after.
+ * Within a row, nodes are placed near the nodes they come after (to keep
+ * edges short), and otherwise in the given order.
+ *
+ * @param {object[]} entries  each with a `key` and `after` (keys)
  */
-export function roadmapLayers(roadmap = []) {
-  const byName = new Map(roadmap.map((n, order) => [n.pattern, { ...n, order }]))
-  const parentsOf = name => (byName.get(name)?.after || []).filter(p => byName.has(p) && p !== name)
+export function layerGraph(entries = []) {
+  const byKey = new Map(entries.map((n, order) => [n.key, { ...n, order }]))
+  const parentsOf = key => (byKey.get(key)?.after || []).filter(p => byKey.has(p) && p !== key)
 
   const depth = new Map()
-  const depthOf = (name, path = new Set()) => {
-    if (depth.has(name)) return depth.get(name)
-    if (path.has(name)) return 0
-    path.add(name)
-    const parents = parentsOf(name)
+  const depthOf = (key, path = new Set()) => {
+    if (depth.has(key)) return depth.get(key)
+    if (path.has(key)) return 0
+    path.add(key)
+    const parents = parentsOf(key)
     const d = parents.length ? 1 + Math.max(...parents.map(p => depthOf(p, path))) : 0
-    path.delete(name)
-    depth.set(name, d)
+    path.delete(key)
+    depth.set(key, d)
     return d
   }
-  for (const name of byName.keys()) depthOf(name)
+  for (const key of byKey.keys()) depthOf(key)
 
   const rows = []
-  for (const node of byName.values()) {
-    const d = depth.get(node.pattern)
+  for (const node of byKey.values()) {
+    const d = depth.get(node.key)
     ;(rows[d] ||= []).push(node)
   }
 
   const position = new Map()
   return rows.filter(Boolean).map(row => {
     const centre = node => {
-      const ps = parentsOf(node.pattern).filter(p => position.has(p))
+      const ps = parentsOf(node.key).filter(p => position.has(p))
       return ps.length ? ps.reduce((s, p) => s + position.get(p), 0) / ps.length : null
     }
     const sorted = [...row].sort((a, b) => {
@@ -69,9 +71,43 @@ export function roadmapLayers(roadmap = []) {
       if (ca != null && cb != null && ca !== cb) return ca - cb
       return a.order - b.order
     })
-    sorted.forEach((n, i) => position.set(n.pattern, (i + 0.5) / sorted.length))
-    return sorted.map(n => ({ ...n, after: parentsOf(n.pattern) }))
+    sorted.forEach((n, i) => position.set(n.key, (i + 0.5) / sorted.length))
+    return sorted.map(n => ({ ...n, after: parentsOf(n.key) }))
   })
+}
+
+/** The legacy pattern roadmap in rows. */
+export function roadmapLayers(roadmap = []) {
+  return layerGraph(roadmap.map(n => ({ ...n, key: n.pattern })))
+}
+
+/**
+ * Every problem on the sheet with the problems it comes after. An explicit
+ * `after` wins; without one, an item follows the one listed before it in the
+ * same pattern.
+ */
+export function problemEntries(sheet) {
+  const entries = []
+  for (const list of ['revision', 'new']) {
+    for (const group of sheet?.[list] || []) {
+      group.items.forEach((item, i) => {
+        entries.push({
+          ...item,
+          key: item.slug,
+          list,
+          pattern: group.pattern,
+          rank: i + 1,
+          after: item.after ?? (i > 0 ? [group.items[i - 1].slug] : []),
+        })
+      })
+    }
+  }
+  return entries
+}
+
+/** The problem roadmap: every problem on the sheet, laid out top to bottom. */
+export function problemRoadmap(sheet) {
+  return layerGraph(problemEntries(sheet))
 }
 
 /** Problems on the sheet per pattern, across both lists. */
@@ -127,7 +163,7 @@ export function latestAttemptBySlug(worklist, practiceLog = []) {
   return map
 }
 
-const COMPARED = ['title', 'number', 'difficulty', 'flag', 'mode', 'reason', 'detail', 'checklist', 'minutes']
+const COMPARED = ['title', 'number', 'difficulty', 'flag', 'mode', 'reason', 'detail', 'checklist', 'minutes', 'after']
 
 function sameValue(a, b) {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)

@@ -20,6 +20,7 @@ import {
   sheetName,
   roadmapLayers,
   countsByPattern,
+  problemRoadmap,
 } from '../src/utils/worklist.js'
 
 const fixture = n => JSON.parse(readFileSync(new URL(`../fixtures/${n}`, import.meta.url)))
@@ -189,21 +190,33 @@ test('moving between lists is a move, grouped under the destination', () => {
 
 /* ---------- Sheets: name, summary, roadmap ---------- */
 
-test('roadmap: unknown links, duplicates and cycles are rejected', () => {
-  const w = clone(current)
+// The pattern-level roadmap is legacy: still validated, no longer drawn.
+const LEGACY_ROADMAP = [
+  { pattern: 'Arrays & Hashing', status: 'done' },
+  { pattern: 'Two Pointers', after: ['Arrays & Hashing'], status: 'done' },
+  { pattern: 'Monotonic Stack', after: ['Arrays & Hashing'], status: 'active' },
+  { pattern: 'Sliding Window', after: ['Two Pointers'], status: 'done' },
+  { pattern: 'Intervals', after: ['Two Pointers'], status: 'next' },
+  { pattern: 'Heap / Priority Queue', after: ['Intervals', 'Monotonic Stack'], status: 'later' },
+]
+const withLegacyRoadmap = () => ({ ...clone(current), roadmap: clone(LEGACY_ROADMAP) })
+
+test('legacy roadmap: unknown links, duplicates and cycles are rejected', () => {
+  assert.ok(validateWorklist(withLegacyRoadmap()).valid)
+  const w = withLegacyRoadmap()
   w.roadmap.push({ pattern: 'Trees', after: ['Graphs'] })
   w.roadmap.push({ pattern: 'Intervals' })
   const errs = validateWorklist(w).errors.join(' ')
   assert.match(errs, /"Trees" comes after "Graphs", which is not in the roadmap/)
   assert.match(errs, /"Intervals" appears twice/)
 
-  const cyc = clone(current)
+  const cyc = withLegacyRoadmap()
   cyc.roadmap[0].after = ['Heap / Priority Queue']
   assert.match(validateWorklist(cyc).errors.join(' '), /form a cycle/)
 })
 
-test('roadmap: every pattern on the lists must be on the roadmap', () => {
-  const w = clone(current)
+test('legacy roadmap: every pattern on the lists must be on the roadmap', () => {
+  const w = withLegacyRoadmap()
   w.roadmap = w.roadmap.filter(n => n.pattern !== 'Sliding Window')
   w.roadmap.find(n => n.pattern === 'Intervals').after = ['Two Pointers']
   assert.match(validateWorklist(w).errors.join(' '), /revision: pattern "Sliding Window" is not in the roadmap/)
@@ -216,7 +229,7 @@ test('a sheet without a roadmap, name or summary is still valid', () => {
 })
 
 test('roadmap layers place a pattern below the deepest pattern it builds on', () => {
-  const rows = roadmapLayers(current.roadmap).map(r => r.map(n => n.pattern))
+  const rows = roadmapLayers(LEGACY_ROADMAP).map(r => r.map(n => n.pattern))
   assert.deepEqual(rows, [
     ['Arrays & Hashing'],
     ['Two Pointers', 'Monotonic Stack'],
@@ -239,6 +252,47 @@ test('counts per pattern span both lists', () => {
   const c = countsByPattern(current)
   assert.deepEqual(c.get('Monotonic Stack'), { new: 0, revision: 2 })
   assert.deepEqual(c.get('Intervals'), { new: 2, revision: 0 })
+})
+
+test('problem roadmap: an item follows the one before it in its pattern unless it says otherwise', () => {
+  const rows = problemRoadmap(current).map(r => r.map(n => n.slug))
+  assert.deepEqual(rows, [
+    ['daily-temperatures', 'longest-substring-without-repeating-characters'],
+    ['next-greater-element-ii', 'merge-intervals'],
+    ['insert-interval'],
+  ])
+})
+
+test('problem roadmap: explicit "after" links problems across patterns and lists', () => {
+  const w = clone(current)
+  w.new[0].items[0].after = ['next-greater-element-ii']
+  w.revision[1].items[0].after = []
+  const rows = problemRoadmap(w).map(r => r.map(n => n.slug))
+  assert.deepEqual(rows[0], ['daily-temperatures', 'longest-substring-without-repeating-characters'])
+  assert.deepEqual(rows[1], ['next-greater-element-ii'])
+  assert.deepEqual(rows[2], ['merge-intervals'])
+  assert.deepEqual(rows[3], ['insert-interval'])
+  const node = problemRoadmap(w).flat().find(n => n.slug === 'merge-intervals')
+  assert.equal(node.list, 'new')
+  assert.equal(node.pattern, 'Intervals')
+  assert.equal(node.rank, 1)
+})
+
+test('"after" must name problems on the sheet and must not loop', () => {
+  const w = clone(current)
+  w.new[0].items[0].after = ['two-sum']
+  assert.match(validateWorklist(w).errors.join(' '), /merge-intervals comes after two-sum, which is not on this sheet/)
+
+  const loop = clone(current)
+  loop.new[0].items[0].after = ['insert-interval']
+  assert.match(validateWorklist(loop).errors.join(' '), /form a cycle/)
+})
+
+test('a changed "after" is reported as a modification', () => {
+  const next = clone(current)
+  next.new[0].items[1].after = []
+  const d = diffWorklists(current, next)
+  assert.deepEqual(d.modified.map(i => [i.slug, i.fields]), [['insert-interval', ['after']]])
 })
 
 test('diff from nothing lists everything as added', () => {

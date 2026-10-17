@@ -108,8 +108,9 @@ whatever span the user is planning for, sized to their capacity over that span.
 
 Write against [`schemas/worklist.schema.json`](../schemas/worklist.schema.json),
 and update [`schemas/worklist-manifest.schema.json`](../schemas/worklist-manifest.schema.json)
-in the same commit. A sheet has a `name`, a `summary`, a pattern `roadmap`,
-and `new` and `revision` problems grouped by pattern in priority order. Worked examples:
+in the same commit. A sheet has a `name`, a `summary`, and `new` and
+`revision` problems grouped by pattern in priority order; each problem's
+`after` links shape the problem roadmap. Worked examples:
 - [`fixtures/worklist.example.json`](../fixtures/worklist.example.json)
 - [`fixtures/worklist.migrated.example.json`](../fixtures/worklist.migrated.example.json)
 - [`fixtures/worklist-manifest.example.json`](../fixtures/worklist-manifest.example.json)
@@ -119,8 +120,8 @@ Rules the app enforces before it lets the user accept a version:
 - The version and the manifest are schema-valid.
 - `id` is `writtenAt` without punctuation.
 - No problem appears twice, and no pattern name repeats within a list.
-- The roadmap names each pattern once, links only to patterns on it, has no
-  cycles, and includes every pattern used in the lists.
+- Every `after` link names a problem on the same sheet, and the links form no
+  cycle.
 - The publishing commit touched only `coaching/worklists/`.
 - The commit added version files without editing or deleting any.
 - The version the user currently follows still has the content they accepted.

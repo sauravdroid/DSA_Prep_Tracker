@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import crypto from 'node:crypto'
 import Ajv2020 from 'ajv/dist/2020.js'
 import addFormats from 'ajv-formats'
-import { idFromWrittenAt, worklistPath } from './worklist.js'
+import { idFromWrittenAt, worklistPath, problemEntries } from './worklist.js'
 
 /**
  * Node-side checks on what the coach publishes. The Vite middleware, the
@@ -47,6 +47,37 @@ function worklistSemantics(w) {
     }
   }
   if (Array.isArray(w.roadmap)) errors.push(...roadmapErrors(w))
+  errors.push(...problemLinkErrors(w))
+  return errors
+}
+
+function hasCycle(keys, parentsOf) {
+  const state = new Map()
+  const visit = key => {
+    if (state.get(key) === 'done') return false
+    if (state.get(key) === 'open') return true
+    state.set(key, 'open')
+    const cyclic = parentsOf(key).some(visit)
+    state.set(key, 'done')
+    return cyclic
+  }
+  return keys.some(visit)
+}
+
+function problemLinkErrors(w) {
+  const errors = []
+  const entries = problemEntries(w)
+  const slugs = new Set(entries.map(e => e.slug))
+  for (const e of entries) {
+    for (const p of e.after) {
+      if (p === e.slug) errors.push(`${e.slug} cannot come after itself.`)
+      else if (!slugs.has(p)) errors.push(`${e.slug} comes after ${p}, which is not on this sheet.`)
+    }
+  }
+  const parents = new Map(entries.map(e => [e.slug, e.after.filter(p => slugs.has(p) && p !== e.slug)]))
+  if (hasCycle([...slugs], k => parents.get(k) || [])) {
+    errors.push('The "after" links between problems form a cycle.')
+  }
   return errors
 }
 

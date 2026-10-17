@@ -12,14 +12,6 @@
   "headline": "Repair monotonic stack before starting interval problems.",
   "name": "Stack repair, then Intervals",
   "summary": "Two cold misses on monotonic stack this week, both on what the stack holds. Repair that first: re-derive the invariant on Daily Temperatures with help allowed, then check Next Greater Element II cold.\n\nIntervals starts in parallel as the new pattern. Work Merge Intervals before Insert Interval; the second is the same sweep without the sort.\n\nSliding Window stays as a single sample so it does not go cold.",
-  "roadmap": [
-    { "pattern": "Arrays & Hashing", "status": "done" },
-    { "pattern": "Two Pointers", "after": ["Arrays & Hashing"], "status": "done" },
-    { "pattern": "Monotonic Stack", "after": ["Arrays & Hashing"], "status": "active", "note": "Invariant not yet automatic." },
-    { "pattern": "Sliding Window", "after": ["Two Pointers"], "status": "done" },
-    { "pattern": "Intervals", "after": ["Two Pointers"], "status": "next" },
-    { "pattern": "Heap / Priority Queue", "after": ["Intervals", "Monotonic Stack"], "status": "later" }
-  ],
   "new": [
     {
       "pattern": "Intervals",
@@ -33,6 +25,9 @@
           "reason": "Foundation of the pattern: sort, then sweep.",
           "detail": "Hints are fine. Write down why sorting by start is enough before you code.",
           "minutes": 30,
+          "after": [
+            "daily-temperatures"
+          ],
           "addedIn": "20260302T090000Z"
         },
         {
@@ -97,10 +92,35 @@
     }
   ],
   "changes": [
-    { "op": "added", "slug": "merge-intervals", "list": "new", "reason": "Starting intervals." },
-    { "op": "added", "slug": "insert-interval", "list": "new", "reason": "Starting intervals." },
-    { "op": "modified", "slug": "daily-temperatures", "list": "revision", "reason": "Cold Red on Feb 27, so repair first." },
-    { "op": "added", "slug": "next-greater-element-ii", "list": "revision", "reason": "Cold check after the repair." },
-    { "op": "removed", "slug": "two-sum-ii-input-array-is-sorted", "list": "revision", "reason": "Cold Green Mar 1." }
+    {
+      "op": "added",
+      "slug": "merge-intervals",
+      "list": "new",
+      "reason": "Starting intervals."
+    },
+    {
+      "op": "added",
+      "slug": "insert-interval",
+      "list": "new",
+      "reason": "Starting intervals."
+    },
+    {
+      "op": "modified",
+      "slug": "daily-temperatures",
+      "list": "revision",
+      "reason": "Cold Red on Feb 27, so repair first."
+    },
+    {
+      "op": "added",
+      "slug": "next-greater-element-ii",
+      "list": "revision",
+      "reason": "Cold check after the repair."
+    },
+    {
+      "op": "removed",
+      "slug": "two-sum-ii-input-array-is-sorted",
+      "list": "revision",
+      "reason": "Cold Green Mar 1."
+    }
   ]
 }

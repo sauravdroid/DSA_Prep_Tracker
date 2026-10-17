@@ -5,8 +5,8 @@ point. Refresh any ChatGPT project file or coach plugin from this version rather
 than editing a separate copy.
 
 **The coach decides; the app renders.** You write a **prep sheet**: a named,
-undated roadmap of what to work on, in priority order. It has a summary, a
-pattern roadmap, problems to learn (`new`) and problems to revisit
+undated roadmap of problems to work through, in priority order. It has a
+summary, problems to learn (`new`) and problems to revisit
 (`revision`), each grouped by pattern. The app shows the sheet the user made
 current, exactly as written, lets them open any earlier sheet, and records the
 attempts they make. It computes no plan, due date, debt or branch of its own.
@@ -116,12 +116,23 @@ Start from the latest sheet and change what the evidence says should change.
 - `summary`: the brief for the whole sheet, in plain text with blank lines
   between paragraphs. What it focuses on and why, what changed since the last
   sheet, what to watch for. Shown at the top of the page.
-- `roadmap`: the pattern roadmap, drawn as a graph above the lists. One entry
-  per pattern, with `after` naming the patterns it builds on, and a `status`
-  (`done`, `active`, `next`, `later`). Include patterns with no problems on
-  this sheet so the whole path stays visible. Every pattern used in `new` or
-  `revision` must be on the roadmap. No cycles. Reuse the previous sheet's
-  roadmap and change only what moved.
+
+**The roadmap is made of problems.** The app draws every problem on the sheet
+as a tree, top to bottom. You shape it with each item's `after`: the problems
+on this sheet to do before it.
+- Omit `after` and the item follows the problem listed before it in the same
+  pattern. A sheet without any `after` therefore reads as one chain per
+  pattern.
+- Use `after` to connect across patterns and lists: a cold check after its
+  repair, a new problem after the revision that prepares for it, a harder
+  problem after the one that teaches its building block.
+- `"after": []` starts a new branch at the top.
+- Keep the tree narrow and deep rather than wide: at most four or five
+  problems should be startable at once, so the top of the tree really is
+  what to do first.
+- Links must name problems on this sheet and must not form a loop.
+- The older pattern-level `roadmap` field is still accepted but no longer
+  shown. Do not write it.
 
 **Priority is order.** There are no priority numbers to fill in; the app numbers
 what you write.
@@ -156,6 +167,7 @@ what you write.
 | `minutes` | Optional time box. Omit rather than guess |
 | `mode` | How to attempt and record it: `cold`, `warm`, `repair` or `learn`. Defaults to `cold` in revision and `learn` in new |
 | `flag` | `repair` highlights a weak skill being rebuilt |
+| `after` | Optional. Slugs of problems on this sheet to do first; the edges of the roadmap. Omit to follow the previous item in the same pattern |
 | `addedIn`, `modifiedIn` | Ids of the sheets that added or last changed the item. Carry `addedIn` forward unchanged |
 
 **Removing, adding, changing.** You may add, remove, modify or move anything.
@@ -232,9 +244,9 @@ schemas. In the data repository, read `manifest.json`, then
 `coaching/worklists/manifest.json` and the latest sheet. Then read the
 attempts recorded since that sheet's `basedOn.lastAttemptAt`, from the
 evidence shards covering them, and my coaching context. Write the next prep
-sheet as a new, complete sheet: a name, a summary, the pattern roadmap, and
-new and revision problems grouped by pattern in priority order, each with a
-one-line reason. No dates and no day-by-day plan. Add it and update the
-manifest in one commit that touches nothing else, or return both files if you
-cannot publish. Report what you read, what changed and why, and whether it was
-published.
+sheet as a new, complete sheet: a name, a summary, and new and revision
+problems grouped by pattern in priority order, each with a one-line reason and
+`after` links that shape the problem roadmap. No dates and no day-by-day plan.
+Add it and update the manifest in one commit that touches nothing else, or
+return both files if you cannot publish. Report what you read, what changed
+and why, and whether it was published.

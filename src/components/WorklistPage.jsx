@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import {
-  LIST_LABEL, versionNumber, attemptsSince, latestAttemptBySlug, itemMode, sheetName, countsByPattern,
+  LIST_LABEL, versionNumber, attemptsSince, latestAttemptBySlug, itemMode, sheetName,
 } from '../utils/worklist'
 import { loadAccepted } from '../utils/worklistStore'
 import { subscribeSync } from '../utils/autoSync'
@@ -194,7 +194,6 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
   const [viewing, setViewing] = useState(null)
   const [latestManifest, setLatestManifest] = useState(null)
   const [tab, setTab] = useState(null)
-  const [focus, setFocus] = useState(null)
   const [showRoadmap, setShowRoadmap] = useState(true)
   const [open, setOpen] = useState(null)
   const [recording, setRecording] = useState(null)
@@ -217,16 +216,12 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
   const number = versionNumber(manifest, sheet?.id)
   const unseen = useMemo(() => attemptsSince(sheet, log), [sheet, log])
   const latestBySlug = useMemo(() => latestAttemptBySlug(sheet, log), [sheet, log])
-  const counts = useMemo(() => countsByPattern(sheet), [sheet])
 
   const count = list => (sheet?.[list] || []).reduce((n, g) => n + g.items.length, 0)
   const activeTab = tab || (count('revision') || !count('new') ? 'revision' : 'new')
-  const groups = (sheet?.[activeTab] || []).filter(g => !focus || g.pattern === focus)
-  const otherTab = activeTab === 'new' ? 'revision' : 'new'
-  const focusElsewhere = focus ? counts.get(focus)?.[otherTab] || 0 : 0
+  const groups = sheet?.[activeTab] || []
 
   const pick = useCallback(async id => {
-    setFocus(null)
     setTab(null)
     if (!id || id === current?.id) { setViewing(null); return }
     setViewing({ id, loading: true })
@@ -329,29 +324,22 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
           <>
             <Summary key={sheet.id} headline={sheet.headline} summary={sheet.summary} />
 
-            {sheet.roadmap?.length > 0 ? (
-              <section className="mt-4 rounded-[10px] border border-slate-200 bg-white px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-[13px] font-bold text-slate-900">Roadmap</h2>
-                  <span className="flex-1 text-xs text-slate-400">
-                    {showRoadmap ? 'Click a pattern to see only its problems.' : ''}
-                  </span>
-                  <button onClick={() => setShowRoadmap(s => !s)} className="text-xs font-medium text-slate-500 underline-offset-2 hover:underline">
-                    {showRoadmap ? 'Hide' : 'Show'}
-                  </button>
+            <section className="mt-4 rounded-[10px] border border-slate-200 bg-white px-4 py-3">
+              <div className="flex items-center gap-3">
+                <h2 className="text-[13px] font-bold text-slate-900">Roadmap</h2>
+                <span className="flex-1 text-xs text-slate-400">
+                  {showRoadmap ? 'Every problem on this sheet, in the order to work through them. Click one to open it.' : ''}
+                </span>
+                <button onClick={() => setShowRoadmap(s => !s)} className="text-xs font-medium text-slate-500 underline-offset-2 hover:underline">
+                  {showRoadmap ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              {showRoadmap && (
+                <div className="mt-3">
+                  <Roadmap sheet={sheet} attempts={latestBySlug} selected={open?.slug} onOpen={setOpen} />
                 </div>
-                {showRoadmap && (
-                  <div className="mt-2">
-                    <Roadmap roadmap={sheet.roadmap} counts={counts} selected={focus} onSelect={setFocus} />
-                  </div>
-                )}
-              </section>
-            ) : (
-              <p className="mt-4 rounded-[10px] border border-dashed border-slate-300 px-4 py-2.5 text-xs text-slate-500">
-                <span className="font-semibold text-slate-700">No roadmap on this sheet.</span>{' '}
-                The coach adds the pattern roadmap when it writes a sheet; ask it for your next one, then Sync.
-              </p>
-            )}
+              )}
+            </section>
 
             <div className="mt-5 flex items-end gap-6 border-b border-slate-200">
               {['revision', 'new'].map(list => (
@@ -370,21 +358,11 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
                   </span>
                 </button>
               ))}
-              {focus && (
-                <span className="mb-2 ml-auto inline-flex items-center gap-1.5 rounded-full bg-slate-900 py-0.5 pl-3 pr-1 text-xs font-medium text-white">
-                  {focus}
-                  <button onClick={() => setFocus(null)} aria-label="Show all patterns" className="flex size-5 items-center justify-center rounded-full hover:bg-white/20">✕</button>
-                </span>
-              )}
             </div>
 
             {groups.length === 0 && (
               <p className="mt-8 text-center text-sm text-slate-400">
-                {focus
-                  ? <>No {LIST_LABEL[activeTab].toLowerCase()} problems for {focus} on this sheet.{focusElsewhere > 0 && (
-                    <> <button onClick={() => setTab(otherTab)} className="font-medium text-slate-700 underline underline-offset-2">See {focusElsewhere} in {LIST_LABEL[otherTab]}</button></>
-                  )}</>
-                  : `Nothing in ${LIST_LABEL[activeTab]} on this sheet.`}
+                Nothing in {LIST_LABEL[activeTab]} on this sheet.
               </p>
             )}
 
@@ -452,8 +430,7 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
             setReviewing(null)
             setViewing(null)
             setTab(null)
-            setFocus(null)
-            setNotice({ tone: 'ok', text: `“${sheetName(record.version, record.source?.number)}” is now your current sheet.` })
+                    setNotice({ tone: 'ok', text: `“${sheetName(record.version, record.source?.number)}” is now your current sheet.` })
           }}
         />
       )}
