@@ -329,7 +329,7 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
           <>
             <Summary key={sheet.id} headline={sheet.headline} summary={sheet.summary} />
 
-            {sheet.roadmap?.length > 0 && (
+            {sheet.roadmap?.length > 0 ? (
               <section className="mt-4 rounded-[10px] border border-slate-200 bg-white px-4 py-3">
                 <div className="flex items-center gap-3">
                   <h2 className="text-[13px] font-bold text-slate-900">Roadmap</h2>
@@ -346,6 +346,11 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
                   </div>
                 )}
               </section>
+            ) : (
+              <p className="mt-4 rounded-[10px] border border-dashed border-slate-300 px-4 py-2.5 text-xs text-slate-500">
+                <span className="font-semibold text-slate-700">No roadmap on this sheet.</span>{' '}
+                The coach adds the pattern roadmap when it writes a sheet; ask it for your next one, then Sync.
+              </p>
             )}
 
             <div className="mt-5 flex items-end gap-6 border-b border-slate-200">
