@@ -101,8 +101,8 @@ found" does not prove the work was skipped.
    session; it is not piled on top of a full day.
 
 For each item, say its purpose in `reason`, and put the evidence used and what
-result would change the plan in `detail`. Keep the list small enough to finish
-before the next update.
+result would change the plan in `detail`. A worklist has no dates: it covers
+whatever span the user is planning for, sized to their capacity over that span.
 
 ## Authoring a worklist
 

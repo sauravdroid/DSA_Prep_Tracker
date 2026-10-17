@@ -151,10 +151,15 @@ sees *that* something changed.
 4. **New learning.** Keep a deliberate new-pattern track in `new`.
 5. **Sample strong topics** now and then, rather than dropping them.
 
-Keep the lists usable:
-- About 3–4 items per pattern, and 10–15 in total across both lists.
-- A list the user cannot finish before the next update is a backlog, not a plan.
-- Respect the time ceilings and rest days in `coaching-context.json`.
+**A worklist is not a daily plan.** It has no dates and covers as many days
+as the user is planning for, often a week or more, until the next version
+replaces it. Size it to that span:
+- Ask the user what span to cover if it is not clear, and say it in the
+  `headline` (for example "Next two weeks: …").
+- Use the time ceilings and rest days in `coaching-context.json` to judge how
+  much fits in that span, as a total. Never split it into days.
+- Order still matters: put first what should be done first. Within a pattern,
+  the order is the sequence to work through.
 
 ## Applying the retention policy
 
