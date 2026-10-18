@@ -197,7 +197,8 @@ what you write.
 | `after` | Optional. Slugs of problems on this sheet to do first; the edges of the roadmap. Omit to follow the previous item in the same pattern |
 | `addedIn`, `modifiedIn` | Timestamps in id form (`20261018T090000Z`) of the write that added the item and the write that last changed it. Carry `addedIn` forward unchanged |
 
-**Removing, adding, changing.** You may add, remove, modify or move anything.
+**Removing, adding, changing.** You may add, remove, modify or move anything,
+except that a [pinned problem](#pinned-problems) never leaves a sheet.
 - Remove items that are done.
 - Remove items that no longer earn their place.
 - Keep an item whose result was Yellow or Red, and change its instruction or
@@ -208,6 +209,33 @@ since the sheet's previous content when you update it, or since the sheet it
 was started from when you create it. The app works out what changed on its
 own and only borrows your reasons, so a missing entry cannot hide a change.
 Without a reason, though, the user only sees *that* something changed.
+
+## Pinned problems
+
+These problems are on **every** sheet, created or updated, permanently. They
+exist so the user never loses the pattern and its flow. They are never removed
+for being Green, never left off a new sheet, and never swapped for a similar
+problem. Only the user can add or unpin one, by asking.
+
+| Problem | Pattern | The flow the user must be able to rebuild |
+|---|---|---|
+| 526. Beautiful Arrangement (`beautiful-arrangement`) | Backtracking | Fill positions 1..n in order (1-based, not 0-based). At each position try every unused number; place it only if `num % pos == 0` or `pos % num == 0`; mark it used, recurse to `pos + 1`, unmark on return. Reaching `pos > n` counts one arrangement. |
+| 698. Partition to K Equal Sum Subsets (`partition-to-k-equal-sum-subsets`) | Backtracking | `target = sum / k`; fail early if it does not divide or the largest number exceeds it. Sort descending. Place each number into one of the k buckets; skip a bucket it overflows; add, recurse to the next number, and **restore the bucket sum** on return. Keep a per-call set of bucket sums already tried and skip repeats (symmetry; this also skips every empty bucket after the first). That set is local to the call, so it is never undone. |
+
+How to carry them:
+- Put both in `revision` under `Backtracking`. If the sheet has no
+  Backtracking group, add one for them.
+- The evidence still decides the treatment. While a pinned problem has an
+  unresolved Red or Yellow, or no eligible cold Green, it is a `repair` or
+  cold check placed near the top. Once it has a cold Green, it becomes a cold
+  refresher on the usual spacing (7, 14, 30 days, then about monthly), placed
+  lower, but it stays.
+- The `checklist` asks the user to rebuild the flow before coding: what state
+  each call holds, what is undone on return and why, and what is skipped and
+  why that is safe. Ask the questions; do not put the answers in `detail`, or
+  the attempt stops being unaided.
+- Give each one a `reason` that says why it is there now, not just that it
+  is pinned.
 
 ## Selecting work
 
@@ -252,6 +280,7 @@ Before publishing:
       the manifest entry's `updatedAt` equals the sheet's `writtenAt`.
 - [ ] No problem appears twice. No pattern name repeats within a list. Every
       `after` link names a problem on the sheet and the links form no loop.
+- [ ] Every [pinned problem](#pinned-problems) is in `revision`.
 - [ ] `current` names a listed sheet that is not archived. No manifest entry
       was removed.
 - [ ] `basedOn` describes data you actually read. Re-check that the data
