@@ -17,7 +17,7 @@ function idDate(id) {
  * this problem, a way to record an attempt, and the graded attempts so far.
  * Everything else (link, tags, revisions, notes) comes from ProblemDetail.
  */
-export default function SheetItemDetail({ item, attempts, onRecord }) {
+export default function SheetItemDetail({ item, attempts, solvedOn, onRecord }) {
   const history = [...attempts].sort((a, b) => (b.at || b.date).localeCompare(a.at || a.date))
   const added = idDate(item.addedIn)
   const modified = item.modifiedIn && item.modifiedIn !== item.addedIn ? idDate(item.modifiedIn) : null
@@ -25,6 +25,17 @@ export default function SheetItemDetail({ item, attempts, onRecord }) {
   return (
     <>
       <div className="tw mt-4">
+        {solvedOn && (
+          <p className="mb-2 flex items-start gap-2 rounded-lg bg-[#effaf8] px-3 py-2 text-[13px] leading-snug text-slate-700">
+            <svg viewBox="0 0 16 16" className="mt-0.5 size-4 shrink-0" aria-hidden="true">
+              <path d="M3 8.4l3.3 3.3L13 4.8" stroke="#00b8a3" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>
+              <span className="font-semibold text-[#00897b]">Accepted on LeetCode {shortDate(solvedOn)}.</span>{' '}
+              Record how it went so the coach can judge it.
+            </span>
+          </p>
+        )}
         <button
           onClick={onRecord}
           className="w-full rounded-lg bg-slate-900 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { problemForest, packForest } from '../utils/worklist'
+import SheetStatusIcon from './SheetStatusIcon'
 
 const CARD_W = 176
 const CARD_H = 64
@@ -8,7 +9,6 @@ const ROW_GAP = 28
 const BAND_GAP = 36
 
 const DIFF_DOT = { Easy: 'bg-[#00b8a3]', Medium: 'bg-[#ffb800]', Hard: 'bg-[#ff375f]' }
-const RESULT_DOT = { green: 'bg-[#00b8a3]', yellow: 'bg-[#ffb800]', red: 'bg-[#ff375f]' }
 
 function useWidth(ref) {
   const [width, setWidth] = useState(0)
@@ -26,7 +26,7 @@ function useWidth(ref) {
  * the one it comes after. Independent branches sit side by side and wrap to
  * the width of the page. Clicking a card opens the problem.
  */
-export default function Roadmap({ sheet, attempts, selected, onOpen }) {
+export default function Roadmap({ sheet, attempts, solved, selected, onOpen }) {
   const box = useRef(null)
   const width = useWidth(box) || 900
   const [hover, setHover] = useState(null)
@@ -93,13 +93,17 @@ export default function Roadmap({ sheet, attempts, selected, onOpen }) {
 
         {cards.map(c => {
           const attempt = attempts.get(c.slug)
+          const solvedOn = solved?.get(c.slug)
+          const complete = attempt ? attempt.result === 'green' : !!solvedOn
           const isSel = selected === c.slug
           const dim = focus && !linked.has(c.slug)
           const tone = isSel
             ? 'border-[#ffa116] bg-[#fff7ea]'
-            : c.list === 'new'
-              ? 'border-violet-200 bg-violet-50/60 hover:border-violet-400'
-              : 'border-slate-200 bg-white hover:border-slate-400'
+            : complete
+              ? 'border-[#a7e3d9] bg-[#f1fbf9] hover:border-[#00b8a3]'
+              : c.list === 'new'
+                ? 'border-violet-200 bg-violet-50/60 hover:border-violet-400'
+                : 'border-slate-200 bg-white hover:border-slate-400'
           return (
             <button
               key={c.slug}
@@ -116,8 +120,8 @@ export default function Roadmap({ sheet, attempts, selected, onOpen }) {
                 <span className="line-clamp-2 min-w-0 flex-1 text-[12.5px] font-semibold leading-snug text-slate-900">
                   {c.number ? `${c.number}. ` : ''}{c.title}
                 </span>
-                {attempt && (
-                  <span className={`mt-1 size-2 shrink-0 rounded-full ${RESULT_DOT[attempt.result] || 'bg-slate-400'}`} title={`Recorded ${attempt.result}`} />
+                {(attempt || solvedOn) && (
+                  <SheetStatusIcon attempt={attempt} solvedOn={solvedOn} className="mt-0.5 size-3.5 shrink-0" />
                 )}
               </span>
               <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-slate-400">
@@ -135,7 +139,8 @@ export default function Roadmap({ sheet, attempts, selected, onOpen }) {
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
         <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-sm border border-slate-300 bg-white" />Revision</span>
         {hasNew && <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-sm border border-violet-300 bg-violet-50" />New</span>}
-        <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#00b8a3]" />recorded since the coach looked</span>
+        <span className="inline-flex items-center gap-1.5"><SheetStatusIcon solvedOn="2000-01-01" className="size-3" />solved on LeetCode since the sheet was written</span>
+        <span className="inline-flex items-center gap-1.5"><SheetStatusIcon attempt={{ result: 'green' }} className="size-3" />graded attempt</span>
         <span className="inline-flex items-center gap-1.5"><svg width="18" height="6" aria-hidden="true"><path d="M0 3h18" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 3" /></svg>also needs (shown on hover)</span>
         <span className="text-slate-400">Start at the top of any branch.</span>
       </div>

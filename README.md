@@ -49,6 +49,10 @@ changed and the checks it passed. It applies only when you choose. The coach
 archives sheets instead of deleting them, so every sheet stays viewable under
 **All sheets**.
 
+A problem on the sheet shows as done once you get an Accepted on LeetCode on
+or after the day the coach wrote the sheet (a plain ✓). Recording a graded
+attempt replaces that with its result, which is what the coach goes by.
+
 ## Layout
 
 ```
@@ -56,6 +60,7 @@ src/utils/worklist.js          rendering helpers and the sheet diff
 src/utils/validateWorklist.js  schema, publishing-rule and content-hash checks
 src/components/Worklist*.jsx   the Sheets page and review panel
 src/components/SheetItemDetail.jsx  the sheet's section in the shared problem drawer
+src/components/SheetStatusIcon.jsx  a problem's status: graded result, solved, or not yet
 src/components/Roadmap.jsx     the problem roadmap tree
 src/components/                Calendar, Problems, Stats, Recursion
 schemas/ fixtures/ docs/       the coaching contract

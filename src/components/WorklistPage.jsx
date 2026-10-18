@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import {
-  LIST_LABEL, normalizeManifest, sheetEntry, attemptsSince, latestAttemptBySlug, itemMode, sheetName,
+  LIST_LABEL, normalizeManifest, sheetEntry, attemptsSince, latestAttemptBySlug, solvedSince, itemMode, sheetName,
 } from '../utils/worklist'
 import { loadAccepted } from '../utils/worklistStore'
 import { subscribeSync, syncNow } from '../utils/autoSync'
 import { backupIfConnected, worklistPreview } from '../utils/github'
 import ProblemDrawer from './ProblemDrawer'
 import SheetItemDetail from './SheetItemDetail'
+import SheetStatusIcon from './SheetStatusIcon'
 import WorklistReview from './WorklistReview'
 import Roadmap from './Roadmap'
 import ColdTestModal from './ColdTestModal'
@@ -17,26 +18,6 @@ const DIFF_TONE = { Easy: 'text-[#00b8a3]', Medium: 'text-[#ffb800]', Hard: 'tex
 function shortDate(iso) {
   if (!iso) return ''
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
-/** Filled when you have recorded an attempt the coach has not seen yet. */
-function StatusIcon({ attempt }) {
-  if (!attempt) {
-    return (
-      <svg viewBox="0 0 16 16" className="size-4" aria-label="Not attempted">
-        <circle cx="8" cy="8" r="6.5" fill="none" stroke="#cbd5e1" strokeWidth="1.5" />
-      </svg>
-    )
-  }
-  const fill = attempt.result === 'green' ? '#00b8a3' : attempt.result === 'yellow' ? '#ffb800' : '#ff375f'
-  return (
-    <svg viewBox="0 0 16 16" className="size-4" aria-label={`Recorded ${attempt.result}`}>
-      <circle cx="8" cy="8" r="7" fill={fill} />
-      {attempt.result === 'green' && <path d="M4.8 8.3l2.1 2.1 4.3-4.6" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />}
-      {attempt.result === 'yellow' && <path d="M5 8h6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />}
-      {attempt.result === 'red' && <path d="M5.6 5.6l4.8 4.8M10.4 5.6l-4.8 4.8" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />}
-    </svg>
-  )
 }
 
 /**
@@ -141,7 +122,7 @@ const TABLE_COLS = {
 }
 
 /** One problem, LeetCode-list style: a quiet row, the title is the link. */
-function Row({ item, attempt, selected, striped, showTime, onOpen }) {
+function Row({ item, attempt, solvedOn, selected, striped, showTime, onOpen }) {
   return (
     <button
       onClick={() => onOpen(item)}
@@ -150,7 +131,7 @@ function Row({ item, attempt, selected, striped, showTime, onOpen }) {
         selected ? 'bg-[#fff7ea]' : striped ? 'bg-[#f7f8fa] hover:bg-slate-100' : 'bg-white hover:bg-slate-100'
       }`}
     >
-      <span className="flex justify-center"><StatusIcon attempt={attempt} /></span>
+      <span className="flex justify-center"><SheetStatusIcon attempt={attempt} solvedOn={solvedOn} /></span>
       <span className="flex min-w-0 items-center gap-2">
         <span className="truncate text-[#262626] group-hover:text-[#007aff]">
           {item.number ? `${item.number}. ` : ''}{item.title}
@@ -171,7 +152,7 @@ function Row({ item, attempt, selected, striped, showTime, onOpen }) {
  * heading followed by its problems in priority order. Rows stripe across the
  * whole table, the way LeetCode's problem list does.
  */
-function ProblemTable({ groups, list, attempts, selectedSlug, onOpen }) {
+function ProblemTable({ groups, list, attempts, solved, selectedSlug, onOpen }) {
   let stripe = 0
   const showTime = groups.some(g => g.items.some(i => i.minutes))
   const cols = showTime ? TABLE_COLS.withTime : TABLE_COLS.noTime
@@ -185,7 +166,7 @@ function ProblemTable({ groups, list, attempts, selectedSlug, onOpen }) {
         {showTime && <span className="text-right">Time</span>}
       </div>
       {groups.map(group => {
-        const done = group.items.filter(i => attempts.has(i.slug)).length
+        const done = group.items.filter(i => attempts.has(i.slug) || solved.has(i.slug)).length
         return (
           <section key={group.pattern}>
             <div className="flex items-baseline gap-2 px-3 pb-1.5 pt-4">
@@ -198,6 +179,7 @@ function ProblemTable({ groups, list, attempts, selectedSlug, onOpen }) {
                 key={item.slug}
                 item={{ ...item, list, pattern: group.pattern }}
                 attempt={attempts.get(item.slug)}
+                solvedOn={solved.get(item.slug)}
                 selected={selectedSlug === item.slug}
                 striped={stripe++ % 2 === 1}
                 showTime={showTime}
@@ -319,6 +301,7 @@ export default function WorklistPage({ problems, revisions = [], practiceLog: lo
   const entry = sheetEntry(manifest, sheet?.id)
   const unseen = useMemo(() => attemptsSince(sheet, log), [sheet, log])
   const latestBySlug = useMemo(() => latestAttemptBySlug(sheet, log), [sheet, log])
+  const solved = useMemo(() => solvedSince(sheet, problems, revisions), [sheet, problems, revisions])
 
   const count = list => (sheet?.[list] || []).reduce((n, g) => n + g.items.length, 0)
   const activeTab = tab || 'roadmap'
@@ -465,7 +448,7 @@ export default function WorklistPage({ problems, revisions = [], practiceLog: lo
 
             {activeTab === 'roadmap' && (
               <section className="mt-4 rounded-[10px] border border-slate-200 bg-white px-4 py-4">
-                <Roadmap sheet={sheet} attempts={latestBySlug} selected={open?.slug} onOpen={setOpen} />
+                <Roadmap sheet={sheet} attempts={latestBySlug} solved={solved} selected={open?.slug} onOpen={setOpen} />
               </section>
             )}
 
@@ -480,6 +463,7 @@ export default function WorklistPage({ problems, revisions = [], practiceLog: lo
                 groups={groups}
                 list={activeTab}
                 attempts={latestBySlug}
+                solved={solved}
                 selectedSlug={open?.slug}
                 onOpen={setOpen}
               />
@@ -499,6 +483,7 @@ export default function WorklistPage({ problems, revisions = [], practiceLog: lo
           <SheetItemDetail
             item={open}
             attempts={log.filter(e => e.slug === open.slug)}
+            solvedOn={latestBySlug.has(open.slug) ? null : solved.get(open.slug)}
             onRecord={() => setRecording(open)}
           />
         </ProblemDrawer>

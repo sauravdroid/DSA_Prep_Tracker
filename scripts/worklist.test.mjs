@@ -22,6 +22,7 @@ import {
   sheetName,
   problemForest,
   packForest,
+  solvedSince,
 } from '../src/utils/worklist.js'
 
 const fixture = n => JSON.parse(readFileSync(new URL(`../fixtures/${n}`, import.meta.url)))
@@ -332,4 +333,32 @@ test('diff from nothing lists everything as added', () => {
   const d = diffWorklists(null, current)
   assert.equal(d.added.length, 5)
   assert.equal(d.removed.length, 0)
+})
+
+test('solvedSince: Accepted submissions on or after the day the sheet was written', () => {
+  const sheet = {
+    writtenAt: '2026-10-18T12:00:00Z',
+    revision: [{ pattern: 'Backtracking', items: [{ slug: 'subsets-ii' }, { slug: 'gas-station' }] }],
+    new: [{ pattern: 'Trees', items: [{ slug: 'fresh' }] }],
+  }
+  const problems = {
+    'subsets-ii': { dateSolved: '2026-03-27' },
+    fresh: { dateSolved: '2026-10-19' },
+    'not-on-sheet': { dateSolved: '2026-10-19' },
+  }
+  const revisions = [
+    { slug: 'subsets-ii', date: '2026-07-06' },
+    { slug: 'subsets-ii', date: '2026-10-18' },
+    { slug: 'gas-station', date: '2026-10-17' },
+    { slug: 'not-on-sheet', date: '2026-10-18' },
+  ]
+  const solved = solvedSince(sheet, problems, revisions)
+  assert.deepEqual([...solved.entries()].sort(), [['fresh', '2026-10-19'], ['subsets-ii', '2026-10-18']])
+})
+
+test('solvedSince: the latest date wins and a sheet without writtenAt has nothing solved', () => {
+  const sheet = { writtenAt: '2026-10-18T12:00:00Z', revision: [{ pattern: 'P', items: [{ slug: 'a' }] }], new: [] }
+  const solved = solvedSince(sheet, {}, [{ slug: 'a', date: '2026-10-20' }, { slug: 'a', date: '2026-10-19' }])
+  assert.equal(solved.get('a'), '2026-10-20')
+  assert.equal(solvedSince({ revision: [] }, {}, [{ slug: 'a', date: '2026-10-20' }]).size, 0)
 })

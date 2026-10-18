@@ -4,6 +4,8 @@
  * recorded since the coach last looked. Nothing here decides what to do next.
  */
 
+import { toLocalDateStr } from './dateUtils.js'
+
 export const LISTS = ['new', 'revision']
 export const LIST_LABEL = { new: 'New', revision: 'Revision' }
 export const DEFAULT_MODE = { new: 'learn', revision: 'cold' }
@@ -196,6 +198,25 @@ export function latestAttemptBySlug(worklist, practiceLog = []) {
   for (const e of attemptsSince(worklist, practiceLog)) {
     if (!map.has(e.slug)) map.set(e.slug, e)
   }
+  return map
+}
+
+/**
+ * Problems on the sheet with an Accepted LeetCode submission (a first solve
+ * or a revision) since the coach wrote it, as slug → latest date. Submissions
+ * are kept by day only, so a solve earlier that same day also counts.
+ */
+export function solvedSince(worklist, problems = {}, revisions = []) {
+  const map = new Map()
+  if (!worklist?.writtenAt) return map
+  const since = toLocalDateStr(worklist.writtenAt)
+  const onSheet = new Set(flattenItems(worklist).map(i => i.slug))
+  const note = (slug, date) => {
+    if (!onSheet.has(slug) || !date || date < since) return
+    if (!map.has(slug) || date > map.get(slug)) map.set(slug, date)
+  }
+  for (const [slug, p] of Object.entries(problems)) note(slug, p?.dateSolved)
+  for (const r of revisions) note(r.slug, r.date)
   return map
 }
 
