@@ -18,12 +18,13 @@ application code.
 
 | Party | Owns |
 | --- | --- |
-| Application | Practice facts: recording attempts and publishing them. Rendering the current prep sheet exactly as written, and any earlier sheet on request. Checking that a published sheet is valid and kept to its paths |
-| Coach | Every decision about what to do: which problems, which list, which pattern, what order, when to repair, when to retest, when an item comes off. The reasoning and explanation |
+| Application | Practice facts: recording attempts and publishing them. Rendering the current prep sheet exactly as written, and any other sheet on request. Checking that a published sheet is valid and kept to its paths |
+| Coach | Every decision about what to do: which problems, which list, which pattern, what order, when to repair, when to retest, when an item comes off. Creating, updating and archiving sheets. The reasoning and explanation |
 
 The coach cannot manufacture attempts or override recorded evidence. The
-application makes no learning judgements. It computes no plan, due date, debt
-or branch, and it never makes a sheet current before the user has reviewed it.
+application makes no learning judgements and never edits a sheet. It computes
+no plan, due date, debt or branch, and it never applies a sheet change before
+the user has reviewed it.
 
 ## What counts as evidence
 
@@ -107,27 +108,34 @@ whatever span the user is planning for, sized to their capacity over that span.
 ## Authoring a prep sheet
 
 Write against [`schemas/worklist.schema.json`](../schemas/worklist.schema.json),
-and update [`schemas/worklist-manifest.schema.json`](../schemas/worklist-manifest.schema.json)
+and keep `coaching/worklists/manifest.json` in step, against
+[`schemas/worklist-manifest.schema.json`](../schemas/worklist-manifest.schema.json),
 in the same commit. A sheet has a `name`, a `summary`, and `new` and
 `revision` problems grouped by pattern in priority order; each problem's
-`after` links shape the problem roadmap. Worked examples:
+`after` links shape the problem roadmap. The coach creates a sheet, updates it
+by overwriting its file, and archives it in the manifest; it never deletes
+one. Worked examples:
 - [`fixtures/worklist.example.json`](../fixtures/worklist.example.json)
 - [`fixtures/worklist.migrated.example.json`](../fixtures/worklist.migrated.example.json)
 - [`fixtures/worklist-manifest.example.json`](../fixtures/worklist-manifest.example.json)
 
-Rules the app enforces before it lets the user accept a version:
+Rules the app enforces before it lets the user apply a change:
 
-- The version and the manifest are schema-valid.
-- `id` is `writtenAt` without punctuation.
+- The sheet and the manifest are schema-valid.
+- `id` matches `createdAt`, or `writtenAt` on a sheet never updated; the
+  manifest's `updatedAt` equals the sheet's `writtenAt`.
 - No problem appears twice, and no pattern name repeats within a list.
 - Every `after` link names a problem on the same sheet, and the links form no
   cycle.
-- The publishing commit touched only `coaching/worklists/`.
-- The commit added version files without editing or deleting any.
-- The version the user currently follows still has the content they accepted.
+- `current` is listed and not archived.
+- The publishing commit touched only `coaching/worklists/` and deleted or
+  renamed nothing.
+- Every sheet the user has already seen is still listed in the manifest.
 
-The app works out what changed between versions on its own. A version's
-`changes` supplies the reasons it shows; it cannot hide a change.
+The app works out what changed on its own: against the user's copy of an
+updated sheet, or against their current sheet when the coach recommends a
+different one. A sheet's `changes` supplies the reasons it shows; it cannot
+hide a change.
 
 ## Legacy coaching files
 

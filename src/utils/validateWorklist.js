@@ -17,8 +17,14 @@ const manifestSchema = load('worklist-manifest.schema.json')
 const ajv = new Ajv2020({ allErrors: true, strict: false })
 addFormats(ajv)
 ajv.addSchema(worklistSchema)
+ajv.addSchema(manifestSchema)
 const checkWorklist = ajv.getSchema(worklistSchema.$id)
-const checkManifest = ajv.compile(manifestSchema)
+// Checked against the branch its version names, so an error reads as one
+// sentence instead of a failed oneOf across both formats.
+const checkManifest = {
+  1: ajv.getSchema(`${manifestSchema.$id}#/$defs/v1`),
+  2: ajv.getSchema(`${manifestSchema.$id}#/$defs/v2`),
+}
 
 export const WORKLIST_DIR = 'coaching/worklists/'
 export const WORKLIST_MANIFEST = 'coaching/worklists/manifest.json'
@@ -27,10 +33,14 @@ const schemaErrors = errs => (errs || []).map(e => `${e.instancePath || '/'} ${e
 
 function worklistSemantics(w) {
   const errors = []
-  if (w.writtenAt && idFromWrittenAt(w.writtenAt) !== w.id) {
-    errors.push(`id ${w.id} does not match writtenAt ${w.writtenAt}.`)
+  const created = w.createdAt || w.writtenAt
+  if (created && idFromWrittenAt(created) !== w.id) {
+    errors.push(w.createdAt
+      ? `id ${w.id} does not match createdAt ${w.createdAt}.`
+      : `id ${w.id} does not match writtenAt ${w.writtenAt}; an updated sheet needs createdAt.`)
   }
-  if (w.replaces && w.replaces === w.id) errors.push('A version cannot replace itself.')
+  if (w.createdAt && w.writtenAt && w.writtenAt < w.createdAt) errors.push('writtenAt is earlier than createdAt.')
+  if (w.replaces && w.replaces === w.id) errors.push('A sheet cannot be started from itself.')
 
   const listOf = new Map()
   for (const list of ['new', 'revision']) {
@@ -131,23 +141,38 @@ export function validateWorklistManifest(m) {
   if (!m || typeof m !== 'object' || Array.isArray(m)) {
     return { valid: false, errors: ['The manifest must be a JSON object.'] }
   }
+  const check = checkManifest[m.manifestVersion]
+  if (!check) return { valid: false, errors: [`Unsupported manifestVersion ${m.manifestVersion}.`] }
   const errors = []
-  if (!checkManifest(m)) errors.push(...schemaErrors(checkManifest.errors))
+  if (!check(m)) errors.push(...schemaErrors(check.errors))
 
-  const ids = (m.versions || []).map(v => v.id)
-  if (new Set(ids).size !== ids.length) errors.push('A version id is listed twice.')
-  if (ids.some((id, i) => i > 0 && id < ids[i - 1])) errors.push('Versions must be listed oldest first.')
-  for (const v of m.versions || []) {
+  const entries = m.manifestVersion === 2 ? m.sheets || [] : m.versions || []
+  const ids = entries.map(v => v.id)
+  if (new Set(ids).size !== ids.length) errors.push('A sheet id is listed twice.')
+  if (ids.some((id, i) => i > 0 && id < ids[i - 1])) errors.push('Sheets must be listed oldest first.')
+  for (const v of entries) {
     if (v.id && v.path && v.path !== worklistPath(v.id)) errors.push(`${v.id}: path should be ${worklistPath(v.id)}.`)
   }
-  if (m.latest && !ids.includes(m.latest)) errors.push(`latest ${m.latest} is not in versions.`)
+
+  if (m.manifestVersion === 2) {
+    const current = entries.find(s => s.id === m.current)
+    if (m.current && !current) errors.push(`current ${m.current} is not in sheets.`)
+    if (current?.archived) errors.push(`current ${m.current} is archived.`)
+    for (const s of entries) {
+      if (s.createdAt && idFromWrittenAt(s.createdAt) !== s.id) errors.push(`${s.id}: createdAt does not match the id.`)
+      if (s.archivedAt && !s.archived) errors.push(`${s.id}: archivedAt is set but the sheet is not archived.`)
+    }
+  } else if (m.latest && !ids.includes(m.latest)) {
+    errors.push(`latest ${m.latest} is not in versions.`)
+  }
   return { valid: errors.length === 0, errors: [...new Set(errors)] }
 }
 
 /**
  * Whether a publishing commit kept to the rules: only coaching/worklists/,
- * and no published version edited or deleted. `files` is the GitHub commit
- * API's list, with `filename` and `status`.
+ * and no sheet file deleted or renamed (archive instead). Updating a sheet
+ * by overwriting its file is allowed. `files` is the GitHub commit API's
+ * list, with `filename` and `status`.
  */
 export function worklistCommitProblems(files = []) {
   const problems = []
@@ -155,11 +180,23 @@ export function worklistCommitProblems(files = []) {
     const name = f.filename || ''
     if (!name.startsWith(WORKLIST_DIR)) {
       problems.push(`Also changed ${name}, outside ${WORKLIST_DIR}.`)
-    } else if (name !== WORKLIST_MANIFEST && f.status !== 'added') {
-      problems.push(`${f.status === 'removed' ? 'Deleted' : 'Changed'} the published version ${name}.`)
+    } else if (f.status === 'removed') {
+      problems.push(`Deleted ${name}. Archive a sheet instead of deleting it.`)
+    } else if (f.status === 'renamed') {
+      problems.push(`Renamed ${name}. A sheet keeps its file for life.`)
     }
   }
   return problems
+}
+
+/**
+ * Sheets the user has seen that the new manifest no longer lists. Entries are
+ * never removed, only archived, so a missing one means a broken manifest.
+ */
+export function droppedSheets(previous, next) {
+  const before = (previous?.sheets || previous?.versions || []).map(s => s.id)
+  const after = new Set((next?.sheets || next?.versions || []).map(s => s.id))
+  return before.filter(id => !after.has(id))
 }
 
 // Keys sorted, arrays kept in order: the coach's ordering is content here.

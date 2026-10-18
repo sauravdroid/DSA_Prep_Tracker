@@ -120,20 +120,20 @@ export function pullDays(dates) {
 
 /* ---------- Worklist ---------- */
 
-/** The latest version id upstream. Cheap: one manifest read. */
+/** The current sheet upstream and when it was last updated. Cheap: one manifest read. */
 export function worklistLatest() {
   return call('/worklist/latest', { repo: getRepo() })
 }
 
 /**
- * One version with its manifest, validation result, publishing-commit checks
- * and content hash, all read at a single commit. `id` defaults to latest.
- * Passing the accepted version lets the server confirm it was not rewritten.
+ * One sheet with its manifest, validation result, publishing-commit checks
+ * and content hash, all read at a single commit. `id` defaults to the current
+ * sheet. `knownSheets` lets the server confirm none were removed.
  */
-export function worklistPreview({ id, acceptedId, acceptedHash } = {}) {
+export function worklistPreview({ id, knownSheets } = {}) {
   return call('/worklist/preview', {
     repo: getRepo(),
     ...(id ? { id } : {}),
-    ...(acceptedId ? { acceptedId, acceptedHash } : {}),
+    ...(knownSheets?.length ? { knownSheets } : {}),
   })
 }

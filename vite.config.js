@@ -13,7 +13,7 @@ import { dayPath, dayEntry, linkDays, daysFromDecisions } from './src/utils/days
 import { rollupsFor } from './src/utils/rollups.js'
 import { sealReason, sealOutcome, outcomePath, summariseOutcome, OUTCOME_VERSION, outcomeDrift } from './src/utils/outcomes.js'
 import { validateWorklist, validateWorklistManifest, worklistCommitProblems, worklistHash, WORKLIST_MANIFEST } from './src/utils/validateWorklist.js'
-import { worklistPath } from './src/utils/worklist.js'
+import { worklistPath, normalizeManifest } from './src/utils/worklist.js'
 
 const DATA_DIR = 'data'
 const DATA_FILE = 'tracker-data.json'
@@ -277,9 +277,9 @@ function githubSync() {
     const decodeContent = r => JSON.parse(Buffer.from(r.body.content || '', 'base64').toString('utf8'))
 
     try {
-      // --- Worklist. Read-only: the coach publishes, the app reviews and
-      // accepts. Everything is read at one commit, so the manifest, the
-      // version and the checks all describe the same snapshot.
+      // --- Prep sheets. Read-only: the coach publishes, the app reviews and
+      // applies. Everything is read at one commit, so the manifest, the sheet
+      // and the checks all describe the same snapshot.
       if (url === '/worklist/latest' || url === '/worklist/preview') {
         const head = await gh(token, 'GET', `/repos/${repo}/git/ref/heads/${BRANCH}`)
         if (head.status !== 200) return send(res, head.status, { error: head.body?.message || `Cannot read ${BRANCH}` })
@@ -294,27 +294,32 @@ function githubSync() {
         try {
           manifest = decodeContent(m)
         } catch (e) {
-          return send(res, 422, { error: `The worklist manifest is not valid JSON: ${e.message}` })
+          return send(res, 422, { error: `The sheet manifest is not valid JSON: ${e.message}` })
         }
         const manifestCheck = validateWorklistManifest(manifest)
+        const sheets = normalizeManifest(manifest)?.sheets || []
+        const currentId = normalizeManifest(manifest)?.current || null
 
         if (url === '/worklist/latest') {
+          const entry = sheets.find(s => s.id === currentId) || null
           return send(res, 200, {
             empty: false,
             commit,
-            latest: manifest.latest || null,
-            count: (manifest.versions || []).length,
+            current: currentId,
+            currentName: entry?.name || null,
+            currentUpdatedAt: entry?.updatedAt || null,
+            count: sheets.filter(s => !s.archived).length,
             valid: manifestCheck.valid,
           })
         }
 
-        const id = (body.id || manifest.latest || '').trim()
+        const id = (body.id || currentId || '').trim()
         const errors = manifestCheck.errors.map(e => `Manifest: ${e}`)
-        const listed = (manifest.versions || []).find(v => v.id === id)
-        if (!listed) errors.push(`Version ${id || '(none)'} is not listed in the manifest.`)
+        const entry = sheets.find(s => s.id === id) || null
+        if (!entry) errors.push(`Sheet ${id || '(none)'} is not listed in the manifest.`)
 
         let version = null
-        if (listed) {
+        if (entry) {
           const v = await gh(token, 'GET', at(worklistPath(id)))
           if (v.status !== 200) {
             errors.push(`${worklistPath(id)} could not be read (${v.status}).`)
@@ -326,13 +331,16 @@ function githubSync() {
             }
             if (version) {
               errors.push(...validateWorklist(version).errors)
-              if (version.id !== id) errors.push(`The file for ${id} holds version ${version.id}.`)
+              if (version.id !== id) errors.push(`The file for ${id} holds sheet ${version.id}.`)
+              if (manifest.manifestVersion === 2 && entry.updatedAt !== version.writtenAt) {
+                errors.push(`Manifest says ${id} was updated at ${entry.updatedAt}, but the sheet says ${version.writtenAt}. Update both together.`)
+              }
             }
           }
         }
 
-        // The commit that last touched the worklists must have kept to them,
-        // and must not have rewritten a published version.
+        // The commit that last touched the sheets must have kept to them, and
+        // must not have deleted or renamed a sheet file.
         let authored = null
         const problems = []
         const log = await gh(token, 'GET', `/repos/${repo}/commits?path=${encodeURIComponent('coaching/worklists')}&sha=${commit}&per_page=1`)
@@ -349,22 +357,12 @@ function githubSync() {
           if (detail.status === 200) problems.push(...worklistCommitProblems(detail.body?.files))
         }
 
-        // A version already accepted here must still read the same upstream;
-        // append-only is only worth something if it is checked.
-        const acceptedId = (body.acceptedId || '').trim()
-        if (acceptedId && body.acceptedHash && acceptedId !== id) {
-          const prior = await gh(token, 'GET', at(worklistPath(acceptedId)))
-          if (prior.status === 404) {
-            problems.push(`The version you follow (${acceptedId}) has been deleted upstream.`)
-          } else if (prior.status === 200) {
-            try {
-              if (worklistHash(decodeContent(prior)) !== body.acceptedHash) {
-                problems.push(`The version you follow (${acceptedId}) was edited after you accepted it.`)
-              }
-            } catch {
-              problems.push(`The version you follow (${acceptedId}) is no longer valid JSON.`)
-            }
-          }
+        // Sheets are archived, never removed, so one the user has already
+        // seen must still be listed.
+        const known = Array.isArray(body.knownSheets) ? body.knownSheets : []
+        const listedIds = new Set(sheets.map(s => s.id))
+        for (const k of known) {
+          if (!listedIds.has(k)) problems.push(`Sheet ${k} was removed from the manifest. Sheets must be archived, not removed.`)
         }
 
         return send(res, 200, {
@@ -373,6 +371,7 @@ function githubSync() {
           shortCommit: commit.slice(0, 7),
           authored,
           id,
+          entry,
           manifest,
           version,
           hash: version ? worklistHash(version) : null,

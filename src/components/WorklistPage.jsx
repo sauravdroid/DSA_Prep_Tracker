@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import {
-  LIST_LABEL, versionNumber, attemptsSince, latestAttemptBySlug, itemMode, sheetName,
+  LIST_LABEL, normalizeManifest, sheetEntry, attemptsSince, latestAttemptBySlug, itemMode, sheetName,
 } from '../utils/worklist'
 import { loadAccepted } from '../utils/worklistStore'
 import { subscribeSync } from '../utils/autoSync'
@@ -16,11 +16,6 @@ const DIFF_TONE = { Easy: 'text-[#00b8a3]', Medium: 'text-[#ffb800]', Hard: 'tex
 function shortDate(iso) {
   if (!iso) return ''
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
-function idDate(id) {
-  const m = /^(\d{4})(\d{2})(\d{2})T/.exec(id || '')
-  return m ? new Date(`${m[1]}-${m[2]}-${m[3]}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''
 }
 
 /** Filled when you have recorded an attempt the coach has not seen yet. */
@@ -56,16 +51,37 @@ function SyncButton({ onClick, available }) {
       Sync
       {available && (
         <span className="rounded-full bg-[#ffa116] px-1.5 py-px text-[10px] font-bold text-white">
-          {available.number ? `v${available.number}` : 'new'}
+          {available.kind === 'updated' ? 'updated' : 'new'}
         </span>
       )}
     </button>
   )
 }
 
-/** Every sheet the coach has published, newest first. */
+function PickerRow({ sheet, currentId, shownId, onPick }) {
+  return (
+    <button
+      onClick={() => onPick(sheet.id)}
+      className={`flex w-full items-start gap-3 border-0 bg-transparent px-3.5 py-2.5 text-left hover:bg-slate-50 ${sheet.id === shownId ? 'bg-slate-50' : ''}`}
+    >
+      <span className="min-w-0 flex-1">
+        <span className={`block truncate text-sm font-medium ${sheet.archived ? 'text-slate-500' : 'text-slate-900'}`}>{sheet.label}</span>
+        <span className="block truncate text-xs text-slate-500">
+          {sheet.updatedAt && sheet.updatedAt !== sheet.createdAt
+            ? `Updated ${shortDate(sheet.updatedAt)}`
+            : `Created ${shortDate(sheet.createdAt)}`}
+          {sheet.summary ? ` · ${sheet.summary}` : ''}
+        </span>
+      </span>
+      {sheet.id === currentId && <span className="mt-0.5 shrink-0 text-[10px] font-bold uppercase text-emerald-600">yours</span>}
+    </button>
+  )
+}
+
+/** Every sheet the coach has published, newest first; archived ones apart. */
 function SheetPicker({ manifest, currentId, shownId, onPick }) {
   const [open, setOpen] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
   const ref = useRef(null)
 
   useEffect(() => {
@@ -77,7 +93,10 @@ function SheetPicker({ manifest, currentId, shownId, onPick }) {
     return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey) }
   }, [open])
 
-  const versions = [...(manifest?.versions || [])].map((v, i) => ({ ...v, number: i + 1 })).reverse()
+  const all = (normalizeManifest(manifest)?.sheets || []).map((s, i) => ({ ...s, label: s.name || `Sheet ${i + 1}` })).reverse()
+  const active = all.filter(s => !s.archived)
+  const archived = all.filter(s => s.archived)
+  const pick = id => { setOpen(false); onPick(id) }
 
   return (
     <div ref={ref} className="relative">
@@ -87,33 +106,29 @@ function SheetPicker({ manifest, currentId, shownId, onPick }) {
         className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
       >
         All sheets
-        <span className="text-xs text-slate-400">{versions.length}</span>
+        <span className="text-xs text-slate-400">{active.length}</span>
         <svg viewBox="0 0 12 12" className="size-3 text-slate-400" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
       </button>
       {open && (
         <div className="absolute right-0 z-30 mt-1.5 w-[22rem] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-          <div className="max-h-80 overflow-y-auto py-1">
-            {versions.map(v => (
-              <button
-                key={v.id}
-                onClick={() => { setOpen(false); onPick(v.id) }}
-                className={`flex w-full items-start gap-3 border-0 bg-transparent px-3.5 py-2.5 text-left hover:bg-slate-50 ${v.id === shownId ? 'bg-slate-50' : ''}`}
-              >
-                <span className={`mt-0.5 shrink-0 rounded px-1.5 py-px font-mono text-[11px] ${v.id === currentId ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                  v{v.number}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-slate-900">{v.name || `Sheet ${v.number}`}</span>
-                  <span className="block truncate text-xs text-slate-500">
-                    {idDate(v.id)}{v.summary ? ` · ${v.summary}` : ''}
-                  </span>
-                </span>
-                {v.id === currentId && <span className="mt-0.5 shrink-0 text-[10px] font-bold uppercase text-emerald-600">current</span>}
-              </button>
-            ))}
+          <div className="max-h-96 overflow-y-auto py-1">
+            {active.map(s => <PickerRow key={s.id} sheet={s} currentId={currentId} shownId={shownId} onPick={pick} />)}
+            {active.length === 0 && <p className="px-3.5 py-2.5 text-xs text-slate-400">No active sheets.</p>}
+            {archived.length > 0 && (
+              <>
+                <button
+                  onClick={() => setShowArchived(a => !a)}
+                  className="flex w-full items-center gap-1.5 border-0 border-t border-slate-100 bg-transparent px-3.5 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-600"
+                >
+                  Archived · {archived.length}
+                  <svg viewBox="0 0 12 12" className={`size-3 transition ${showArchived ? 'rotate-180' : ''}`} aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                </button>
+                {showArchived && archived.map(s => <PickerRow key={s.id} sheet={s} currentId={currentId} shownId={shownId} onPick={pick} />)}
+              </>
+            )}
           </div>
           <p className="border-t border-slate-100 bg-slate-50 px-3.5 py-2 text-[11px] text-slate-500">
-            Sync to see sheets published since you last looked.
+            The coach creates, updates and archives sheets. Sync to see its latest changes.
           </p>
         </div>
       )}
@@ -213,7 +228,7 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
   const current = accepted?.version || null
   const sheet = viewing?.version || current
   const manifest = latestManifest || viewing?.manifest || accepted?.manifest
-  const number = versionNumber(manifest, sheet?.id)
+  const entry = sheetEntry(manifest, sheet?.id)
   const unseen = useMemo(() => attemptsSince(sheet, log), [sheet, log])
   const latestBySlug = useMemo(() => latestAttemptBySlug(sheet, log), [sheet, log])
 
@@ -263,15 +278,18 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               Prep sheet
-              {number && <span className="normal-case"> · v{number}</span>}
-              {viewing && !viewing.loading ? ' · older sheet' : ''}
+              {viewing && !viewing.loading && (entry?.archived ? ' · archived' : ' · not your current sheet')}
             </p>
             <h1 className="mt-0.5 truncate text-[22px] font-bold tracking-tight text-slate-900">
-              {sheet ? sheetName(sheet, number) : 'Prep sheet'}
+              {sheet ? sheetName(sheet, manifest) : 'Prep sheet'}
             </h1>
             {sheet && (
               <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-slate-500">
-                <span>By coach, {shortDate(sheet.writtenAt)}</span>
+                <span>
+                  {sheet.createdAt && sheet.createdAt !== sheet.writtenAt
+                    ? `By coach, ${shortDate(sheet.createdAt)} · updated ${shortDate(sheet.writtenAt)}`
+                    : `By coach, ${shortDate(sheet.writtenAt)}`}
+                </span>
                 <span className="size-[3px] rounded-full bg-slate-300" aria-hidden="true" />
                 <span>based on {sheet.basedOn?.attempts ?? '?'} attempts</span>
                 {!viewing && unseen.length > 0 && (
@@ -292,7 +310,11 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
         {viewing && (
           <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg bg-slate-900 px-4 py-2.5 text-[13px] text-white">
             <span className="flex-1">
-              {viewing.loading ? 'Opening sheet…' : "You're looking at an older sheet. Your current sheet is unchanged."}
+              {viewing.loading
+                ? 'Opening sheet…'
+                : entry?.archived
+                  ? 'The coach archived this sheet. Your current sheet is unchanged.'
+                  : "You're looking at another sheet. Your current sheet is unchanged."}
             </span>
             {!viewing.loading && (
               <button onClick={() => setReviewing({ id: viewing.id })} className="rounded-md bg-white/10 px-3 py-1 text-xs font-semibold hover:bg-white/20">
@@ -302,6 +324,12 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
             <button onClick={() => pick(current?.id)} className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-slate-900 hover:bg-slate-100">
               Back to current
             </button>
+          </div>
+        )}
+
+        {!viewing && entry?.archived && (
+          <div className="mt-4 rounded-lg bg-amber-50 px-4 py-2.5 text-[13px] text-amber-900 ring-1 ring-amber-200">
+            The coach has archived this sheet. Pick another under <strong>All sheets</strong>, or Sync to see what it recommends now.
           </div>
         )}
 
@@ -430,7 +458,7 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
             setReviewing(null)
             setViewing(null)
             setTab(null)
-                    setNotice({ tone: 'ok', text: `“${sheetName(record.version, record.source?.number)}” is now your current sheet.` })
+                    setNotice({ tone: 'ok', text: `“${sheetName(record.version, record.manifest)}” is now your current sheet.` })
           }}
         />
       )}

@@ -7,10 +7,12 @@ import {
   validateWorklistManifest,
   worklistCommitProblems,
   worklistHash,
+  droppedSheets,
 } from '../src/utils/validateWorklist.js'
 import {
   idFromWrittenAt,
-  versionNumber,
+  normalizeManifest,
+  sheetEntry,
   flattenItems,
   itemMode,
   attemptsSince,
@@ -46,10 +48,18 @@ test('a non-object is rejected', () => {
   }
 })
 
-test('id must match writtenAt', () => {
+test('id is fixed at creation: it matches createdAt, or writtenAt on a sheet never updated', () => {
   const w = clone(current)
   w.id = '20260302T090001Z'
-  assert.match(validateWorklist(w).errors.join(' '), /does not match writtenAt/)
+  assert.match(validateWorklist(w).errors.join(' '), /does not match writtenAt .*; an updated sheet needs createdAt/)
+
+  const updated = clone(current)
+  updated.createdAt = updated.writtenAt
+  updated.writtenAt = '2026-03-05T10:00:00Z'
+  assert.ok(validateWorklist(updated).valid, validateWorklist(updated).errors.join('; '))
+
+  updated.writtenAt = '2026-03-01T00:00:00Z'
+  assert.match(validateWorklist(updated).errors.join(' '), /earlier than createdAt/)
 })
 
 test('a problem cannot be in both lists', () => {
@@ -82,31 +92,70 @@ test('both lists may be empty', () => {
   assert.ok(validateWorklist(w).valid)
 })
 
-test('manifest: latest must be listed, ids ordered, paths derived from ids', () => {
+test('manifest: current must be listed and not archived; ids ordered; paths derived from ids', () => {
   const m = clone(manifest)
-  m.latest = '20990101T000000Z'
-  m.versions.reverse()
-  m.versions[0].path = 'coaching/worklists/other.json'
-  const errs = validateWorklistManifest(m).errors.join(' ')
-  assert.match(errs, /latest .* is not in versions/)
+  m.current = '20990101T000000Z'
+  m.sheets.reverse()
+  m.sheets[0].path = 'coaching/worklists/other.json'
+  let errs = validateWorklistManifest(m).errors.join(' ')
+  assert.match(errs, /current .* is not in sheets/)
   assert.match(errs, /oldest first/)
+
+  const archivedCurrent = clone(manifest)
+  archivedCurrent.current = '20260227T183000Z'
+  errs = validateWorklistManifest(archivedCurrent).errors.join(' ')
+  assert.match(errs, /current 20260227T183000Z is archived/)
+
+  const stray = clone(manifest)
+  stray.sheets[1].archivedAt = '2026-03-03T00:00:00Z'
+  assert.match(validateWorklistManifest(stray).errors.join(' '), /archivedAt is set but the sheet is not archived/)
 })
 
-test('commit check: only coaching/worklists/, and published versions are never touched', () => {
+const LEGACY_MANIFEST = {
+  manifestVersion: 1,
+  latest: '20260302T090000Z',
+  versions: [
+    { id: '20260227T183000Z', path: 'coaching/worklists/20260227T183000Z.json', writtenAt: '2026-02-27T18:30:00Z', replaces: null, migrated: true },
+    { id: '20260302T090000Z', path: 'coaching/worklists/20260302T090000Z.json', writtenAt: '2026-03-02T09:00:00Z', replaces: '20260227T183000Z', name: 'Stack repair' },
+  ],
+}
+
+test('manifest: version 1 is still read, and normalises to sheets', () => {
+  assert.ok(validateWorklistManifest(LEGACY_MANIFEST).valid)
+  const n = normalizeManifest(LEGACY_MANIFEST)
+  assert.equal(n.current, '20260302T090000Z')
+  assert.deepEqual(n.sheets.map(s => [s.id, s.updatedAt, !!s.archived]), [
+    ['20260227T183000Z', '2026-02-27T18:30:00Z', false],
+    ['20260302T090000Z', '2026-03-02T09:00:00Z', false],
+  ])
+  assert.equal(normalizeManifest(manifest), manifest)
+  assert.equal(sheetEntry(LEGACY_MANIFEST, '20260302T090000Z').name, 'Stack repair')
+  assert.equal(validateWorklistManifest({ manifestVersion: 3 }).valid, false)
+})
+
+test('manifest: a sheet the user has seen may be archived but never dropped', () => {
+  assert.deepEqual(droppedSheets(LEGACY_MANIFEST, manifest), [])
+  const dropped = clone(manifest)
+  dropped.sheets.shift()
+  assert.deepEqual(droppedSheets(manifest, dropped), ['20260227T183000Z'])
+})
+
+test('commit check: only coaching/worklists/; sheets may be added or updated, never deleted or renamed', () => {
   assert.deepEqual(worklistCommitProblems([
     { filename: 'coaching/worklists/20260302T090000Z.json', status: 'added' },
+    { filename: 'coaching/worklists/20260227T183000Z.json', status: 'modified' },
     { filename: 'coaching/worklists/manifest.json', status: 'modified' },
   ]), [])
 
   const problems = worklistCommitProblems([
     { filename: 'tracker-data.json', status: 'modified' },
-    { filename: 'coaching/worklists/20260227T183000Z.json', status: 'modified' },
     { filename: 'coaching/worklists/20260101T000000Z.json', status: 'removed' },
+    { filename: 'coaching/worklists/20260102T000000Z.json', status: 'renamed' },
   ])
   assert.equal(problems.length, 3)
   assert.match(problems[0], /outside coaching\/worklists/)
-  assert.match(problems[1], /Changed the published version/)
-  assert.match(problems[2], /Deleted the published version/)
+  assert.match(problems[1], /Archive a sheet instead of deleting it/)
+  assert.match(problems[2], /keeps its file for life/)
 })
 
 test('hash ignores key order and whitespace but not item order', () => {
@@ -126,12 +175,10 @@ test('hash ignores key order and whitespace but not item order', () => {
 
 /* ---------- Rendering helpers ---------- */
 
-test('ids derive from writtenAt; version numbers from manifest order', () => {
+test('ids derive from a timestamp', () => {
   assert.equal(idFromWrittenAt('2026-10-17T21:20:00Z'), '20261017T212000Z')
   assert.equal(idFromWrittenAt('2026-10-17T21:20:00.123Z'), '20261017T212000Z')
   assert.equal(idFromWrittenAt('2026-10-17'), null)
-  assert.equal(versionNumber(manifest, '20260302T090000Z'), 2)
-  assert.equal(versionNumber(manifest, 'nope'), null)
 })
 
 test('items flatten with their list and pattern; mode defaults by list', () => {
@@ -223,8 +270,10 @@ test('legacy roadmap: every pattern on the lists must be on the roadmap', () => 
 
 test('a sheet without a roadmap, name or summary is still valid', () => {
   assert.ok(validateWorklist(migrated).valid)
-  assert.equal(sheetName(migrated, 1), 'Sheet 1')
-  assert.equal(sheetName(current, 2), 'Stack repair, then Intervals')
+  assert.equal(sheetName(migrated, manifest), 'Migrated dated plans')
+  assert.equal(sheetName(migrated, LEGACY_MANIFEST), 'Sheet 1')
+  assert.equal(sheetName(migrated, null), 'Untitled sheet')
+  assert.equal(sheetName(current, manifest), 'Stack repair, then Intervals')
 })
 
 test('"after" must name problems on the sheet and must not loop', () => {

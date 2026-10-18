@@ -1,33 +1,71 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/sauravdroid/DSA_Prep_Tracker/schemas/worklist-manifest.schema.json",
-  "title": "Worklist manifest",
-  "description": "coaching/worklists/manifest.json. Names the latest worklist version and lists every version ever published. Versions are append-only: the coach adds a version file and updates this manifest in the same commit, and never edits or deletes an earlier version.",
-  "type": "object",
-  "required": ["manifestVersion", "latest", "versions"],
-  "additionalProperties": false,
-  "properties": {
-    "$schema": { "type": "string" },
-    "manifestVersion": { "const": 1 },
-    "latest": { "$ref": "worklist.schema.json#/$defs/versionId" },
-    "versions": {
-      "type": "array",
-      "minItems": 1,
-      "description": "Oldest first.",
-      "items": {
-        "type": "object",
-        "required": ["id", "path", "writtenAt"],
-        "additionalProperties": false,
-        "properties": {
-          "id": { "$ref": "worklist.schema.json#/$defs/versionId" },
-          "path": { "type": "string", "pattern": "^coaching/worklists/\\d{8}T\\d{6}Z\\.json$" },
-          "writtenAt": { "type": "string", "format": "date-time" },
-          "replaces": {
-            "oneOf": [{ "$ref": "worklist.schema.json#/$defs/versionId" }, { "type": "null" }]
-          },
-          "name": { "type": "string", "maxLength": 80, "description": "The sheet's name, repeated here so sheets can be listed without fetching each one." },
-          "summary": { "type": "string", "maxLength": 200 },
-          "migrated": { "type": "boolean", "description": "Generated from legacy coaching files rather than written by the coach." }
+  "title": "Prep sheet manifest",
+  "description": "coaching/worklists/manifest.json. Lists every prep sheet and names the current one. Version 2 is what the coach writes: a sheet is created once, updated by overwriting its file, and archived rather than deleted. Version 1 (a list of immutable versions) is still read so older records stay valid.",
+  "oneOf": [{ "$ref": "#/$defs/v2" }, { "$ref": "#/$defs/v1" }],
+  "$defs": {
+    "path": { "type": "string", "pattern": "^coaching/worklists/\\d{8}T\\d{6}Z\\.json$" },
+    "v2": {
+      "type": "object",
+      "required": ["manifestVersion", "current", "sheets"],
+      "additionalProperties": false,
+      "properties": {
+        "$schema": { "type": "string" },
+        "manifestVersion": { "const": 2 },
+        "current": {
+          "$ref": "worklist.schema.json#/$defs/versionId",
+          "description": "The sheet the coach recommends working from. Must be listed and not archived."
+        },
+        "sheets": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Every sheet ever created, oldest first. Entries are never removed; archive instead.",
+          "items": {
+            "type": "object",
+            "required": ["id", "path", "name", "createdAt", "updatedAt"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "$ref": "worklist.schema.json#/$defs/versionId", "description": "Fixed when the sheet is created; the file name." },
+              "path": { "$ref": "#/$defs/path" },
+              "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+              "summary": { "type": "string", "maxLength": 200, "description": "One line, shown in the list of sheets." },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "updatedAt": { "type": "string", "format": "date-time", "description": "Equals the sheet file's writtenAt. Changes on every update." },
+              "archived": { "type": "boolean", "description": "Hidden from the list of sheets. The file stays; set back to false to restore." },
+              "archivedAt": { "type": "string", "format": "date-time" },
+              "migrated": { "type": "boolean", "description": "Generated from legacy coaching files rather than written by the coach." }
+            }
+          }
+        }
+      }
+    },
+    "v1": {
+      "type": "object",
+      "description": "Legacy: a list of immutable versions. Read, never written.",
+      "required": ["manifestVersion", "latest", "versions"],
+      "additionalProperties": false,
+      "properties": {
+        "$schema": { "type": "string" },
+        "manifestVersion": { "const": 1 },
+        "latest": { "$ref": "worklist.schema.json#/$defs/versionId" },
+        "versions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "path", "writtenAt"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "$ref": "worklist.schema.json#/$defs/versionId" },
+              "path": { "$ref": "#/$defs/path" },
+              "writtenAt": { "type": "string", "format": "date-time" },
+              "replaces": { "oneOf": [{ "$ref": "worklist.schema.json#/$defs/versionId" }, { "type": "null" }] },
+              "name": { "type": "string", "maxLength": 80 },
+              "summary": { "type": "string", "maxLength": 200 },
+              "migrated": { "type": "boolean" }
+            }
+          }
         }
       }
     }

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/sauravdroid/DSA_Prep_Tracker/schemas/worklist.schema.json",
-  "title": "Worklist version (a prep sheet)",
-  "description": "One complete, immutable prep sheet written by the coach: a name, a summary, a roadmap of patterns, and the problems to learn (`new`) and to revisit (`revision`), each grouped by pattern in priority order. Sheets carry no dates and no day-by-day schedule. A sheet is never edited after it is published; a change is a new sheet. The app renders it verbatim and makes no decisions of its own.",
+  "title": "Prep sheet",
+  "description": "One prep sheet written by the coach: a name, a summary, and the problems to learn (`new`) and to revisit (`revision`), each grouped by pattern in priority order, with `after` links that form the problem roadmap. Sheets carry no dates and no day-by-day schedule. The coach updates a sheet by overwriting its file and archives it rather than deleting it. The app renders it verbatim and makes no decisions of its own.",
   "type": "object",
   "required": ["worklistVersion", "id", "writtenAt", "basedOn", "headline", "new", "revision"],
   "additionalProperties": false,
@@ -14,12 +14,17 @@
     },
     "id": {
       "$ref": "#/$defs/versionId",
-      "description": "`writtenAt` with punctuation removed, e.g. 20261017T212000Z. Also the file name: coaching/worklists/<id>.json."
+      "description": "Fixed when the sheet is created: its creation time with punctuation removed, e.g. 20261017T212000Z. Also the file name: coaching/worklists/<id>.json. Never changes on update."
     },
-    "writtenAt": { "type": "string", "format": "date-time" },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the sheet was created; `id` is derived from it. Required once a sheet has been updated, because `writtenAt` then moves on."
+    },
+    "writtenAt": { "type": "string", "format": "date-time", "description": "When this content was written: creation, or the latest update." },
     "replaces": {
       "oneOf": [{ "$ref": "#/$defs/versionId" }, { "type": "null" }],
-      "description": "The version this one was written to follow, or null for the first."
+      "description": "The sheet this one was started from, or null."
     },
     "basedOn": {
       "type": "object",
@@ -74,7 +79,7 @@
     "revision": { "$ref": "#/$defs/list", "description": "Problems to revisit: cold checks, repairs, transfer checks." },
     "changes": {
       "type": "array",
-      "description": "Why things changed since `replaces`. Display only: the app computes what changed itself and uses these for the reasons.",
+      "description": "Why things changed: since this sheet's previous content when it is updated, or since `replaces` when it is created. Display only: the app computes what changed itself and uses these for the reasons.",
       "items": {
         "type": "object",
         "required": ["op", "slug", "reason"],

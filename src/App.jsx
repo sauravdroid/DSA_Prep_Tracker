@@ -136,8 +136,8 @@ export default function App() {
               {t}
               {t === 'Problems' && count > 0 && <span className="tab-badge">{count}</span>}
               {t === 'Sheets' && worklistAvailable && (
-                <span className="tab-badge" title="A new prep sheet is ready to review">
-                  {worklistAvailable.number ? `v${worklistAvailable.number}` : 'new'}
+                <span className="tab-badge" title={worklistAvailable.kind === 'updated' ? 'Your prep sheet was updated' : 'A new prep sheet is ready to review'}>
+                  {worklistAvailable.kind === 'updated' ? 'updated' : 'new'}
                 </span>
               )}
             </button>

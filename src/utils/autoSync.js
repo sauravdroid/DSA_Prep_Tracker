@@ -166,31 +166,41 @@ async function pushStep(changed, status) {
 }
 
 /**
- * Whether the coach has published a worklist newer than the one accepted.
- * Never adopts: a new version only becomes the list after it is reviewed.
+ * Whether the coach has a different current sheet, or has updated the one
+ * you follow. Never applies it: that is a review the user does.
  */
 async function planStep() {
   step('plan', 'running')
-  const remote = await withTimeout(worklistLatest(), 'Checking the worklist')
-  if (remote.empty || !remote.latest) {
+  const remote = await withTimeout(worklistLatest(), 'Checking prep sheets')
+  if (remote.empty || !remote.current) {
     set({ worklistAvailable: null })
     step('plan', 'skipped', 'No prep sheet published yet')
     return
   }
 
-  const { accepted } = await withTimeout(loadAccepted(), 'Reading the accepted worklist')
-  const current = accepted?.version?.id || null
-  if (current === remote.latest) {
+  const { accepted } = await withTimeout(loadAccepted(), 'Reading your current sheet')
+  const mine = accepted?.version || null
+  const kind = !mine || mine.id !== remote.current
+    ? 'new'
+    : mine.writtenAt !== remote.currentUpdatedAt ? 'updated' : null
+  if (!kind) {
     set({ worklistAvailable: null })
     step('plan', 'done', 'Up to date')
     return
   }
 
-  const announced = state.worklistAvailable?.id
-  set({ worklistAvailable: { id: remote.latest, number: remote.count, commit: remote.commit } })
-  step('plan', 'done', `v${remote.count} ready to review`)
-  if (announced !== remote.latest) note(`New prep sheet v${remote.count} from the coach — open Sheets to review`)
+  const key = `${remote.current}@${remote.currentUpdatedAt}`
+  const announced = state.worklistAvailable?.key
+  set({ worklistAvailable: { key, id: remote.current, kind, name: remote.currentName, commit: remote.commit } })
+  const label = remote.currentName ? `“${remote.currentName}”` : 'a sheet'
+  step('plan', 'done', kind === 'updated' ? 'Your sheet was updated' : 'New current sheet')
+  if (announced !== key) {
+    note(kind === 'updated'
+      ? `The coach updated ${label} — open Sheets to review`
+      : `The coach made ${label} the current sheet — open Sheets to review`)
+  }
 }
+
 /** One pass. Never throws: a failed step is reported, the rest still run. */
 export async function runCycle({ manual = false } = {}) {
   const stuck = state.running && state.startedAt

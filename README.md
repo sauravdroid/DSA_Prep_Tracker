@@ -42,10 +42,11 @@ publishes them, and renders the prep sheet you made current, exactly as
 written. The coach decides what goes on it and in what order. A sheet can
 never create, edit or clear a practice attempt.
 
-**Nothing changes without review.** A new sheet from the coach appears behind
-**Sync** on the Sheets page, with its summary, what changed and the checks it
-passed. It becomes your current sheet only when you choose. Sheets are
-append-only, so every earlier sheet stays viewable under **All sheets**.
+**Nothing changes without review.** When the coach updates your sheet or
+recommends a different one, it appears behind **Sync** on the Sheets page with
+its summary, what changed and the checks it passed. It applies only when you
+choose. The coach archives sheets instead of deleting them, so every sheet
+stays viewable under **All sheets**.
 
 ## Layout
 

@@ -18,15 +18,38 @@ export function worklistPath(id) {
   return `coaching/worklists/${id}.json`
 }
 
-/** 1-based position in the manifest, for display as "v7". */
-export function versionNumber(manifest, id) {
-  const i = (manifest?.versions || []).findIndex(v => v.id === id)
-  return i < 0 ? null : i + 1
+/**
+ * The manifest in its current shape. Version 1 (a list of immutable
+ * versions) reads as a list of sheets, each never updated.
+ */
+export function normalizeManifest(m) {
+  if (!m) return null
+  if (m.manifestVersion === 2) return m
+  return {
+    manifestVersion: 2,
+    current: m.latest,
+    sheets: (m.versions || []).map(v => ({
+      id: v.id,
+      path: v.path,
+      name: v.name,
+      summary: v.summary,
+      createdAt: v.writtenAt,
+      updatedAt: v.writtenAt,
+      ...(v.migrated ? { migrated: true } : {}),
+    })),
+  }
 }
 
-/** What to call a sheet: its own name, or its number when it has none. */
-export function sheetName(sheet, number) {
-  return sheet?.name || (number ? `Sheet ${number}` : 'Untitled sheet')
+export function sheetEntry(manifest, id) {
+  return normalizeManifest(manifest)?.sheets.find(s => s.id === id) || null
+}
+
+/** What to call a sheet: its own name, the manifest's, or its position. */
+export function sheetName(sheet, manifest) {
+  if (sheet?.name) return sheet.name
+  const sheets = normalizeManifest(manifest)?.sheets || []
+  const i = sheets.findIndex(s => s.id === sheet?.id)
+  return sheets[i]?.name || (i >= 0 ? `Sheet ${i + 1}` : 'Untitled sheet')
 }
 
 /**

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { worklistPreview, backupIfConnected, getRepo } from '../utils/github'
 import { acceptWorklist } from '../utils/worklistStore'
 import { worklistAccepted } from '../utils/autoSync'
-import { diffWorklists, changesByList, versionNumber, attemptsSince, sheetName, LIST_LABEL } from '../utils/worklist'
+import { diffWorklists, changesByList, attemptsSince, sheetName, normalizeManifest, LIST_LABEL } from '../utils/worklist'
 
 const ANIM_MS = 200
 
@@ -13,13 +13,9 @@ const OP = {
   moved: { glyph: '→', tone: 'bg-violet-100 text-violet-700', label: 'Moved' },
 }
 
-function idDate(id, withTime) {
-  const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})/.exec(id || '')
-  if (!m) return ''
-  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]))
-  return d.toLocaleString(undefined, withTime
-    ? { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
-    : { month: 'short', day: 'numeric' })
+function when(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function Check({ ok, warn, children }) {
@@ -28,8 +24,9 @@ function Check({ ok, warn, children }) {
 }
 
 /**
- * Shows what the coach has published before anything changes. Accepting
- * stores the exact snapshot shown here; anything newer needs its own review.
+ * Shows what the coach has published before anything changes: a different
+ * current sheet, or an update to the one you follow. Applying stores the
+ * exact snapshot shown here; anything newer needs its own review.
  */
 export default function WorklistReview({ accepted, initialId, practiceLog, onManifest, onClose, onAccepted }) {
   const [shown, setShown] = useState(false)
@@ -38,9 +35,10 @@ export default function WorklistReview({ accepted, initialId, practiceLog, onMan
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [showVersions, setShowVersions] = useState(false)
+  const [showSheets, setShowSheets] = useState(false)
 
   const current = accepted?.version || null
+  const known = useMemo(() => (normalizeManifest(accepted?.manifest)?.sheets || []).map(s => s.id), [accepted?.manifest])
 
   const close = useCallback(() => {
     setShown(false)
@@ -58,7 +56,7 @@ export default function WorklistReview({ accepted, initialId, practiceLog, onMan
     setPhase('loading')
     setError(null)
     try {
-      const r = await worklistPreview({ id, acceptedId: current?.id, acceptedHash: accepted?.source?.hash })
+      const r = await worklistPreview({ id, knownSheets: known })
       setResult(r)
       if (r.manifest) onManifest?.(r.manifest)
       setPhase('ready')
@@ -66,7 +64,7 @@ export default function WorklistReview({ accepted, initialId, practiceLog, onMan
       setError(e.message)
       setPhase('error')
     }
-  }, [current?.id, accepted?.source?.hash])
+  }, [known, onManifest])
 
   // Publish first, so the comparison with what the coach saw is honest.
   useEffect(() => {
@@ -81,25 +79,27 @@ export default function WorklistReview({ accepted, initialId, practiceLog, onMan
       if (!cancelled) load(initialId)
     })()
     return () => { cancelled = true }
-    // Runs once when the panel opens; later loads come from picking a version.
+    // Runs once when the panel opens; later loads come from picking a sheet.
   }, [])
 
   const view = useMemo(() => {
     if (!result || result.empty || !result.manifest) return null
     const next = result.version
-    const number = versionNumber(result.manifest, result.id)
-    const currentNumber = current ? versionNumber(result.manifest, current.id) : null
-    const isCurrent = !!current && current.id === result.id && accepted?.source?.hash === result.hash
-    const isLatest = result.id === result.manifest.latest
-    const diff = next ? diffWorklists(current, next) : null
+    const manifest = normalizeManifest(result.manifest)
+    const sameSheet = !!current && current.id === result.id
+    const kind = sameSheet && accepted?.source?.hash === result.hash
+      ? 'current'
+      : sameSheet ? 'updated' : 'switch'
+    const recommended = result.id === manifest.current
+    const archived = !!result.entry?.archived
+    const diff = next && kind !== 'current' ? diffWorklists(current, next) : null
     const unseen = next ? attemptsSince(next, practiceLog).length : 0
-    const skipped = number && currentNumber && number > currentNumber + 1 ? number - currentNumber - 1 : 0
-    return { next, number, currentNumber, isCurrent, isLatest, diff, unseen, skipped }
+    return { next, manifest, kind, recommended, archived, diff, unseen }
   }, [result, current, accepted?.source?.hash, practiceLog])
 
-  const canAccept = !!view && !!result?.valid && (result.problems || []).length === 0 && !view.isCurrent
+  const canApply = !!view && view.kind !== 'current' && !!result?.valid && (result.problems || []).length === 0
 
-  const accept = async () => {
+  const apply = async () => {
     setBusy(true)
     setError(null)
     try {
@@ -111,7 +111,6 @@ export default function WorklistReview({ accepted, initialId, practiceLog, onMan
           commit: result.commit,
           shortCommit: result.shortCommit,
           hash: result.hash,
-          number: view.number,
           authored: result.authored,
         },
       })
@@ -125,6 +124,12 @@ export default function WorklistReview({ accepted, initialId, practiceLog, onMan
   }
 
   const grouped = view?.diff ? changesByList(view.diff) : null
+  const title = !view ? ''
+    : view.kind === 'current' ? (view.recommended ? "You're up to date" : 'This is your current sheet')
+      : view.kind === 'updated' ? 'The coach updated your sheet'
+        : view.archived ? 'Archived sheet'
+          : view.recommended ? 'New current sheet from the coach' : 'Another sheet'
+  const currentName = current ? sheetName(current, accepted?.manifest) : null
 
   return (
     <div
@@ -166,7 +171,7 @@ export default function WorklistReview({ accepted, initialId, practiceLog, onMan
 
           {(phase === 'publishing' || phase === 'loading') && (
             <p className="mt-8 text-sm text-slate-500">
-              {phase === 'publishing' ? 'Publishing your attempts…' : 'Reading the latest sheet…'}
+              {phase === 'publishing' ? 'Publishing your attempts…' : 'Reading the coach’s sheets…'}
             </p>
           )}
 
@@ -185,34 +190,39 @@ export default function WorklistReview({ accepted, initialId, practiceLog, onMan
 
           {phase === 'ready' && view && (
             <>
-              <h2 className="mt-3 text-xl font-bold text-slate-900">
-                {view.isCurrent
-                  ? 'This is your current sheet'
-                  : view.isLatest ? 'New sheet from coach' : `Older sheet · v${view.number}`}
-              </h2>
+              <h2 className="mt-3 text-xl font-bold text-slate-900">{title}</h2>
               {view.next && (
-                <p className="mt-1 text-[15px] font-semibold text-slate-700">{sheetName(view.next, view.number)}</p>
+                <p className="mt-1 text-[15px] font-semibold text-slate-700">{sheetName(view.next, result.manifest)}</p>
               )}
 
-              <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                {current && !view.isCurrent && (
+              <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
+                {view.kind === 'updated' && (
                   <>
-                    <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">
-                      v{view.currentNumber ?? '?'} · {idDate(current.id)}
-                    </span>
+                    <span className="rounded-md bg-slate-100 px-2.5 py-0.5 font-semibold text-slate-500">Your copy · {when(current.writtenAt)}</span>
                     <span className="text-slate-400">→</span>
+                    <span className="rounded-md bg-[#fff1db] px-2.5 py-0.5 font-semibold text-[#b45309]">Coach’s update · {when(view.next?.writtenAt)}</span>
                   </>
                 )}
-                <span className={`rounded-md px-2.5 py-0.5 text-xs font-semibold ${view.isCurrent ? 'bg-slate-100 text-slate-600' : 'bg-[#fff1db] text-[#b45309]'}`}>
-                  v{view.number} · {idDate(result.id, true)}
-                </span>
-                {view.skipped > 0 && (
-                  <span className="text-xs text-slate-400">skips {view.skipped} version{view.skipped === 1 ? '' : 's'}</span>
+                {view.kind === 'switch' && (
+                  <>
+                    {currentName && (
+                      <>
+                        <span className="max-w-[12rem] truncate rounded-md bg-slate-100 px-2.5 py-0.5 font-semibold text-slate-500">{currentName}</span>
+                        <span className="text-slate-400">→</span>
+                      </>
+                    )}
+                    <span className={`rounded-md px-2.5 py-0.5 font-semibold ${view.archived ? 'bg-slate-100 text-slate-500' : 'bg-[#fff1db] text-[#b45309]'}`}>
+                      {view.archived ? 'Archived' : view.recommended ? 'Recommended by the coach' : 'Not the coach’s current sheet'}
+                    </span>
+                  </>
+                )}
+                {view.kind === 'current' && (
+                  <span className="rounded-md bg-slate-100 px-2.5 py-0.5 font-semibold text-slate-600">Last updated {when(view.next?.writtenAt)}</span>
                 )}
               </div>
 
               <div className="mt-3 flex flex-wrap gap-1.5">
-                <Check ok={result.valid}>{result.valid ? 'Valid format' : 'Invalid format'}</Check>
+                <Check ok={result.valid}>{result.valid ? 'Valid sheet' : 'Invalid sheet'}</Check>
                 <Check ok={(result.problems || []).length === 0}>
                   {(result.problems || []).length === 0 ? 'Only coaching/worklists/ changed' : 'Publishing rules broken'}
                 </Check>
@@ -245,8 +255,18 @@ export default function WorklistReview({ accepted, initialId, practiceLog, onMan
                 </section>
               )}
 
-              {grouped && !view.isCurrent && ['revision', 'new'].map(list => (
-                <section key={list} className="mt-5">
+              {grouped && (
+                <p className="mt-5 text-xs text-slate-500">
+                  {view.diff.total === 0
+                    ? 'Same problems as your current sheet.'
+                    : view.kind === 'updated'
+                      ? 'What changed since your copy:'
+                      : `Compared with ${currentName ? `“${currentName}”` : 'your current sheet'}:`}
+                </p>
+              )}
+
+              {grouped && view.diff.total > 0 && ['revision', 'new'].map(list => (
+                <section key={list} className="mt-3">
                   <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                     {LIST_LABEL[list]}
                     <span className="ml-1.5 normal-case tracking-normal text-slate-500">
@@ -278,25 +298,26 @@ export default function WorklistReview({ accepted, initialId, practiceLog, onMan
 
               <section className="mt-6">
                 <button
-                  onClick={() => setShowVersions(v => !v)}
+                  onClick={() => setShowSheets(v => !v)}
                   className="text-xs font-medium text-slate-500 underline-offset-2 hover:underline"
                 >
-                  {showVersions ? 'Hide' : 'Show'} all sheets ({result.manifest.versions.length})
+                  {showSheets ? 'Hide' : 'Show'} all sheets ({view.manifest.sheets.length})
                 </button>
-                {showVersions && (
+                {showSheets && (
                   <ul className="mt-2 list-none space-y-0 pl-0">
-                    {[...result.manifest.versions].reverse().map((v, i, all) => (
-                      <li key={v.id}>
+                    {[...view.manifest.sheets].reverse().map((s, i, all) => (
+                      <li key={s.id}>
                         <button
-                          onClick={() => load(v.id)}
-                          className={`flex w-full items-center gap-2.5 border-0 border-b border-slate-100 bg-transparent py-1.5 text-left text-xs hover:bg-slate-50 ${v.id === result.id ? 'font-semibold' : ''}`}
+                          onClick={() => load(s.id)}
+                          className={`flex w-full items-center gap-2.5 border-0 border-b border-slate-100 bg-transparent py-1.5 text-left text-xs hover:bg-slate-50 ${s.id === result.id ? 'font-semibold' : ''}`}
                         >
-                          <span className={`rounded px-1.5 py-px font-mono text-[11px] ${v.id === current?.id ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>
-                            v{all.length - i}
+                          <span className={`min-w-0 flex-1 truncate ${s.archived ? 'text-slate-400' : 'text-slate-700'}`}>
+                            {s.name || `Sheet ${all.length - i}`}
                           </span>
-                          <span className="w-14 shrink-0 text-slate-400">{idDate(v.id)}</span>
-                          <span className="min-w-0 flex-1 truncate text-slate-600">{v.name || v.summary || ''}</span>
-                          {v.migrated && <span className="rounded bg-slate-100 px-1.5 text-[10px] font-bold uppercase text-slate-500">migrated</span>}
+                          <span className="shrink-0 text-slate-400">{when(s.updatedAt)}</span>
+                          {s.id === view.manifest.current && <span className="rounded bg-[#fff1db] px-1.5 text-[10px] font-bold uppercase text-[#b45309]">coach’s pick</span>}
+                          {s.id === current?.id && <span className="rounded bg-slate-900 px-1.5 text-[10px] font-bold uppercase text-white">yours</span>}
+                          {s.archived && <span className="rounded bg-slate-100 px-1.5 text-[10px] font-bold uppercase text-slate-500">archived</span>}
                         </button>
                       </li>
                     ))}
@@ -308,21 +329,21 @@ export default function WorklistReview({ accepted, initialId, practiceLog, onMan
         </div>
 
         <div className="flex items-center gap-2 border-t border-slate-200 bg-white px-6 py-3.5">
-          {phase === 'ready' && view && !view.isCurrent && (
+          {phase === 'ready' && view && view.kind !== 'current' && (
             <button
-              onClick={accept}
-              disabled={!canAccept || busy}
+              onClick={apply}
+              disabled={!canApply || busy}
               className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              {busy ? 'Saving…' : `Make v${view.number} current`}
+              {busy ? 'Saving…' : view.kind === 'updated' ? 'Apply update' : 'Make this my current sheet'}
             </button>
           )}
           <button onClick={close} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
-            {view?.isCurrent || !view ? 'Close' : 'Not now'}
+            {view?.kind === 'current' || !view ? 'Close' : 'Not now'}
           </button>
           {error && phase === 'ready' && <span className="ml-2 min-w-0 flex-1 truncate text-xs text-[#be123c]">{error}</span>}
-          {!error && current && view && !view.isCurrent && (
-            <span className="ml-auto text-xs text-slate-400">You stay on v{view.currentNumber ?? '?'} until you choose.</span>
+          {!error && currentName && view && view.kind !== 'current' && (
+            <span className="ml-auto truncate text-xs text-slate-400">Nothing changes until you choose.</span>
           )}
         </div>
       </aside>

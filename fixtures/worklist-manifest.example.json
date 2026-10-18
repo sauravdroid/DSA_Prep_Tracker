@@ -1,22 +1,25 @@
 {
-  "manifestVersion": 1,
-  "latest": "20260302T090000Z",
-  "versions": [
+  "manifestVersion": 2,
+  "current": "20260302T090000Z",
+  "sheets": [
     {
       "id": "20260227T183000Z",
       "path": "coaching/worklists/20260227T183000Z.json",
-      "writtenAt": "2026-02-27T18:30:00Z",
-      "replaces": null,
+      "name": "Migrated dated plans",
       "summary": "Migrated from the dated plans.",
+      "createdAt": "2026-02-27T18:30:00Z",
+      "updatedAt": "2026-02-27T18:30:00Z",
+      "archived": true,
+      "archivedAt": "2026-03-02T09:00:00Z",
       "migrated": true
     },
     {
       "id": "20260302T090000Z",
       "path": "coaching/worklists/20260302T090000Z.json",
-      "writtenAt": "2026-03-02T09:00:00Z",
-      "replaces": "20260227T183000Z",
       "name": "Stack repair, then Intervals",
-      "summary": "Monotonic stack repair; start intervals."
+      "summary": "Monotonic stack repair; start intervals.",
+      "createdAt": "2026-03-02T09:00:00Z",
+      "updatedAt": "2026-03-02T09:00:00Z"
     }
   ]
 }
