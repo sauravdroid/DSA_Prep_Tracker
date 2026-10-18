@@ -5,7 +5,8 @@ import {
 import { loadAccepted } from '../utils/worklistStore'
 import { subscribeSync, syncNow } from '../utils/autoSync'
 import { backupIfConnected, worklistPreview } from '../utils/github'
-import WorklistDrawer from './WorklistDrawer'
+import ProblemDrawer from './ProblemDrawer'
+import SheetItemDetail from './SheetItemDetail'
 import WorklistReview from './WorklistReview'
 import Roadmap from './Roadmap'
 import ColdTestModal from './ColdTestModal'
@@ -280,7 +281,7 @@ function EmptyState({ onReview, unavailable, available, checking }) {
   )
 }
 
-export default function WorklistPage({ problems, practiceLog: log = [], onChanged, reviewRequest = 0, onReviewOpened }) {
+export default function WorklistPage({ problems, revisions = [], practiceLog: log = [], onChanged, reviewRequest = 0, onReviewOpened }) {
   const [accepted, setAccepted] = useState(null)
   const [loaded, setLoaded] = useState(false)
   const [unavailable, setUnavailable] = useState(false)
@@ -488,14 +489,19 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
       </div>
 
       {open && (
-        <WorklistDrawer
-          item={open}
+        <ProblemDrawer
+          key={open.slug}
           problem={problemOf(open)}
-          attempts={log.filter(e => e.slug === open.slug)}
-          unseen={latestBySlug.get(open.slug)}
-          onRecord={() => setRecording(open)}
+          revisions={revisions}
+          notice={problems[open.slug] ? null : 'Not in your tracker yet. Details fill in once you solve it on LeetCode and it syncs.'}
           onClose={() => setOpen(null)}
-        />
+        >
+          <SheetItemDetail
+            item={open}
+            attempts={log.filter(e => e.slug === open.slug)}
+            onRecord={() => setRecording(open)}
+          />
+        </ProblemDrawer>
       )}
 
       {recording && (

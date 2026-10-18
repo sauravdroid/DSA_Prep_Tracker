@@ -54,7 +54,8 @@ archives sheets instead of deleting them, so every sheet stays viewable under
 ```
 src/utils/worklist.js          rendering helpers and the sheet diff
 src/utils/validateWorklist.js  schema, publishing-rule and content-hash checks
-src/components/Worklist*.jsx   the Sheets page, problem drawer and review panel
+src/components/Worklist*.jsx   the Sheets page and review panel
+src/components/SheetItemDetail.jsx  the sheet's section in the shared problem drawer
 src/components/Roadmap.jsx     the problem roadmap tree
 src/components/                Calendar, Problems, Stats, Recursion
 schemas/ fixtures/ docs/       the coaching contract

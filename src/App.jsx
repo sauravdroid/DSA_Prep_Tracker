@@ -194,6 +194,7 @@ export default function App() {
         {tab === 'Sheets' && (
           <WorklistPage
             problems={problems}
+            revisions={revisions}
             practiceLog={practiceLog}
             onChanged={reload}
             reviewRequest={reviewRequest}
