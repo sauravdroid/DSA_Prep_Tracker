@@ -67,11 +67,14 @@ export default function Roadmap({ sheet, attempts, selected, onOpen }) {
             const a = pos.get(e.from)
             const b = pos.get(e.to)
             if (!a || !b) return null
+            const lit = focus && (focus === e.from || focus === e.to)
+            // Extra prerequisites cross the tree, so they appear only for the
+            // problem you are looking at; the tree lines are always drawn.
+            if (!e.primary && !lit) return null
             const x1 = a.x + CARD_W / 2
             const y1 = a.y + CARD_H
             const x2 = b.x + CARD_W / 2
             const y2 = b.y
-            const lit = focus && (focus === e.from || focus === e.to)
             const d = y2 > y1
               ? `M ${x1} ${y1} C ${x1} ${y1 + ROW_GAP * 0.6}, ${x2} ${y2 - ROW_GAP * 0.6}, ${x2} ${y2}`
               : `M ${x1} ${y1} C ${x1} ${y1 + 40}, ${x2} ${y2 - 40}, ${x2} ${y2}`
@@ -133,7 +136,7 @@ export default function Roadmap({ sheet, attempts, selected, onOpen }) {
         <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-sm border border-slate-300 bg-white" />Revision</span>
         {hasNew && <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-sm border border-violet-300 bg-violet-50" />New</span>}
         <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#00b8a3]" />recorded since the coach looked</span>
-        <span className="inline-flex items-center gap-1.5"><svg width="18" height="6" aria-hidden="true"><path d="M0 3h18" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 3" /></svg>also needs</span>
+        <span className="inline-flex items-center gap-1.5"><svg width="18" height="6" aria-hidden="true"><path d="M0 3h18" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 3" /></svg>also needs (shown on hover)</span>
         <span className="text-slate-400">Start at the top of any branch.</span>
       </div>
     </div>
