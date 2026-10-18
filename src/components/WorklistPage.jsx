@@ -133,32 +133,80 @@ function SheetPicker({ manifest, currentId, shownId, onPick }) {
   )
 }
 
-function Row({ rank, item, attempt, selected, onOpen }) {
+// Status · Title · Why · Difficulty (· Time), shared by the header and the rows.
+const TABLE_COLS = {
+  withTime: 'grid-cols-[2.25rem_minmax(14rem,2fr)_minmax(0,3fr)_5.5rem_4.5rem]',
+  noTime: 'grid-cols-[2.25rem_minmax(14rem,2fr)_minmax(0,3fr)_5.5rem]',
+}
+
+/** One problem, LeetCode-list style: a quiet row, the title is the link. */
+function Row({ item, attempt, selected, striped, showTime, onOpen }) {
   return (
     <button
       onClick={() => onOpen(item)}
-      className={`grid h-12 w-full grid-cols-[1.5rem_1.25rem_minmax(0,1fr)_4.5rem_3.5rem] items-center gap-3 border-0 border-t border-slate-100 px-4 text-left transition first:border-t-0 even:bg-[#f7f8fa] hover:bg-slate-100 ${
-        selected ? '!bg-[#fff7ea] shadow-[inset_3px_0_0_#ffa116]' : ''
+      title={item.reason}
+      className={`group grid h-10 w-full ${showTime ? TABLE_COLS.withTime : TABLE_COLS.noTime} items-center gap-4 rounded-md border-0 px-3 text-left text-sm transition ${
+        selected ? 'bg-[#fff7ea]' : striped ? 'bg-[#f7f8fa] hover:bg-slate-100' : 'bg-white hover:bg-slate-100'
       }`}
     >
-      <span className="text-right text-xs font-semibold tabular-nums text-slate-400">{rank}</span>
-      <StatusIcon attempt={attempt} />
-      <span className="flex min-w-0 items-baseline gap-2.5">
-        <span className="shrink-0 font-medium text-slate-900">
+      <span className="flex justify-center"><StatusIcon attempt={attempt} /></span>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="truncate text-[#262626] group-hover:text-[#007aff]">
           {item.number ? `${item.number}. ` : ''}{item.title}
         </span>
         {item.flag === 'repair' && (
-          <span className="shrink-0 rounded bg-[#ffe8ed] px-1.5 py-px text-[11px] font-semibold text-[#ff375f] ring-1 ring-[#ff375f]/20">
-            Repair
-          </span>
+          <span className="shrink-0 rounded-full bg-[#ffe8ed] px-2 py-px text-[11px] font-medium text-[#e0244b]">Repair</span>
         )}
-        <span className="truncate text-[13px] text-slate-400">{item.reason}</span>
       </span>
-      <span className={`text-[13px] font-medium ${DIFF_TONE[item.difficulty] || 'text-slate-400'}`}>
-        {item.difficulty || ''}
-      </span>
-      <span className="text-right text-xs text-slate-400">{item.minutes ? `${item.minutes} min` : ''}</span>
+      <span className="truncate text-[13px] text-slate-500">{item.reason}</span>
+      <span className={`text-[13px] ${DIFF_TONE[item.difficulty] || 'text-slate-400'}`}>{item.difficulty || '—'}</span>
+      {showTime && <span className="text-right text-[13px] tabular-nums text-slate-500">{item.minutes ? `${item.minutes}m` : '—'}</span>}
     </button>
+  )
+}
+
+/**
+ * A list tab as one table: a header, then each pattern as a small section
+ * heading followed by its problems in priority order. Rows stripe across the
+ * whole table, the way LeetCode's problem list does.
+ */
+function ProblemTable({ groups, list, attempts, selectedSlug, onOpen }) {
+  let stripe = 0
+  const showTime = groups.some(g => g.items.some(i => i.minutes))
+  const cols = showTime ? TABLE_COLS.withTime : TABLE_COLS.noTime
+  return (
+    <div className="mt-3 rounded-[10px] bg-white px-2 pb-2 pt-1 ring-1 ring-slate-200/70">
+      <div className={`grid ${cols} gap-4 border-b border-slate-100 px-3 py-2.5 text-xs font-medium text-slate-500`}>
+        <span className="text-center">Status</span>
+        <span>Title</span>
+        <span>Why</span>
+        <span>Difficulty</span>
+        {showTime && <span className="text-right">Time</span>}
+      </div>
+      {groups.map(group => {
+        const done = group.items.filter(i => attempts.has(i.slug)).length
+        return (
+          <section key={group.pattern}>
+            <div className="flex items-baseline gap-2 px-3 pb-1.5 pt-4">
+              <h2 className="text-[13px] font-semibold text-slate-800">{group.pattern}</h2>
+              <span className="text-xs tabular-nums text-slate-400">{done}/{group.items.length}</span>
+              {group.note && <span className="min-w-0 flex-1 truncate text-xs text-slate-400">· {group.note}</span>}
+            </div>
+            {group.items.map(item => (
+              <Row
+                key={item.slug}
+                item={{ ...item, list, pattern: group.pattern }}
+                attempt={attempts.get(item.slug)}
+                selected={selectedSlug === item.slug}
+                striped={stripe++ % 2 === 1}
+                showTime={showTime}
+                onOpen={onOpen}
+              />
+            ))}
+          </section>
+        )
+      })}
+    </div>
   )
 }
 
@@ -426,30 +474,15 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
               </p>
             )}
 
-            {activeTab !== 'roadmap' && groups.map(group => {
-              const done = group.items.filter(i => latestBySlug.has(i.slug)).length
-              return (
-                <section key={group.pattern} className="mt-6">
-                  <div className="flex items-baseline gap-2.5 px-1 pb-2">
-                    <h2 className="text-[15px] font-bold text-slate-900">{group.pattern}</h2>
-                    <span className="text-xs font-semibold text-slate-400">{done} / {group.items.length}</span>
-                    {group.note && <span className="min-w-0 flex-1 truncate text-xs text-slate-500">{group.note}</span>}
-                  </div>
-                  <div className="overflow-hidden rounded-[10px] border border-slate-200 bg-white">
-                    {group.items.map((item, i) => (
-                      <Row
-                        key={item.slug}
-                        rank={i + 1}
-                        item={{ ...item, list: activeTab, pattern: group.pattern }}
-                        attempt={latestBySlug.get(item.slug)}
-                        selected={open?.slug === item.slug}
-                        onOpen={setOpen}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )
-            })}
+            {activeTab !== 'roadmap' && groups.length > 0 && (
+              <ProblemTable
+                groups={groups}
+                list={activeTab}
+                attempts={latestBySlug}
+                selectedSlug={open?.slug}
+                onOpen={setOpen}
+              />
+            )}
           </>
         )}
       </div>
