@@ -1,3 +1,5 @@
+import { reconcileFailedCounts } from './failedCounts.js'
+
 const parse = (raw, fallback) => {
   if (raw == null) return fallback
   try {
@@ -105,6 +107,12 @@ export function mergeTrackerData(local, remote, { localSavedAt, remoteSavedAt } 
       default:
         break
     }
+  }
+
+  if (merged.dsa_problems != null) {
+    const problems = parse(merged.dsa_problems, {})
+    const reconciled = reconcileFailedCounts(problems, parse(merged.dsa_failures, []))
+    if (reconciled !== problems) merged.dsa_problems = JSON.stringify(reconciled)
   }
 
   summary.problemsAdded = Object.keys(parse(merged.dsa_problems, {})).length - beforeProblems

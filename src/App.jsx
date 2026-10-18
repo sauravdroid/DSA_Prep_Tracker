@@ -61,14 +61,12 @@ export default function App() {
     setSyncMsg('Syncing...')
     try {
       const { results, resubmissions, failures } = await fetcher(session)
-      if (results.length > 0) {
-        const merged = store.mergeProblems(results)
-        setProblems(merged)
-      }
+      if (results.length > 0) store.mergeProblems(results)
       for (const r of resubmissions) {
         store.addRevision(r.slug, r.date)
       }
       store.addFailures(failures)
+      setProblems(store.getProblems())
       setFailures(store.getFailures())
       if (resubmissions.length > 0) setRevisions(store.getRevisions())
       setSyncMsg(`Synced ${results.length} problem${results.length !== 1 ? 's' : ''}, ${resubmissions.length} revision${resubmissions.length !== 1 ? 's' : ''}`)

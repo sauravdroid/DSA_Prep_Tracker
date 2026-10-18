@@ -95,6 +95,7 @@ export function pendingPaths() {
 
 /** LeetCode submissions since the last sync, merged into the store. */
 async function leetcodeStep(changed) {
+  const failedCountTotal = problems => Object.values(problems).reduce((n, p) => n + (p.failedCount || 0), 0)
   const session = store.getSession()
   if (!session) {
     step('leetcode', 'skipped', 'No session cookie set')
@@ -111,15 +112,23 @@ async function leetcodeStep(changed) {
   const known = store.getProblems()
   const revisedTitles = r.resubmissions.map(x => known[x.slug]?.title || x.slug)
 
+  const failuresBefore = store.getFailures().length
+  const countsBefore = failedCountTotal(store.getProblems())
   if (r.results.length > 0) store.mergeProblems(r.results)
   for (const x of r.resubmissions) store.addRevision(x.slug, x.date)
   store.addFailures(r.failures)
+  const newFailures = store.getFailures().length - failuresBefore
+  const countsFixed = failedCountTotal(store.getProblems()) !== countsBefore
 
   const total = r.results.length + r.resubmissions.length
   if (total > 0) changed.push(`${r.results.length} solved, ${r.resubmissions.length} revised`)
+  else if (newFailures > 0) changed.push(`${newFailures} failed submission${newFailures === 1 ? '' : 's'}`)
+  else if (countsFixed) changed.push('failed-submission counts corrected')
   step('leetcode', 'done', total > 0
     ? `${r.results.length} solved, ${r.resubmissions.length} revised`
-    : 'Nothing new since the last check')
+    : newFailures > 0
+      ? `${newFailures} failed submission${newFailures === 1 ? '' : 's'}, nothing solved`
+      : 'Nothing new since the last check')
 
   for (const p of r.results) note(`Solved: ${p.title || p.slug}`)
   for (const t of revisedTitles) note(`Revised: ${t}`)

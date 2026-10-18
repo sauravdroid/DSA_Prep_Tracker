@@ -1,5 +1,6 @@
 import { todayStr } from './utils/dateUtils'
 import { scheduleSave } from './utils/dataFile'
+import { reconcileFailedCounts } from './utils/failedCounts'
 
 const KEYS = {
   SESSION: 'dsa_session',
@@ -89,12 +90,15 @@ export function mergeProblems(newProblems) {
       existing[p.slug] = {
         ...p,
         dateSolved: prev.dateSolved < p.dateSolved ? prev.dateSolved : p.dateSolved,
+        // A sync's count covers only its window; the lifetime total never shrinks.
+        failedCount: Math.max(prev.failedCount || 0, p.failedCount || 0),
       }
     }
   }
-  write(KEYS.PROBLEMS, existing)
+  const reconciled = reconcileFailedCounts(existing, getFailures())
+  write(KEYS.PROBLEMS, reconciled)
   writeRaw(KEYS.LAST_SYNC, new Date().toISOString())
-  return existing
+  return reconciled
 }
 
 export function getRevisions() {
@@ -137,17 +141,23 @@ export function getFailures() {
 }
 
 export function addFailures(events) {
-  if (!events || events.length === 0) return getFailures()
   const existing = getFailures()
-  const seen = new Set(existing.map(f => `${f.slug}|${f.ts}`))
-  for (const e of events) {
-    const key = `${e.slug}|${e.ts}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    existing.push(e)
+  if (events && events.length > 0) {
+    const seen = new Set(existing.map(f => `${f.slug}|${f.ts}`))
+    for (const e of events) {
+      const key = `${e.slug}|${e.ts}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      existing.push(e)
+    }
+    existing.sort((a, b) => a.ts - b.ts)
+    write(KEYS.FAILURES, existing)
   }
-  existing.sort((a, b) => a.ts - b.ts)
-  write(KEYS.FAILURES, existing)
+  // Failures often land on problems with no Accepted in this sync's window,
+  // and older stored counts may be stale, so reconcile every problem.
+  const problems = getProblems()
+  const reconciled = reconcileFailedCounts(problems, existing)
+  if (reconciled !== problems) write(KEYS.PROBLEMS, reconciled)
   return existing
 }
 
