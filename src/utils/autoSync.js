@@ -294,3 +294,6 @@ export function syncNow() {
 export function worklistAccepted(id) {
   if (!state.worklistAvailable || state.worklistAvailable.id === id) set({ worklistAvailable: null })
 }
+
+/** Dispatched on window to open the sheet review from anywhere in the app. */
+export const REVIEW_EVENT = 'dsa:review-sheet'

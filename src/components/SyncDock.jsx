@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { subscribeSync, syncNow, setEnabled, STEPS } from '../utils/autoSync'
+import { subscribeSync, syncNow, setEnabled, STEPS, REVIEW_EVENT } from '../utils/autoSync'
 
 const MARK = {
   pending: { glyph: '·', tone: 'text-slate-300' },
@@ -73,6 +73,7 @@ export default function SyncDock() {
           <div className="space-y-1.5 px-4 py-3">
             {(s.steps || STEPS).map(st => {
               const m = MARK[st.state] || MARK.pending
+              const review = st.key === 'plan' && s.worklistAvailable
               return (
                 <div key={st.key} className="flex items-start gap-2 text-xs">
                   <span className={`w-3 shrink-0 text-center font-bold ${m.tone} ${st.state === 'running' ? 'animate-pulse' : ''}`}>
@@ -82,6 +83,14 @@ export default function SyncDock() {
                     <span className={st.state === 'pending' ? 'text-slate-400' : 'text-slate-700'}>{st.label}</span>
                     {st.note && <span className="block text-[11px] text-slate-500">{st.note}</span>}
                   </span>
+                  {review && (
+                    <button
+                      onClick={() => { setOpen(false); window.dispatchEvent(new CustomEvent(REVIEW_EVENT)) }}
+                      className="shrink-0 rounded-md bg-[#fff1db] px-2 py-0.5 text-[11px] font-semibold text-[#b45309] transition hover:bg-[#ffe2b3]"
+                    >
+                      Review
+                    </button>
+                  )}
                 </div>
               )
             })}

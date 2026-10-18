@@ -3,7 +3,7 @@ import {
   LIST_LABEL, normalizeManifest, sheetEntry, attemptsSince, latestAttemptBySlug, itemMode, sheetName,
 } from '../utils/worklist'
 import { loadAccepted } from '../utils/worklistStore'
-import { subscribeSync } from '../utils/autoSync'
+import { subscribeSync, syncNow } from '../utils/autoSync'
 import { backupIfConnected, worklistPreview } from '../utils/github'
 import WorklistDrawer from './WorklistDrawer'
 import WorklistReview from './WorklistReview'
@@ -38,22 +38,19 @@ function StatusIcon({ attempt }) {
   )
 }
 
-function SyncButton({ onClick, available }) {
+/**
+ * Shown only when the background check found something to review. Syncing
+ * itself belongs to the background panel; this opens the review.
+ */
+function ReviewButton({ onClick, available }) {
+  if (!available) return null
   return (
     <button
       onClick={onClick}
       className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
     >
-      <svg viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M13 5.5A5.5 5.5 0 0 0 3.2 4M3 10.5A5.5 5.5 0 0 0 12.8 12" />
-        <path d="M3 1.8V4.3h2.5M13 14.2v-2.5h-2.5" />
-      </svg>
-      Sync
-      {available && (
-        <span className="rounded-full bg-[#ffa116] px-1.5 py-px text-[10px] font-bold text-white">
-          {available.kind === 'updated' ? 'updated' : 'new'}
-        </span>
-      )}
+      <span className="size-2 rounded-full bg-[#ffa116]" aria-hidden="true" />
+      {available.kind === 'updated' ? 'Review update' : 'Review new sheet'}
     </button>
   )
 }
@@ -128,7 +125,7 @@ function SheetPicker({ manifest, currentId, shownId, onPick }) {
             )}
           </div>
           <p className="border-t border-slate-100 bg-slate-50 px-3.5 py-2 text-[11px] text-slate-500">
-            The coach creates, updates and archives sheets. Sync to see its latest changes.
+            The coach creates, updates and archives sheets. Changes show up here after the background sync.
           </p>
         </div>
       )}
@@ -188,21 +185,34 @@ function Summary({ headline, summary }) {
   )
 }
 
-function EmptyState({ onSync, unavailable, available }) {
+function EmptyState({ onReview, unavailable, available, checking }) {
   return (
     <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
       <p className="text-base font-semibold text-slate-900">No prep sheet yet</p>
       <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
         {unavailable
           ? 'The local data server is not reachable, so your sheet cannot be read.'
-          : 'The coach publishes prep sheets to your data repository. Sync to review the latest one and make it your current sheet.'}
+          : available
+            ? 'The coach has published a sheet. Review it and make it your current sheet.'
+            : 'The background sync checks for the coach’s sheets every 10 minutes. Nothing has been published yet.'}
       </p>
-      <div className="mt-5"><SyncButton onClick={onSync} available={available} /></div>
+      <div className="mt-5 flex justify-center gap-2">
+        <ReviewButton onClick={onReview} available={available} />
+        {!available && !unavailable && (
+          <button
+            onClick={() => syncNow()}
+            disabled={checking}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+          >
+            {checking ? 'Checking…' : 'Check now'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
 
-export default function WorklistPage({ problems, practiceLog: log = [], onChanged }) {
+export default function WorklistPage({ problems, practiceLog: log = [], onChanged, reviewRequest = 0, onReviewOpened }) {
   const [accepted, setAccepted] = useState(null)
   const [loaded, setLoaded] = useState(false)
   const [unavailable, setUnavailable] = useState(false)
@@ -214,6 +224,7 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
   const [recording, setRecording] = useState(null)
   const [reviewing, setReviewing] = useState(null)
   const [available, setAvailable] = useState(null)
+  const [checking, setChecking] = useState(false)
   const [notice, setNotice] = useState(null)
 
   useEffect(() => {
@@ -223,7 +234,16 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
       setLoaded(true)
     })
   }, [])
-  useEffect(() => subscribeSync(s => setAvailable(s.worklistAvailable)), [])
+  useEffect(() => subscribeSync(s => {
+    setAvailable(s.worklistAvailable)
+    setChecking(s.running)
+  }), [])
+  // The background panel's Review link lands here, once per click.
+  useEffect(() => {
+    if (!reviewRequest) return
+    setReviewing({})
+    onReviewOpened?.()
+  }, [reviewRequest, onReviewOpened])
 
   const current = accepted?.version || null
   const sheet = viewing?.version || current
@@ -304,7 +324,7 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
             )}
           </div>
           {manifest && <SheetPicker manifest={manifest} currentId={current?.id} shownId={sheet?.id} onPick={pick} />}
-          {current && <SyncButton onClick={() => setReviewing({})} available={available} />}
+          {current && <ReviewButton onClick={() => setReviewing({})} available={available} />}
         </div>
 
         {viewing && (
@@ -329,7 +349,7 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
 
         {!viewing && entry?.archived && (
           <div className="mt-4 rounded-lg bg-amber-50 px-4 py-2.5 text-[13px] text-amber-900 ring-1 ring-amber-200">
-            The coach has archived this sheet. Pick another under <strong>All sheets</strong>, or Sync to see what it recommends now.
+            The coach has archived this sheet. Pick another under <strong>All sheets</strong>, or review the sheet it recommends when one appears.
           </div>
         )}
 
@@ -345,7 +365,7 @@ export default function WorklistPage({ problems, practiceLog: log = [], onChange
         )}
 
         {loaded && !current && !viewing && (
-          <EmptyState onSync={() => setReviewing({})} unavailable={unavailable} available={available} />
+          <EmptyState onReview={() => setReviewing({})} unavailable={unavailable} available={available} checking={checking} />
         )}
 
         {sheet && (

@@ -43,17 +43,18 @@ written. The coach decides what goes on it and in what order. A sheet can
 never create, edit or clear a practice attempt.
 
 **Nothing changes without review.** When the coach updates your sheet or
-recommends a different one, it appears behind **Sync** on the Sheets page with
-its summary, what changed and the checks it passed. It applies only when you
-choose. The coach archives sheets instead of deleting them, so every sheet
-stays viewable under **All sheets**.
+recommends a different one, the background sync spots it and the Sheets page
+offers **Review update** or **Review new sheet**, with its summary, what
+changed and the checks it passed. It applies only when you choose. The coach
+archives sheets instead of deleting them, so every sheet stays viewable under
+**All sheets**.
 
 ## Layout
 
 ```
-src/utils/worklist.js          rendering helpers and the version diff
+src/utils/worklist.js          rendering helpers and the sheet diff
 src/utils/validateWorklist.js  schema, publishing-rule and content-hash checks
-src/components/Worklist*.jsx   the Sheets page, problem drawer and Sync review
+src/components/Worklist*.jsx   the Sheets page, problem drawer and review panel
 src/components/Roadmap.jsx     the problem roadmap tree
 src/components/                Calendar, Problems, Stats, Recursion
 schemas/ fixtures/ docs/       the coaching contract

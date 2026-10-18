@@ -262,7 +262,8 @@ Before publishing:
 If you have no write-capable route to the data repository, return the files
 and state clearly that nothing was published.
 
-After publishing, the user presses **Sync** on the Sheets page. The app:
+After publishing, the app's background sync notices the change within about ten
+minutes and offers it for review on the Sheets page. The review:
 - reads the manifest and the current sheet at one commit
 - checks the rules above
 - shows the change: an update to the sheet the user follows, or a different

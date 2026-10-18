@@ -13,7 +13,7 @@ import ColdTestModal from './components/ColdTestModal'
 import SyncDock from './components/SyncDock'
 import { syncProblems } from './services/leetcode'
 import { backupIfConnected } from './utils/github'
-import { startAutoSync, subscribeSync } from './utils/autoSync'
+import { startAutoSync, subscribeSync, REVIEW_EVENT } from './utils/autoSync'
 import * as store from './store'
 
 // Study Plan and Today's Revision are intentionally not navigable while the
@@ -119,9 +119,15 @@ export default function App() {
 
   const count = Object.keys(problems).length
 
-  // Announced by the background check; accepting happens on the Worklist page.
+  // Announced by the background check; applying happens on the Sheets page.
   const [worklistAvailable, setWorklistAvailable] = useState(null)
+  const [reviewRequest, setReviewRequest] = useState(0)
   useEffect(() => subscribeSync(s => setWorklistAvailable(s.worklistAvailable)), [])
+  useEffect(() => {
+    const open = () => { setTab('Sheets'); setReviewRequest(n => n + 1) }
+    window.addEventListener(REVIEW_EVENT, open)
+    return () => window.removeEventListener(REVIEW_EVENT, open)
+  }, [])
 
   return (
     <div className="app">
@@ -190,6 +196,8 @@ export default function App() {
             problems={problems}
             practiceLog={practiceLog}
             onChanged={reload}
+            reviewRequest={reviewRequest}
+            onReviewOpened={() => setReviewRequest(0)}
           />
         )}
         {tab === 'Recursion' && <RecursionVisualizer />}

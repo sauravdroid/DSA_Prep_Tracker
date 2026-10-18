@@ -213,7 +213,7 @@ export default function SyncSettings({ onSyncComplete }) {
 
     // A prep sheet is never adopted without review, so a restore only brings
     // the facts back; the Sheets page offers the coach's latest to review.
-    setStatus(`Restored +${s.problemsAdded} problems, +${s.revisionsAdded} revisions, +${s.attemptsAdded} graded attempts. Open Sheets and Sync to review the coach's latest prep sheet.`)
+    setStatus(`Restored +${s.problemsAdded} problems, +${s.revisionsAdded} revisions, +${s.attemptsAdded} graded attempts. The Sheets page will offer the coach's latest prep sheet for review after the next background sync.`)
     onSyncComplete()
   })
 

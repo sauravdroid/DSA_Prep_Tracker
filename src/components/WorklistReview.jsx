@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { worklistPreview, backupIfConnected, getRepo } from '../utils/github'
+import { worklistPreview, getRepo } from '../utils/github'
 import { acceptWorklist } from '../utils/worklistStore'
 import { worklistAccepted } from '../utils/autoSync'
 import { diffWorklists, changesByList, attemptsSince, sheetName, normalizeManifest, LIST_LABEL } from '../utils/worklist'
@@ -30,8 +30,7 @@ function Check({ ok, warn, children }) {
  */
 export default function WorklistReview({ accepted, initialId, practiceLog, onManifest, onClose, onAccepted }) {
   const [shown, setShown] = useState(false)
-  const [phase, setPhase] = useState('publishing')
-  const [published, setPublished] = useState(null)
+  const [phase, setPhase] = useState('loading')
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -66,21 +65,9 @@ export default function WorklistReview({ accepted, initialId, practiceLog, onMan
     }
   }, [known, onManifest])
 
-  // Publish first, so the comparison with what the coach saw is honest.
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const r = await backupIfConnected()
-        if (!cancelled) setPublished(r.skipped ? { skipped: true } : { ok: true, commit: r.committed })
-      } catch (e) {
-        if (!cancelled) setPublished({ ok: false, error: e.message })
-      }
-      if (!cancelled) load(initialId)
-    })()
-    return () => { cancelled = true }
-    // Runs once when the panel opens; later loads come from picking a sheet.
-  }, [])
+  // Publishing your attempts is the background sync's job; the review only
+  // reads. Runs once when the panel opens; later loads come from picking a sheet.
+  useEffect(() => { load(initialId) }, [])
 
   const view = useMemo(() => {
     if (!result || result.empty || !result.manifest) return null
@@ -144,7 +131,7 @@ export default function WorklistReview({ accepted, initialId, practiceLog, onMan
       >
         <div className="flex-1 overflow-y-auto px-6 py-5">
           <div className="flex items-center gap-2.5 text-xs text-slate-500">
-            <span>Sync</span>
+            <span>Review</span>
             <span className="size-[3px] rounded-full bg-slate-300" aria-hidden="true" />
             <span className="truncate">{getRepo()}</span>
             <button
@@ -158,21 +145,8 @@ export default function WorklistReview({ accepted, initialId, practiceLog, onMan
             </button>
           </div>
 
-          {published && !published.skipped && (
-            <p className={`mt-3 text-xs ${published.ok ? 'text-slate-400' : 'text-amber-700'}`}>
-              {published.ok
-                ? `Your attempts are published${published.commit ? ` (${published.commit})` : ''}.`
-                : `Could not publish your attempts first: ${published.error}`}
-            </p>
-          )}
-          {published?.skipped && (
-            <p className="mt-3 text-xs text-amber-700">No GitHub token: connect one in Settings to sync.</p>
-          )}
-
-          {(phase === 'publishing' || phase === 'loading') && (
-            <p className="mt-8 text-sm text-slate-500">
-              {phase === 'publishing' ? 'Publishing your attempts…' : 'Reading the coach’s sheets…'}
-            </p>
+          {phase === 'loading' && (
+            <p className="mt-8 text-sm text-slate-500">Reading the coach’s sheets…</p>
           )}
 
           {phase === 'error' && (
