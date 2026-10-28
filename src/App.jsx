@@ -167,6 +167,7 @@ export default function App() {
             onRemoveRevision={handleRemoveRevision}
             onSyncMonth={handleSyncMonth}
             syncing={syncing}
+            onRecordAttempt={setGrading}
           />
         )}
         {tab === "Today's Revision" && (

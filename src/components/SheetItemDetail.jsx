@@ -1,4 +1,5 @@
 import { LIST_LABEL } from '../utils/worklist'
+import RecordAttemptButton from './RecordAttemptButton'
 
 const RESULT_TONE = { green: 'text-[#00b8a3]', yellow: 'text-[#d99a00]', red: 'text-[#ff375f]' }
 const HELP_LABEL = { none: 'unaided', hint: 'hint', solution: 'saw solution' }
@@ -24,25 +25,18 @@ export default function SheetItemDetail({ item, attempts, solvedOn, onRecord }) 
 
   return (
     <>
-      <div className="tw mt-4">
-        {solvedOn && (
-          <p className="mb-2 flex items-start gap-2 rounded-lg bg-[#effaf8] px-3 py-2 text-[13px] leading-snug text-slate-700">
-            <svg viewBox="0 0 16 16" className="mt-0.5 size-4 shrink-0" aria-hidden="true">
-              <path d="M3 8.4l3.3 3.3L13 4.8" stroke="#00b8a3" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>
-              <span className="font-semibold text-[#00897b]">Accepted on LeetCode {shortDate(solvedOn)}.</span>{' '}
-              Record how it went so the coach can judge it.
-            </span>
-          </p>
-        )}
-        <button
-          onClick={onRecord}
-          className="w-full rounded-lg bg-slate-900 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-        >
-          Record an attempt
-        </button>
-      </div>
+      {solvedOn && (
+        <p className="tw mt-4 flex items-start gap-2 rounded-lg bg-[#effaf8] px-3 py-2 text-[13px] leading-snug text-slate-700">
+          <svg viewBox="0 0 16 16" className="mt-0.5 size-4 shrink-0" aria-hidden="true">
+            <path d="M3 8.4l3.3 3.3L13 4.8" stroke="#00b8a3" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>
+            <span className="font-semibold text-[#00897b]">Accepted on LeetCode {shortDate(solvedOn)}.</span>{' '}
+            Record how it went so the coach can judge it.
+          </span>
+        </p>
+      )}
+      <RecordAttemptButton onClick={onRecord} className={solvedOn ? 'mt-2' : 'mt-4'} />
 
       <div className="tw mt-4 space-y-4 border-t border-slate-200 pt-4">
         <section>

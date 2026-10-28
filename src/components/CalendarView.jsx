@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { getPattern, getPatterns } from '../utils/patterns'
 import ProblemDetail from './ProblemDetail'
 import Drawer from './Drawer'
+import RecordAttemptButton from './RecordAttemptButton'
 import { useMediaQuery } from '../utils/useMediaQuery'
 import { toLocalDateStr, todayStr } from '../utils/dateUtils'
 import { getStartDate, getTodayRevisionList, saveTodayRevisionList } from '../store'
@@ -112,7 +113,7 @@ function exportWeekAsJSON(dates, problemsByDate, revisionsByDate, problems) {
   URL.revokeObjectURL(url)
 }
 
-export default function CalendarView({ problems, revisions, failures = [], onRemoveRevision, onSyncMonth, syncing }) {
+export default function CalendarView({ problems, revisions, failures = [], onRemoveRevision, onSyncMonth, syncing, onRecordAttempt }) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(todayStr())
   const [detailTab, setDetailTab] = useState('new')
@@ -380,6 +381,9 @@ export default function CalendarView({ problems, revisions, failures = [], onRem
           <button className="cal-detail-back" onClick={() => setSelectedProblem(null)}>← Back to list</button>
 
           <ProblemDetail problem={sp} revisions={revisions}>
+            {onRecordAttempt && (
+              <RecordAttemptButton onClick={() => onRecordAttempt(sp.slug)} className="mb-3" />
+            )}
             <button
               className={`add-rev-list-btn large ${revListSet.has(sp.slug) ? 'added' : ''}`}
               onClick={() => toggleRevList(sp.slug)}
