@@ -384,12 +384,6 @@ export default function CalendarView({ problems, revisions, failures = [], onRem
             {onRecordAttempt && (
               <RecordAttemptButton onClick={() => onRecordAttempt(sp.slug)} className="mb-3" />
             )}
-            <button
-              className={`add-rev-list-btn large ${revListSet.has(sp.slug) ? 'added' : ''}`}
-              onClick={() => toggleRevList(sp.slug)}
-            >
-              {revListSet.has(sp.slug) ? '✓ In Revision List' : '+ Add to Revision List'}
-            </button>
           </ProblemDetail>
         </div>
       ) : (
