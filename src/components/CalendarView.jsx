@@ -1,8 +1,13 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { getPattern, getPatterns } from '../utils/patterns'
 import ProblemDetail from './ProblemDetail'
+import Drawer from './Drawer'
+import { useMediaQuery } from '../utils/useMediaQuery'
 import { toLocalDateStr, todayStr } from '../utils/dateUtils'
 import { getStartDate, getTodayRevisionList, saveTodayRevisionList } from '../store'
+
+// Below this width the day details move into a drawer and the calendar takes the page.
+const COMPACT_QUERY = '(max-width: 1439px)'
 
 function exportDayAsJSON(date, newProblems, revisionProblems) {
   const items = []
@@ -116,6 +121,11 @@ export default function CalendarView({ problems, revisions, failures = [], onRem
   const [weekDrillDate, setWeekDrillDate] = useState(null) // date string for drill-down
   const [weekDrillDir, setWeekDrillDir] = useState(null) // 'open' | 'close'
   const [revListSlugs, setRevListSlugs] = useState(() => getTodayRevisionList().slugs)
+  const compact = useMediaQuery(COMPACT_QUERY)
+  const [dayOpen, setDayOpen] = useState(false)
+  // The drawer only exists in the compact layout; widening the window hands
+  // the day back to the side panel, and narrowing again starts closed.
+  useEffect(() => { setDayOpen(false) }, [compact])
 
   const revListSet = useMemo(() => new Set(revListSlugs), [revListSlugs])
 
@@ -279,207 +289,235 @@ export default function CalendarView({ problems, revisions, failures = [], onRem
     }
   }
 
-  return (
-    <div className="calendar-page">
-      {/* Details */}
-      <div className="cal-middle">
-        <div className="cal-panel-header">
-          <button className="day-nav-btn" onClick={() => shiftDay(-1)}>◀</button>
-          <h3 className="cal-panel-title">{selectedDate || 'Select a date'}</h3>
-          <button className="day-nav-btn" onClick={() => shiftDay(1)}>▶</button>
-          {selectedDate && (selectedHasSolved || selectedAttempts.length > 0) && (
-            <div className="cal-panel-progress">
-              {selectedNewProblems.length > 0 && <div className="cell-progress-new" style={{ flex: selectedNewProblems.length }}>{selectedNewProblems.length} new</div>}
-              {selectedRevisionProblems.length > 0 && <div className="cell-progress-rev" style={{ flex: selectedRevisionProblems.length }}>{selectedRevisionProblems.length} rev</div>}
-              {selectedAttempts.length > 0 && <div className="cell-progress-try" style={{ flex: selectedAttempts.length }}>{selectedAttempts.length} tried</div>}
-            </div>
-          )}
-        </div>
+  // Selecting a day lands on a tab that has something in it.
+  const openDay = (dateStr) => {
+    setSelectedDate(dateStr)
+    setSelectedProblem(null)
+    const counts = {
+      new: (problemsByDate[dateStr] || []).length,
+      revised: (revisionsByDate[dateStr] || []).length,
+      attempted: attemptList(dateStr).length,
+    }
+    if (!counts[detailTab]) {
+      const first = ['new', 'revised', 'attempted'].find(t => counts[t] > 0)
+      if (first) setDetailTab(first)
+    }
+    setDayOpen(compact)
+  }
 
-        <div className="detail-tabs">
-          <button
-            className={`detail-tab ${activeTab === 'new' ? 'active' : ''}`}
-            onClick={() => { setDetailTab('new'); setSelectedProblem(null) }}
-          >
-            New Solved
-            {selectedNewProblems.length > 0 && (
-              <span className="detail-tab-count">{selectedNewProblems.length}</span>
-            )}
-          </button>
-          <button
-            className={`detail-tab ${activeTab === 'revised' ? 'active' : ''}`}
-            onClick={() => { setDetailTab('revised'); setSelectedProblem(null) }}
-          >
-            Revised
-            {selectedRevisionProblems.length > 0 && (
-              <span className="detail-tab-count">{selectedRevisionProblems.length}</span>
-            )}
-          </button>
-          {selectedAttempts.length > 0 && (
-            <button
-              className={`detail-tab ${activeTab === 'attempted' ? 'active' : ''}`}
-              onClick={() => { setDetailTab('attempted'); setSelectedProblem(null) }}
-            >
-              Attempted
-              <span className="detail-tab-count">{selectedAttempts.length}</span>
-            </button>
-          )}
-          {selectedDate && (weekHasProblems || selectedNewProblems.length > 0 || selectedRevisionProblems.length > 0) && (
-            <div className="export-btn-group" style={{ marginLeft: 'auto' }}>
-              {(selectedNewProblems.length > 0 || selectedRevisionProblems.length > 0) && (
-                <button
-                  className="sp-export-btn has-label"
-                  title="Export this day as JSON"
-                  onClick={() => exportDayAsJSON(selectedDate, selectedNewProblems, selectedRevisionProblems)}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  Day
-                </button>
-              )}
-              {weekHasProblems && (
-                <button
-                  className="sp-export-btn has-label"
-                  title="Export this week (Mon–Sat) as JSON"
-                  onClick={() => exportWeekAsJSON(weekMonSat, problemsByDate, revisionsByDate, problems)}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  Week
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {sp ? (
-          /* Inline problem detail */
-          <div className="cal-inline-detail">
-            <button className="cal-detail-back" onClick={() => setSelectedProblem(null)}>← Back to list</button>
-
-            <ProblemDetail problem={sp} revisions={revisions}>
-              <button
-                className={`add-rev-list-btn large ${revListSet.has(sp.slug) ? 'added' : ''}`}
-                onClick={() => toggleRevList(sp.slug)}
-              >
-                {revListSet.has(sp.slug) ? '✓ In Revision List' : '+ Add to Revision List'}
-              </button>
-            </ProblemDetail>
+  const dayDetails = (
+    <>
+      <div className="cal-panel-header">
+        <button className="day-nav-btn" onClick={() => shiftDay(-1)}>◀</button>
+        <h3 className="cal-panel-title">{selectedDate || 'Select a date'}</h3>
+        <button className="day-nav-btn" onClick={() => shiftDay(1)}>▶</button>
+        {selectedDate && (selectedHasSolved || selectedAttempts.length > 0) && (
+          <div className="cal-panel-progress">
+            {selectedNewProblems.length > 0 && <div className="cell-progress-new" style={{ flex: selectedNewProblems.length }}>{selectedNewProblems.length} new</div>}
+            {selectedRevisionProblems.length > 0 && <div className="cell-progress-rev" style={{ flex: selectedRevisionProblems.length }}>{selectedRevisionProblems.length} rev</div>}
+            {selectedAttempts.length > 0 && <div className="cell-progress-try" style={{ flex: selectedAttempts.length }}>{selectedAttempts.length} tried</div>}
           </div>
-        ) : (
-          /* Problem list */
-          <div className="detail-list" key={activeTab}>
-            {activeTab === 'new' && (
-              groupedNew.length > 0 ? (
-                groupedNew.map(([pat, items]) => (
-                  <div key={pat} className="cal-pattern-group">
-                    <div className="cal-pattern-header">
-                      <span>{pat}</span>
-                      <span className="cal-pattern-count">{items.length}</span>
-                    </div>
-                    {items.map((p, idx) => (
-                      <button
-                        key={p.slug}
-                        className="problem-row"
-                        onClick={() => setSelectedProblem(p)}
-                      >
-                        <span className="problem-row-num">{idx + 1}</span>
-                        <span className="problem-title">{p.title}</span>
-                        <span className="problem-row-meta">
-                          {p.acRate != null && <span className="ac-rate">{Math.round(p.acRate)}%</span>}
-                          {(p.failedCount || 0) > 0 && <span className="fail-count">✗{p.failedCount}</span>}
-                          <span className={`difficulty-badge ${p.difficulty.toLowerCase()}`}>
-                            {p.difficulty}
-                          </span>
-                          <span
-                            className={`add-rev-list-icon ${revListSet.has(p.slug) ? 'added' : ''}`}
-                            onClick={(e) => { e.stopPropagation(); toggleRevList(p.slug) }}
-                            title={revListSet.has(p.slug) ? 'Remove from revision list' : 'Add to revision list'}
-                          >
-                            {revListSet.has(p.slug) ? '✓' : '+'}
-                          </span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ))
-              ) : (
-                <p className="empty-message">No new problems on this date.</p>
-              )
-            )}
+        )}
+      </div>
 
-            {activeTab === 'revised' && (
-              groupedRevised.length > 0 ? (
-                groupedRevised.map(([pat, items]) => (
-                  <div key={pat} className="cal-pattern-group">
-                    <div className="cal-pattern-header">
-                      <span>{pat}</span>
-                      <span className="cal-pattern-count">{items.length}</span>
-                    </div>
-                    {items.map((p, idx) => (
-                      <button
-                        key={p.slug}
-                        className="problem-row"
-                        onClick={() => setSelectedProblem(p)}
-                      >
-                        <span className="problem-row-num">{idx + 1}</span>
-                        <span className="problem-title">{p.title}</span>
-                        <span className="problem-row-meta">
-                          {p.acRate != null && <span className="ac-rate">{Math.round(p.acRate)}%</span>}
-                          {(p.failedCount || 0) > 0 && <span className="fail-count">✗{p.failedCount}</span>}
-                          <span className={`difficulty-badge ${p.difficulty.toLowerCase()}`}>
-                            {p.difficulty}
-                          </span>
-                          <span
-                            className={`add-rev-list-icon ${revListSet.has(p.slug) ? 'added' : ''}`}
-                            onClick={(e) => { e.stopPropagation(); toggleRevList(p.slug) }}
-                            title={revListSet.has(p.slug) ? 'Remove from revision list' : 'Add to revision list'}
-                          >
-                            {revListSet.has(p.slug) ? '✓' : '+'}
-                          </span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ))
-              ) : (
-                <p className="empty-message">No revisions on this date.</p>
-              )
+      <div className="detail-tabs">
+        <button
+          className={`detail-tab ${activeTab === 'new' ? 'active' : ''}`}
+          onClick={() => { setDetailTab('new'); setSelectedProblem(null) }}
+        >
+          New Solved
+          {selectedNewProblems.length > 0 && (
+            <span className="detail-tab-count">{selectedNewProblems.length}</span>
+          )}
+        </button>
+        <button
+          className={`detail-tab ${activeTab === 'revised' ? 'active' : ''}`}
+          onClick={() => { setDetailTab('revised'); setSelectedProblem(null) }}
+        >
+          Revised
+          {selectedRevisionProblems.length > 0 && (
+            <span className="detail-tab-count">{selectedRevisionProblems.length}</span>
+          )}
+        </button>
+        {selectedAttempts.length > 0 && (
+          <button
+            className={`detail-tab ${activeTab === 'attempted' ? 'active' : ''}`}
+            onClick={() => { setDetailTab('attempted'); setSelectedProblem(null) }}
+          >
+            Attempted
+            <span className="detail-tab-count">{selectedAttempts.length}</span>
+          </button>
+        )}
+        {selectedDate && (weekHasProblems || selectedNewProblems.length > 0 || selectedRevisionProblems.length > 0) && (
+          <div className="export-btn-group" style={{ marginLeft: 'auto' }}>
+            {(selectedNewProblems.length > 0 || selectedRevisionProblems.length > 0) && (
+              <button
+                className="sp-export-btn has-label"
+                title="Export this day as JSON"
+                onClick={() => exportDayAsJSON(selectedDate, selectedNewProblems, selectedRevisionProblems)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Day
+              </button>
             )}
-
-            {activeTab === 'attempted' && (
-              selectedAttempts.length > 0 ? (
-                <div className="cal-pattern-group">
-                  <div className="cal-pattern-header">
-                    <span>Failed submissions</span>
-                    <span className="cal-pattern-count">{selectedAttempts.reduce((s, a) => s + a.tries, 0)}</span>
-                  </div>
-                  {selectedAttempts.map((a, idx) => (
-                    <button
-                      key={a.slug}
-                      className="problem-row"
-                      onClick={() => a.problem && setSelectedProblem(a.problem)}
-                    >
-                      <span className="problem-row-num">{idx + 1}</span>
-                      <span className="problem-title">{a.problem?.title || a.slug}</span>
-                      <span className="problem-row-meta">
-                        <span className="fail-count">✗{a.tries}</span>
-                        {a.problem ? (
-                          <span className={`difficulty-badge ${a.problem.difficulty.toLowerCase()}`}>
-                            {a.problem.difficulty}
-                          </span>
-                        ) : (
-                          <span className="attempt-unsolved">not solved yet</span>
-                        )}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p className="empty-message">No failed submissions on this date.</p>
-              )
+            {weekHasProblems && (
+              <button
+                className="sp-export-btn has-label"
+                title="Export this week (Mon–Sat) as JSON"
+                onClick={() => exportWeekAsJSON(weekMonSat, problemsByDate, revisionsByDate, problems)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Week
+              </button>
             )}
           </div>
         )}
       </div>
+
+      {sp ? (
+        /* Inline problem detail */
+        <div className="cal-inline-detail">
+          <button className="cal-detail-back" onClick={() => setSelectedProblem(null)}>← Back to list</button>
+
+          <ProblemDetail problem={sp} revisions={revisions}>
+            <button
+              className={`add-rev-list-btn large ${revListSet.has(sp.slug) ? 'added' : ''}`}
+              onClick={() => toggleRevList(sp.slug)}
+            >
+              {revListSet.has(sp.slug) ? '✓ In Revision List' : '+ Add to Revision List'}
+            </button>
+          </ProblemDetail>
+        </div>
+      ) : (
+        /* Problem list */
+        <div className="detail-list" key={activeTab}>
+          {activeTab === 'new' && (
+            groupedNew.length > 0 ? (
+              groupedNew.map(([pat, items]) => (
+                <div key={pat} className="cal-pattern-group">
+                  <div className="cal-pattern-header">
+                    <span>{pat}</span>
+                    <span className="cal-pattern-count">{items.length}</span>
+                  </div>
+                  {items.map((p, idx) => (
+                    <button
+                      key={p.slug}
+                      className="problem-row"
+                      onClick={() => setSelectedProblem(p)}
+                    >
+                      <span className="problem-row-num">{idx + 1}</span>
+                      <span className="problem-title">{p.title}</span>
+                      <span className="problem-row-meta">
+                        {p.acRate != null && <span className="ac-rate">{Math.round(p.acRate)}%</span>}
+                        {(p.failedCount || 0) > 0 && <span className="fail-count">✗{p.failedCount}</span>}
+                        <span className={`difficulty-badge ${p.difficulty.toLowerCase()}`}>
+                          {p.difficulty}
+                        </span>
+                        <span
+                          className={`add-rev-list-icon ${revListSet.has(p.slug) ? 'added' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); toggleRevList(p.slug) }}
+                          title={revListSet.has(p.slug) ? 'Remove from revision list' : 'Add to revision list'}
+                        >
+                          {revListSet.has(p.slug) ? '✓' : '+'}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ))
+            ) : (
+              <p className="empty-message">No new problems on this date.</p>
+            )
+          )}
+
+          {activeTab === 'revised' && (
+            groupedRevised.length > 0 ? (
+              groupedRevised.map(([pat, items]) => (
+                <div key={pat} className="cal-pattern-group">
+                  <div className="cal-pattern-header">
+                    <span>{pat}</span>
+                    <span className="cal-pattern-count">{items.length}</span>
+                  </div>
+                  {items.map((p, idx) => (
+                    <button
+                      key={p.slug}
+                      className="problem-row"
+                      onClick={() => setSelectedProblem(p)}
+                    >
+                      <span className="problem-row-num">{idx + 1}</span>
+                      <span className="problem-title">{p.title}</span>
+                      <span className="problem-row-meta">
+                        {p.acRate != null && <span className="ac-rate">{Math.round(p.acRate)}%</span>}
+                        {(p.failedCount || 0) > 0 && <span className="fail-count">✗{p.failedCount}</span>}
+                        <span className={`difficulty-badge ${p.difficulty.toLowerCase()}`}>
+                          {p.difficulty}
+                        </span>
+                        <span
+                          className={`add-rev-list-icon ${revListSet.has(p.slug) ? 'added' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); toggleRevList(p.slug) }}
+                          title={revListSet.has(p.slug) ? 'Remove from revision list' : 'Add to revision list'}
+                        >
+                          {revListSet.has(p.slug) ? '✓' : '+'}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ))
+            ) : (
+              <p className="empty-message">No revisions on this date.</p>
+            )
+          )}
+
+          {activeTab === 'attempted' && (
+            selectedAttempts.length > 0 ? (
+              <div className="cal-pattern-group">
+                <div className="cal-pattern-header">
+                  <span>Failed submissions</span>
+                  <span className="cal-pattern-count">{selectedAttempts.reduce((s, a) => s + a.tries, 0)}</span>
+                </div>
+                {selectedAttempts.map((a, idx) => (
+                  <button
+                    key={a.slug}
+                    className="problem-row"
+                    onClick={() => a.problem && setSelectedProblem(a.problem)}
+                  >
+                    <span className="problem-row-num">{idx + 1}</span>
+                    <span className="problem-title">{a.problem?.title || a.slug}</span>
+                    <span className="problem-row-meta">
+                      <span className="fail-count">✗{a.tries}</span>
+                      {a.problem ? (
+                        <span className={`difficulty-badge ${a.problem.difficulty.toLowerCase()}`}>
+                          {a.problem.difficulty}
+                        </span>
+                      ) : (
+                        <span className="attempt-unsolved">not solved yet</span>
+                      )}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="empty-message">No failed submissions on this date.</p>
+            )
+          )}
+        </div>
+      )}
+    </>
+  )
+
+  return (
+    <div className={`calendar-page ${compact ? 'compact' : ''}`}>
+      {/* Details: a side panel, or a drawer when the window is narrow */}
+      {compact ? (
+        dayOpen && (
+          <Drawer onClose={() => setDayOpen(false)} label={`Details for ${selectedDate}`}>
+            <div className="cal-drawer-body">{dayDetails}</div>
+          </Drawer>
+        )
+      ) : (
+        <div className="cal-middle">{dayDetails}</div>
+      )}
 
       {/* Calendar */}
       <div className="cal-right">
@@ -586,7 +624,7 @@ export default function CalendarView({ problems, revisions, failures = [], onRem
                   <button
                     key={day}
                     className={`calendar-cell ${isToday ? 'today' : ''} ${isSelected && !isMissed && !isFuture ? 'selected' : ''} ${hasActivity ? 'active' : ''} ${attemptedOnly ? 'attempted' : ''} ${isFuture ? 'future' : ''} ${isPast && !isToday && dateStr >= startDate ? (hasSolved ? 'past-solved' : attemptedOnly ? 'past-attempted' : 'past-missed') : ''}`}
-                    onClick={() => { if (!isMissed && !isFuture) { setSelectedDate(dateStr); setSelectedProblem(null) } }}
+                    onClick={() => { if (!isMissed && !isFuture) openDay(dateStr) }}
                     style={isMissed || isFuture ? { cursor: 'default' } : undefined}
                   >
                     <span className="day-number">{day}</span>
@@ -637,14 +675,14 @@ export default function CalendarView({ problems, revisions, failures = [], onRem
                           return (
                           <span key={pat} className="cell-pat-wrap">
                             <span className="cell-pat" style={{ background: bg }}>
-                              <span className="cell-pat-count">{items.length}</span>{pat}
+                              <span className="cell-pat-count">{items.length}</span><span className="cell-pat-name">{pat}</span>
                             </span>
                             <span className="cell-pat-tooltip">
                               {items.map(p => (
                                 <span
                                   key={p.slug}
                                   className="tooltip-row clickable"
-                                  onClick={(e) => { e.stopPropagation(); setSelectedDate(dateStr); setSelectedProblem(problems[p.slug]); setDetailTab(p.isNew ? 'new' : 'revised') }}
+                                  onClick={(e) => { e.stopPropagation(); setSelectedDate(dateStr); setSelectedProblem(problems[p.slug]); setDetailTab(p.isNew ? 'new' : 'revised'); setDayOpen(compact) }}
                                 >
                                   <span className="tooltip-title">{p.title}</span>
                                   <span className="tooltip-tags">

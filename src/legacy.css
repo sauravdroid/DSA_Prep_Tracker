@@ -379,7 +379,7 @@ button {
 /* Calendar */
 .calendar-page {
   display: grid;
-  grid-template-columns: 65fr 35fr;
+  grid-template-columns: minmax(0, 65fr) minmax(0, 35fr);
   gap: 16px;
   align-items: stretch;
   height: calc(100vh - 120px);
@@ -499,6 +499,42 @@ button {
 .problem-row.active-row {
   background: var(--surface2);
   border-left: 2px solid var(--accent);
+}
+
+/* Narrow windows: the calendar takes the page and the day opens in a drawer. */
+.calendar-page.compact {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.cal-drawer-body .cal-panel-header {
+  margin-bottom: 14px;
+}
+
+@media (max-width: 760px) {
+  .calendar-page.compact {
+    height: auto;
+    min-height: calc(100vh - 120px);
+  }
+  .calendar-page.compact .cal-right {
+    padding: 8px;
+  }
+  .calendar-page.compact .calendar-cell {
+    min-height: 56px;
+    padding: 3px;
+  }
+  .calendar-page.compact .cell-patterns {
+    display: none;
+  }
+  .calendar-page.compact .day-number,
+  .calendar-page.compact .calendar-cell.past-missed::after {
+    font-size: 32px;
+  }
+  .calendar-page.compact .calendar-nav,
+  .calendar-page.compact .calendar-nav-center,
+  .calendar-page.compact .calendar-nav h3 {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 }
 
 /* Left panel - calendar */
@@ -659,7 +695,7 @@ button {
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 3px;
   flex: 1;
 }
@@ -685,6 +721,7 @@ button {
   transition: all 0.15s;
   padding: 4px 5px;
   min-height: 70px;
+  min-width: 0;
   text-align: left;
   position: relative;
 }
@@ -813,6 +850,13 @@ button {
 
 .cell-pat-wrap {
   position: relative;
+  min-width: 0;
+}
+
+.cell-pat-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cell-pat-wrap:hover .cell-pat-tooltip {
@@ -863,6 +907,13 @@ button {
   visibility: hidden;
   transition: opacity 0.15s, visibility 0.15s;
   transition-delay: 0ms;
+}
+
+/* Popups on the last two columns open leftwards so they never widen the page. */
+.calendar-grid > :nth-child(7n) .cell-pat-tooltip,
+.calendar-grid > :nth-child(7n - 1) .cell-pat-tooltip {
+  left: auto;
+  right: 0;
 }
 
 .tooltip-row {
